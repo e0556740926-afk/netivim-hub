@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --font-heebo: 'Heebo', system-ui, sans-serif;
+  --color-navy: #0D2744;
+  --color-blue: #00488D;
+  --color-light-blue: #DBEAFE;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&display=swap');
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: 'Heebo', system-ui, sans-serif;
+  background: #F0F4F8;
+  color: #0D2744;
+  direction: rtl;
+}
+
+input, textarea, select, button {
+  font-family: inherit;
+}
+
+::placeholder { color: #94A3B8; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pop {
+  0% { transform: scale(.9); opacity: 0; }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.fade-up { animation: fadeUp .25s ease; }
+.pop { animation: pop .35s ease; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #F0F4F8; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }

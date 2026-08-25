@@ -1,0 +1,2 @@
+"use client"
+export default function Page(){return <div className="p-6 md:p-8 fade-up"><h1 className="text-2xl font-extrabold text-[#0D2744] mb-3">הגדרות ומשתמשים</h1><div className="text-sm text-[#64748B]">עמוד זה בפיתוח</div></div>}
