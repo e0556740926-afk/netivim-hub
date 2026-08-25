@@ -7,7 +7,7 @@ import Image from "next/image"
 const nav = [
   { label:"מגדל פיקוח", path:"/admin/dashboard", dot:"#60A5FA" },
   { label:"יעדי לידים", path:"/admin/targets", dot:"#34D399" },
-  { label:"Leaderboard", path:"/admin/leaderboard", dot:"#FBBF24" },
+  { label:"לוח מובילים", path:"/admin/leaderboard", dot:"#FBBF24" },
   null,
   { label:"אנשי קשר", path:"/admin/contacts", dot:"#A78BFA" },
   { label:"אירועים", path:"/admin/events", dot:"#F472B6", badgeKey:"pending" },
