@@ -33,3 +33,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Neon skills
+.agents/
+agent/
+.claude/skills/
+skills-lock.json
