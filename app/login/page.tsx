@@ -20,8 +20,12 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     setGLoading(true)
-    // callbackUrl → after Google auth, NextAuth session hook redirects
-    signIn("google", { callbackUrl: "/" })
+    try {
+      await signIn("google", { callbackUrl: "/" })
+    } catch(e) {
+      // Fallback: navigate directly
+      window.location.href = "/api/auth/signin/google"
+    }
   }
 
   async function handleLogin() {
