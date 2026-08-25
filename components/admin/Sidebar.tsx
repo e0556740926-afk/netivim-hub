@@ -13,7 +13,7 @@ const nav = [
   { label:"אירועים", path:"/admin/events", dot:"#F472B6", badgeKey:"pending" },
   { label:"משימות", path:"/admin/tasks", dot:"#60A5FA", badgeKey:"late" },
   null,
-  { label:"דיווחים", path:"/admin/reports", dot:"#34D399", badgeKey:"missingReports" },
+  { label:"ניהול רכזים", path:"/admin/reports", dot:"#34D399", badgeKey:"missingReports" },
   { label:"פיננסים", path:"/admin/finance", dot:"#FBBF24" },
   { label:"הגדרות", path:"/admin/settings", dot:"#94A3B8" },
 ] as const
