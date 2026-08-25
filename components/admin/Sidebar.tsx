@@ -3,12 +3,14 @@ import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
 import Image from "next/image"
+import GlobalSearch from "./GlobalSearch"
 
 const nav = [
   { label:"מגדל פיקוח", path:"/admin/dashboard", dot:"#60A5FA" },
   { label:"יעדי לידים",  path:"/admin/targets",   dot:"#34D399" },
   { label:"לוח מובילים", path:"/admin/leaderboard",dot:"#FBBF24" },
   null,
+  { label:"לוח שנה",    path:"/admin/calendar",   dot:"#60A5FA" },
   { label:"אנשי קשר",   path:"/admin/contacts",   dot:"#A78BFA" },
   { label:"אירועים",    path:"/admin/events",     dot:"#F472B6", badgeKey:"pending" },
   { label:"משימות",     path:"/admin/tasks",      dot:"#60A5FA", badgeKey:"late" },
@@ -60,6 +62,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
+      <GlobalSearch/>
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5">
         {nav.map((n, i) => n === null

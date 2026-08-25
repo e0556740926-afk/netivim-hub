@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 
 export default function TargetsPage(){
+  const [loading, setLoading] = useState(true)
   const [rows,setRows]=useState<any[]>([])
   const [def,setDef]=useState(50)
   const m=new Date().getMonth()+1,y=new Date().getFullYear()

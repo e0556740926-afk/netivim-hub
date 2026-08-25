@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { fd, ds } from "@/lib/utils"
 import Card from "@/components/ui/Card"
+import ExportButton from "@/components/ui/ExportButton"
 import Button from "@/components/ui/Button"
 
 const TYPE_LABEL: Record<string,string> = {
@@ -26,6 +27,7 @@ const EMPTY_FORM = { name:"", org:"", role:"", phone:"", email:"", type:"partner
 const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summary:"", next_step:"" }
 
 export default function ContactsPage() {
+  const [loading, setLoading] = useState(true)
   const [contacts, setContacts] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [q, setQ] = useState("")
@@ -140,7 +142,7 @@ export default function ContactsPage() {
           <h1 className="text-2xl font-extrabold text-[#0D2744]">אנשי קשר ושותפים</h1>
           <div className="text-sm text-[#64748B] mt-0.5">{contacts.length} רשומות</div>
         </div>
-        <Button onClick={startAdd}>+ איש קשר חדש</Button>
+        <div className="flex gap-2"><ExportButton type="contacts"/><Button onClick={startAdd}>+ איש קשר חדש</Button></div>
       </div>
 
       {/* Add/Edit Form */}

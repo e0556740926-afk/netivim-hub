@@ -13,6 +13,7 @@ const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי
 
 export default function SettingsPage() {
   const { user: me } = useAuth()
+  const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -25,13 +26,14 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"" })
 
   async function load() {
+    setLoading(true)
     const [ur, cr] = await Promise.all([fetch("/api/users"), fetch("/api/targets")])
     const { users } = await ur.json()
     const { coordinators } = await cr.json()
     setUsers(users||[])
     setCoords(coordinators||[])
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
   async function openActivity(coord: any) {
     if (activeCoord?.id === coord.id) { setActiveCoord(null); setActivity(null); return }

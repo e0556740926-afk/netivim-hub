@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
 import Card from "@/components/ui/Card"
+import ExportButton from "@/components/ui/ExportButton"
 import Button from "@/components/ui/Button"
 
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
@@ -11,6 +12,7 @@ const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי
 const MTG_TYPE: Record<string,string> = { regular:"שגרתית", urgent:"חירום", goal:"מטרה מוגדרת" }
 
 export default function CoordManagementPage() {
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<"meetings"|"reports"|"tracking">("meetings")
   const [meetings, setMeetings] = useState<any[]>([])
   const [reports, setReports] = useState<any[]>([])
@@ -31,6 +33,7 @@ export default function CoordManagementPage() {
   const [openReport, setOpenReport] = useState<number|null>(null)
 
   async function load() {
+    setLoading(true)
     const [mr, rr, cr] = await Promise.all([
       fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")
     ])
@@ -41,7 +44,7 @@ export default function CoordManagementPage() {
     setReports(reports||[])
     setCoords(coordinators||[])
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
   async function extractTasks() {
     if (!mtgForm.summary.trim() || !mtgForm.coordinator_id) return
@@ -245,7 +248,7 @@ export default function CoordManagementPage() {
               <option value="">כל הרכזים</option>
               {(coordNames as string[]).map(n=><option key={n} value={n}>{n}</option>)}
             </select>
-            <span className="text-xs text-[#94A3B8]">{filteredReports.length} דיווחים</span>
+            <span className="text-xs text-[#94A3B8]">{filteredReports.length} דיווחים</span><ExportButton type="reports" label="ייצוא דיווחים"/>
           </div>
           <div className="space-y-3">
             {filteredReports.map((r:any) => (

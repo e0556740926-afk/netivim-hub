@@ -13,6 +13,7 @@ const COLS = [
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
 
 export default function TasksPage() {
+  const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
@@ -25,6 +26,7 @@ export default function TasksPage() {
   const today = new Date().toISOString().slice(0,10)
 
   async function load() {
+    setLoading(true)
     const [tr, cr, er, cor] = await Promise.all([
       fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/events"), fetch("/api/targets")
     ])
@@ -35,7 +37,7 @@ export default function TasksPage() {
     setTasks(tasks||[]); setContacts(contacts||[]); setEvents(events||[]); setCoords(coordinators||[])
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
   function startEdit(t: any) {
     setEditTask(t)

@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card"
 import Speedometer from "@/components/ui/Speedometer"
 
 export default function LeaderboardPage(){
+  const [loading, setLoading] = useState(true)
   const [board,setBoard]=useState<any[]>([])
   const [org,setOrg]=useState({actual:0,target:0})
   const MEDAL=["🥇","🥈","🥉"]

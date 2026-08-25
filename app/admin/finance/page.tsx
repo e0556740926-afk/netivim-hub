@@ -5,12 +5,14 @@ import Badge from "@/components/ui/Badge"
 import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 import KPICard from "@/components/ui/KPICard"
+import ExportButton from "@/components/ui/ExportButton"
 
 const CAT_LABEL: Record<string,string> = { equipment:"ציוד", marketing:"פרסום", catering:"כיבוד", venue:"מקום", other:"אחר" }
 const STATUS_LABEL: Record<string,string> = { paid:"שולם", pending:"ממתין", cancelled:"בוטל" }
 const SRC_CAT: Record<string,string> = { ministry:"משרד ממשלתי", municipality:"עירייה", foundation:"קרן", donation:"תרומה", self:"תקציב עצמי", other:"אחר" }
 
 export default function FinancePage() {
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<"expenses"|"sources">("expenses")
   const [expenses, setExpenses] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
@@ -27,6 +29,7 @@ export default function FinancePage() {
   const [srcForm, setSrcForm] = useState({ name:"", description:"", total_amount:0, used_amount:0, category:"ministry", year })
 
   async function load() {
+    setLoading(true)
     const [er, ev, sr] = await Promise.all([
       fetch("/api/expenses"), fetch("/api/events"), fetch(`/api/budget-sources?year=${year}`)
     ])
@@ -35,7 +38,7 @@ export default function FinancePage() {
     const { sources } = await sr.json()
     setExpenses(expenses||[]); setEvents(events||[]); setSources(sources||[])
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
   async function saveExp() {
     if (!expForm.description) return
@@ -90,7 +93,7 @@ export default function FinancePage() {
           </select>
           <span className="text-xs text-[#94A3B8] self-center">{filtered.length} הוצאות</span>
         </div>
-        <Button onClick={()=>{setEditEx(null);setExpForm({event_id:"",description:"",vendor:"",amount:0,date:new Date().toISOString().slice(0,10),status:"pending",category:"other"});setShowExpForm(true)}}>+ הוצאה חדשה</Button>
+        <ExportButton type="expenses"/><Button onClick={()=>{setEditEx(null);setExpForm({event_id:"",description:"",vendor:"",amount:0,date:new Date().toISOString().slice(0,10),status:"pending",category:"other"});setShowExpForm(true)}}>+ הוצאה חדשה</Button>
       </div>
 
       {showExpForm && <Card className="mb-4 border-2 border-[#00488D]"><div className="p-5">
