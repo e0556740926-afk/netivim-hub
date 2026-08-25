@@ -1,61 +1,53 @@
 "use client"
 import {useEffect,useState} from "react"
-import {createClient} from "@/lib/supabase/client"
 import {useAuth} from "@/lib/auth-context"
-import {currentYear,MONTH_HE} from "@/lib/utils"
 
 export default function CoordProfile(){
   const {user,logout}=useAuth()
-  const [myLeads,setMyLeads]=useState(0)
-  const [yearLeads,setYearLeads]=useState(0)
-  const [eventCount,setEventCount]=useState(0)
+  const [stats,setStats]=useState({month:0,year:0,events:0})
   const [report,setReport]=useState({achievements:"",challenges:"",leads_count:0,next_week_plan:""})
   const [sent,setSent]=useState(false)
   const [err,setErr]=useState("")
-  const sb=createClient()
-  const y=currentYear()
-  const now=new Date()
-  const week=Math.ceil((now.getDate()-now.getDay()+1)/7)
+  const y=new Date().getFullYear()
+  const week=Math.ceil(new Date().getDate()/7)
 
   useEffect(()=>{if(user)load()},[user])
 
   async function load(){
-    const c=await sb.from("coordinators").select("id").eq("user_id",user!.id).single()
-    if(!c.data) return
-    const cid=c.data.id
-    const[l,yl,e]=await Promise.all([
-      sb.from("leads").select("id").eq("coordinator_id",cid).gte("created_at",`${y}-${String(now.getMonth()+1).padStart(2,"0")}-01`),
-      sb.from("leads").select("id").eq("coordinator_id",cid).gte("created_at",`${y}-01-01`),
-      sb.from("events").select("id").eq("coordinator_id",cid)
-    ])
-    setMyLeads((l.data||[]).length)
-    setYearLeads((yl.data||[]).length)
-    setEventCount((e.data||[]).length)
+    const cRes=await fetch(`/api/coord?user_id=${user!.id}`)
+    const {coord}=await cRes.json()
+    if(!coord) return
+    const lRes=await fetch(`/api/leads?coordinator_id=${coord.id}`)
+    const {leads}=await lRes.json()
+    const m=new Date().getMonth()+1
+    setStats({
+      month:leads.filter((l:any)=>l.created_at?.slice(5,7)===String(m).padStart(2,"0")).length,
+      year:leads.length,
+      events:0
+    })
   }
 
   async function sendReport(){
     if(!report.achievements||!report.next_week_plan){setErr("יש למלא שדות חובה");return}
-    const c=await sb.from("coordinators").select("id").eq("user_id",user!.id).single()
-    if(!c.data) return
-    await sb.from("weekly_reports").insert({coordinator_id:c.data.id,week_start:new Date(now.setDate(now.getDate()-now.getDay()+1)).toISOString().slice(0,10),...report})
+    const cRes=await fetch(`/api/coord?user_id=${user!.id}`)
+    const {coord}=await cRes.json()
+    if(!coord) return
+    const d=new Date();const mon=new Date(d.setDate(d.getDate()-d.getDay()+1))
+    await fetch("/api/reports",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({coordinator_id:coord.id,week_start:mon.toISOString().slice(0,10),...report})})
     setSent(true)
   }
 
   return <div className="p-4 fade-up">
     <div className="flex items-center gap-3 mb-5">
       <div className="w-14 h-14 rounded-full bg-[#0D2744] text-white flex items-center justify-center text-base font-bold">{user?.name?.split(" ").map((w:string)=>w[0]).join("")}</div>
-      <div><div className="text-lg font-extrabold">{user?.name}</div><div className="text-sm text-[#64748B]">רכז שטח</div></div>
+      <div><div className="text-lg font-extrabold">{user?.name}</div><div className="text-sm text-[#64748B]">רכז שטח · {user?.area}</div></div>
       <button onClick={logout} className="mr-auto text-xs text-[#64748B] border border-[#E2E8F0] px-3 py-1.5 rounded-lg hover:bg-[#F8FAFC]">יציאה</button>
     </div>
-
-    {/* Stats */}
     <div className="grid grid-cols-3 gap-2.5 mb-5">
-      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{myLeads}</div><div className="text-xs text-[#64748B]">לידים החודש</div></div>
-      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{yearLeads}</div><div className="text-xs text-[#64748B]">לידים {y}</div></div>
-      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{eventCount}</div><div className="text-xs text-[#64748B]">אירועים</div></div>
+      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{stats.month}</div><div className="text-xs text-[#64748B]">לידים החודש</div></div>
+      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{stats.year}</div><div className="text-xs text-[#64748B]">לידים {y}</div></div>
+      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-3 text-center"><div className="text-xl font-extrabold">{stats.events}</div><div className="text-xs text-[#64748B]">אירועים</div></div>
     </div>
-
-    {/* Weekly Report */}
     {sent?<div className="bg-[#DCFCE7] rounded-[16px] p-6 text-center pop">
       <div className="text-4xl mb-2">✓</div>
       <div className="text-base font-extrabold text-[#166534]">כל הכבוד! הדיווח נשלח</div>
