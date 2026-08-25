@@ -1,5 +1,6 @@
 "use client"
 import { createContext, useContext, useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface User { id: number; name: string; email: string; role: string; status: string; phone?: string; area?: string }
 interface AuthCtx { user: User | null; loading: boolean; login: (email: string, password: string) => Promise<string | null>; logout: () => Promise<void> }

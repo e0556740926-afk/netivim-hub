@@ -2,6 +2,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
+import Image from "next/image"
 
 const nav = [
   { label:"מגדל פיקוח", path:"/admin/dashboard", dot:"#60A5FA" },
@@ -15,7 +16,7 @@ const nav = [
   { label:"דיווחים", path:"/admin/reports", dot:"#34D399", badgeKey:"missingReports" },
   { label:"פיננסים", path:"/admin/finance", dot:"#FBBF24" },
   { label:"הגדרות", path:"/admin/settings", dot:"#94A3B8" },
-]
+] as const
 
 export default function Sidebar() {
   const path = usePathname()
@@ -38,44 +39,52 @@ export default function Sidebar() {
       } catch {}
     }
     loadBadges()
-    const interval = setInterval(loadBadges, 60000)
-    return () => clearInterval(interval)
+    const i = setInterval(loadBadges, 60000)
+    return () => clearInterval(i)
   }, [])
 
-  return <aside className="w-[236px] flex-shrink-0 bg-white border-l border-[#E2E8F0] flex flex-col min-h-screen sticky top-0 h-screen overflow-y-auto">
-    <div className="p-4 border-b border-[#E2E8F0]">
-      <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-[10px] bg-[#0D2744] flex items-center justify-center text-white text-sm font-extrabold flex-shrink-0">נ</div>
-        <div><div className="text-sm font-bold text-[#0D2744]">נתיבים Hub</div><div className="text-xs text-[#64748B]">v2.5 Pro</div></div>
+  return (
+    <aside className="w-[220px] flex-shrink-0 bg-[#0D2744] flex flex-col min-h-screen sticky top-0 h-screen overflow-y-auto">
+      {/* Logo */}
+      <div className="px-5 py-4 border-b border-white/10">
+        <Image src="/netivim-logo.png" alt="נתיבים" width={130} height={42} className="brightness-0 invert" priority/>
+        <div className="text-[#60A5FA] text-[10px] font-medium mt-1.5 tracking-wide">מערכת ניהול שטח</div>
       </div>
-    </div>
-    <div className="text-xs font-bold text-[#94A3B8] tracking-widest px-4 py-3">ניווט ארגוני</div>
-    <nav className="flex-1 px-2 flex flex-col gap-0.5">
-      {nav.map((n,i) => n===null
-        ? <div key={i} className="h-px bg-[#F1F5F9] my-1.5"/>
-        : <div key={n.path} onClick={()=>router.push(n.path)}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[9px] cursor-pointer text-sm transition-colors ${path===n.path?"bg-[#F0F7FF] text-[#00488D] font-semibold":"text-[#475569] hover:bg-[#F8FAFC]"}`}>
-            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:n.dot}}/>
-            <span className="flex-1">{n.label}</span>
-            {n.badgeKey && badges[n.badgeKey] > 0 && (
-              <span className="w-5 h-5 rounded-full bg-[#960010] text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
-                {badges[n.badgeKey]}
-              </span>
-            )}
+
+      {/* Nav */}
+      <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5">
+        {nav.map((n, i) => n === null
+          ? <div key={i} className="h-px bg-white/10 my-1.5"/>
+          : <div key={n.path} onClick={() => router.push(n.path)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[9px] cursor-pointer text-sm transition-all ${
+                path===n.path
+                  ? "bg-white/15 text-white font-semibold"
+                  : "text-white/60 hover:bg-white/8 hover:text-white/90"
+              }`}>
+              <span className="w-2 h-2 rounded-sm flex-shrink-0 opacity-80" style={{background:n.dot}}/>
+              <span className="flex-1">{n.label}</span>
+              {"badgeKey" in n && badges[n.badgeKey] > 0 && (
+                <span className="w-5 h-5 rounded-full bg-[#960010] text-white text-[10px] flex items-center justify-center font-bold">
+                  {badges[n.badgeKey]}
+                </span>
+              )}
+            </div>
+        )}
+      </nav>
+
+      {/* User */}
+      <div className="p-3 border-t border-white/10">
+        <div className="flex items-center gap-2.5 p-2.5 bg-white/8 rounded-[10px]">
+          <div className="w-8 h-8 rounded-full bg-[#60A5FA] text-[#0D2744] flex items-center justify-center text-xs font-bold flex-shrink-0">
+            {user?.name?.split(" ").map((w:string) => w[0]).join("")}
           </div>
-      )}
-    </nav>
-    <div className="p-3 border-t border-[#E2E8F0]">
-      <div className="flex items-center gap-2.5 p-3 bg-[#F0F4F8] rounded-[11px]">
-        <div className="w-9 h-9 rounded-full bg-[#00488D] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-          {user?.name?.split(" ").map((w:string)=>w[0]).join("")}
+          <div className="flex-1 min-w-0">
+            <div className="text-white text-xs font-semibold truncate">{user?.name}</div>
+            <div className="text-white/50 text-[10px]">{user?.role==="admin"?"מנהל":user?.role==="coordinator"?"רכז":"צופה"}</div>
+          </div>
+          <button onClick={logout} className="text-white/40 hover:text-white/80 text-xs transition-colors">יציאה</button>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold truncate">{user?.name}</div>
-          <div className="text-xs text-[#64748B]">{user?.role==="admin"?"מנהל":user?.role==="coordinator"?"רכז":"צופה"}</div>
-        </div>
-        <button onClick={logout} className="text-xs text-[#64748B] hover:text-[#0D2744] transition-colors">יציאה</button>
       </div>
-    </div>
-  </aside>
+    </aside>
+  )
 }
