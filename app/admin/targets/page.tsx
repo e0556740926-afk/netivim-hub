@@ -28,7 +28,7 @@ export default function TargetsPage(){
 
   async function applyDefault(){await Promise.all(rows.map(r=>setTarget(r.coord_id,def)))}
 
-  return <div className="p-6 md:p-8 fade-up">
+  return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold text-[#0D2744] mb-1">הגדרת יעדי לידים</h1>
     <div className="text-sm text-[#64748B] mb-5">יעד חודשי ושנתי לכל רכז</div>
     <Card className="mb-4"><div className="p-4 flex items-center gap-4 flex-wrap">
@@ -37,11 +37,11 @@ export default function TargetsPage(){
       <Button onClick={applyDefault}>החל על כל הרכזים</Button>
     </div></Card>
     <Card>
-      <div className="grid grid-cols-[1.4fr_.8fr_1fr_1fr_.9fr_1.4fr] px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-xs font-bold text-[#64748B]">
+      <div className="hidden lg:grid grid-cols-[1.4fr_.8fr_1fr_1fr_.9fr_1.4fr] px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-xs font-bold text-[#64748B]">
         <div>רכז</div><div>אזור</div><div>יעד חודשי</div><div>שנתי</div><div>בוצע</div><div>%</div>
       </div>
       {rows.map(r=>{const p=pct(r.actual,r.monthly);const col=leadColor(p);return(
-        <div key={r.coord_id} className="grid grid-cols-[1.4fr_.8fr_1fr_1fr_.9fr_1.4fr] px-4 py-3 border-b border-[#F1F5F9] items-center last:border-b-0">
+        <div key={r.coord_id} className="hidden lg:grid grid-cols-[1.4fr_.8fr_1fr_1fr_.9fr_1.4fr] px-4 py-3 border-b border-[#F1F5F9] items-center last:border-b-0">
           <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold">{r.name.split(" ").map((w:string)=>w[0]).join("")}</div><div className="text-sm font-semibold">{r.name}</div></div>
           <div className="text-sm text-[#64748B]">{r.area}</div>
           <div><input value={r.monthly} onChange={e=>setTarget(r.coord_id,+e.target.value)} type="number" className="w-18 px-2 py-1.5 border border-[#CBD5E1] rounded-lg text-sm text-center focus:outline-none focus:border-[#00488D]"/></div>

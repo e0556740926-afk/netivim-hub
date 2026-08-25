@@ -77,7 +77,7 @@ export default function TasksPage() {
 
   const filtered = filterAssignee ? tasks.filter(t => t.assignees?.includes(filterAssignee)) : tasks
 
-  return <div className="p-6 md:p-8 fade-up">
+  return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <div className="flex items-center justify-between mb-5">
       <div><h1 className="text-2xl font-extrabold text-[#0D2744]">לוח משימות Kanban</h1>
         <div className="text-sm text-[#64748B] mt-0.5">{tasks.filter(t=>t.status!=="done").length} פתוחות · {tasks.filter(t=>t.status==="done").length} הושלמו</div>
@@ -94,7 +94,7 @@ export default function TasksPage() {
     {/* Form */}
     {showForm && <div className="bg-white border-2 border-[#00488D] rounded-[14px] p-5 mb-5">
       <div className="text-sm font-bold text-[#00488D] mb-4">{editTask?"עריכת משימה":"משימה חדשה"}</div>
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div className="col-span-2"><label className="text-xs font-semibold block mb-1">כותרת *</label>
           <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
         <div><label className="text-xs font-semibold block mb-1">סוג</label>
@@ -125,7 +125,7 @@ export default function TasksPage() {
     </div>}
 
     {/* Kanban */}
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       {COLS.map(col => {
         const colTasks = filtered.filter(t => t.status===col.key)
         return <div key={col.key} style={{background:col.bg,borderColor:col.border}} className="border rounded-[14px] p-3 min-h-[300px]">

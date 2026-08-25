@@ -21,9 +21,9 @@ export default function LeaderboardPage(){
     })
   },[])
 
-  return <div className="p-6 md:p-8 fade-up">
+  return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold mb-5">Leaderboard · לידים החודש</h1>
-    <div className="grid grid-cols-[240px_1fr] gap-5 mb-5">
+    <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5 mb-5">
       <Card className="p-5 flex flex-col items-center gap-3">
         <div className="text-sm font-bold">מד לידים ארגוני</div>
         <Speedometer actual={org.actual} target={org.target} size={160}/>

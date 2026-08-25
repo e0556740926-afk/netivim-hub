@@ -133,7 +133,7 @@ export default function ContactsPage() {
   const today = new Date().toISOString().slice(0,10)
 
   return (
-    <div className="p-6 md:p-8 fade-up">
+    <div className="p-4 md:p-6 lg:p-8 fade-up">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -148,7 +148,7 @@ export default function ContactsPage() {
         <Card className="mb-5 border-2 border-[#00488D]">
           <div className="p-5">
             <div className="text-sm font-bold text-[#00488D] mb-4">{editId ? "עריכת איש קשר" : "איש קשר חדש"}</div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="text-xs font-semibold block mb-1">שם *</label>
                 <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
@@ -245,7 +245,7 @@ export default function ContactsPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Interactions */}
               <div>
                 <div className="flex items-center justify-between mb-3">
@@ -357,8 +357,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Table */}
-      <Card>
-        <table className="w-full text-sm border-collapse">
+      <Card><div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
               <th className="px-3 py-2.5 text-right text-xs font-bold text-[#64748B]">שם</th>
@@ -410,8 +409,7 @@ export default function ContactsPage() {
               )
             })}
           </tbody>
-        </table>
-      </Card>
+        </table></div></Card>
     </div>
   )
 }

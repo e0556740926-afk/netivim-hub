@@ -42,3 +42,16 @@ input, textarea, select, button {
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: #F0F4F8; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+
+/* Responsive table wrapper */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Touch improvements */
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* Smooth scroll on mobile */
+html { scroll-behavior: smooth; }
+
+/* Better input on iOS */
+input, select, textarea { font-size: 16px; }
+@media (min-width: 640px) { input, select, textarea { font-size: 14px; } }

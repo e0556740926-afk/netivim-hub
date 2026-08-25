@@ -81,7 +81,7 @@ export default function Dashboard() {
       <div className="px-3 py-1.5 bg-[#DCFCE7] text-[#166534] text-sm font-semibold rounded-lg">{board.length} רכזים פעילים</div>
     </div>
 
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
       <KPICard label="אירועים פעילים" value={totalEvents} />
       <KPICard label="ניצול תקציב" value={`${budgetPct}%`} color={budgetPct > 90 ? "#960010" : budgetPct > 75 ? "#B45309" : "#0D2744"} />
       <KPICard label="משימות באיחור" value={lateTasks} color={lateTasks > 0 ? "#960010" : "#0D2744"} />
@@ -98,7 +98,7 @@ export default function Dashboard() {
       </div>
     </Card>}
 
-    <div className="grid grid-cols-[300px_1fr] gap-4 mb-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 mb-4">
       <Card className="p-5 flex flex-col items-center gap-3">
         <div className="text-sm font-bold self-start">מד לידים ארגוני</div>
         <Speedometer actual={orgLeads} target={orgTarget} size={170} />
@@ -123,7 +123,7 @@ export default function Dashboard() {
       </Card>
     </div>
 
-    <div className="grid grid-cols-[1fr_320px] gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
       <Card className="p-5">
         <div className="text-sm font-bold mb-4">רדאר אירועים · הקרובים</div>
         <div className="space-y-2.5">

@@ -37,7 +37,7 @@ export default function CoordProfile(){
     setSent(true)
   }
 
-  return <div className="p-4 fade-up">
+  return <div className="p-4 max-w-2xl mx-auto fade-up">
     <div className="flex items-center gap-3 mb-5">
       <div className="w-14 h-14 rounded-full bg-[#0D2744] text-white flex items-center justify-center text-base font-bold">{user?.name?.split(" ").map((w:string)=>w[0]).join("")}</div>
       <div><div className="text-lg font-extrabold">{user?.name}</div><div className="text-sm text-[#64748B]">רכז שטח · {user?.area}</div></div>

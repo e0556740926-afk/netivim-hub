@@ -63,11 +63,11 @@ export default function FinancePage() {
   const pending = expenses.filter(e=>e.status==="pending").reduce((s:number,e:any)=>s+(+e.amount||0),0)
   const pct = totBudget>0?Math.round(totSpent/totBudget*100):0
 
-  return <div className="p-6 md:p-8 fade-up">
+  return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold text-[#0D2744] mb-5">מרכז פיננסי</h1>
 
     {/* KPIs */}
-    <div className="grid grid-cols-4 gap-3 mb-5">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
       <KPICard label="תקציב מאושר (סעיפים)" value={`₪${totBudget.toLocaleString()}`}/>
       <KPICard label="הוצאות בפועל" value={`₪${totSpent.toLocaleString()}`} color={pct>90?"#960010":pct>75?"#B45309":"#0D2744"}/>
       <KPICard label="יתרה" value={`₪${(totBudget-totSpent).toLocaleString()}`} color={totBudget-totSpent<0?"#960010":"#166534"}/>
@@ -95,7 +95,7 @@ export default function FinancePage() {
 
       {showExpForm && <Card className="mb-4 border-2 border-[#00488D]"><div className="p-5">
         <div className="text-sm font-bold text-[#00488D] mb-4">{editEx?"עריכת הוצאה":"הוצאה חדשה"}</div>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div><label className="text-xs font-semibold block mb-1">תיאור *</label><input value={expForm.description} onChange={e=>setExpForm(f=>({...f,description:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
           <div><label className="text-xs font-semibold block mb-1">ספק</label><input value={expForm.vendor} onChange={e=>setExpForm(f=>({...f,vendor:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
           <div><label className="text-xs font-semibold block mb-1">אירוע</label>
@@ -151,7 +151,7 @@ export default function FinancePage() {
 
       {showSrcForm && <Card className="mb-4 border-2 border-[#00488D]"><div className="p-5">
         <div className="text-sm font-bold text-[#00488D] mb-4">{editSrc?"עריכת סעיף":"סעיף תקציב חדש"}</div>
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           <div><label className="text-xs font-semibold block mb-1">שם הסעיף *</label><input value={srcForm.name} onChange={e=>setSrcForm(f=>({...f,name:e.target.value}))} placeholder="לדוגמה: משרד החינוך 2026" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
           <div><label className="text-xs font-semibold block mb-1">מקור מימון</label>
             <select value={srcForm.category} onChange={e=>setSrcForm(f=>({...f,category:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">

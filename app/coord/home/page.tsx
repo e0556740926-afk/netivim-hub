@@ -61,7 +61,7 @@ export default function CoordHome() {
     setTasks(t => t.filter(x => x.id !== id))
   }
 
-  return <div className="p-4">
+  return <div className="p-4 max-w-2xl mx-auto">
     <div className="text-xl font-extrabold mb-0.5">שלום {user?.name?.split(" ")[0]},</div>
     <div className="text-sm text-[#64748B] mb-4">יש לך {tasks.length} משימות פתוחות</div>
 

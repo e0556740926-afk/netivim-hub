@@ -52,7 +52,7 @@ export default function CoordLeads(){
 
   const p=pct(myLeads,target)
 
-  return <div className="p-4 fade-up">
+  return <div className="p-4 max-w-2xl mx-auto fade-up">
     <div className="text-xl font-extrabold mb-3">הלידים שלי</div>
     <div className="bg-white border border-[#E2E8F0] rounded-[18px] p-4 text-center mb-3">
       <div className="flex justify-center mb-3"><Speedometer actual={myLeads} target={target} size={150}/></div>

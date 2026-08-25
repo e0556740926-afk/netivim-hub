@@ -37,14 +37,14 @@ export default function EventsPage(){
 
   const filtered=events.filter(e=>!filter||e.status===filter)
 
-  return <div className="p-6 md:p-8 fade-up">
+  return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <div className="flex items-center justify-between mb-5">
       <h1 className="text-2xl font-extrabold text-[#0D2744]">ניהול אירועים</h1>
       <Button onClick={()=>setShowForm(true)}>+ אירוע חדש</Button>
     </div>
     {showForm&&<Card className="mb-4 border-2 border-[#00488D]"><div className="p-4">
       <div className="text-sm font-bold text-[#00488D] mb-3">אירוע חדש</div>
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <div><label className="text-xs font-semibold block mb-1">שם *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
         <div><label className="text-xs font-semibold block mb-1">מיקום</label><input value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
         <div><label className="text-xs font-semibold block mb-1">תאריך</label><input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
