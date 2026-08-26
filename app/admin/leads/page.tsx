@@ -36,11 +36,20 @@ export default function AdminLeads() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [lr, cr] = await Promise.all([fetch("/api/leads"), fetch("/api/targets")])
+      const [lr, cr, ur] = await Promise.all([
+        fetch("/api/leads"), fetch("/api/targets"), fetch("/api/users/assignees")
+      ])
       const { leads } = await lr.json()
       const { coordinators } = await cr.json()
+      const { managers } = await ur.json()
       setLeads(leads||[])
-      setCoords(coordinators||[])
+      // All people who can be assigned a lead
+      const allCoords = [
+        ...coordinators,
+        ...(managers||[]).filter((m:any)=>!coordinators.find((c:any)=>c.name===m.name))
+          .map((m:any)=>({...m, name:m.name+" 👑"}))
+      ]
+      setCoords(allCoords)
     } catch { setError(true) }
     finally { setLoading(false) }
   }
