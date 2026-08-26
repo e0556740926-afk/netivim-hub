@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
+import CalendarPopup from "@/components/ui/CalendarPopup"
 
 const MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"]
 const DAYS_HE = ["א","ב","ג","ד","ה","ו","ש"]
@@ -20,7 +21,6 @@ export default function CoordCalendar() {
   const [now, setNow] = useState(new Date())
   const [selected, setSelected] = useState<string|null>(null)
   const [calToken, setCalToken] = useState("")
-  const [copied, setCopied] = useState(false)
   const [coord, setCoord] = useState<any>(null)
 
   useEffect(() => {
@@ -70,51 +70,12 @@ export default function CoordCalendar() {
     tasks: tasks.filter(t => t.due_date?.slice(0,10) === selected && t.status !== "done")
   } : null
 
-  const icsUrl = calToken && typeof window !== "undefined"
-    ? `${window.location.origin}/api/calendar.ics/${calToken}` : ""
-  const googleUrl = icsUrl
-    ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icsUrl)}` : ""
-
-  async function copyLink() {
-    if (!icsUrl) return
-    await navigator.clipboard.writeText(icsUrl)
-    setCopied(true); setTimeout(() => setCopied(false), 2500)
-  }
-
-  return (
+    return (
     <div className="p-4 pb-6 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="text-xl font-extrabold mb-3">לוח שנה</div>
-
-      {/* Google Calendar connection */}
-      <div className="bg-[#0D2744] rounded-[16px] p-4 mb-4">
-        <div className="text-white text-sm font-bold mb-1">📅 חיבור ליומן Google</div>
-        <div className="text-[#60A5FA] text-xs mb-3">האירועים והמשימות שלך יופיעו ביומן שלך אוטומטית</div>
-        <div className="flex gap-2 mb-3">
-          <a href={googleUrl} target="_blank"
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 bg-white rounded-[10px] text-xs font-bold text-[#0D2744] hover:bg-[#F0F7FF] transition-colors ${!googleUrl?"opacity-50 pointer-events-none":""}`}>
-            <svg width="14" height="14" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            הוסף ל-Google Calendar
-          </a>
-        </div>
-        {/* Copy link section */}
-        <div className="bg-white/10 rounded-[10px] p-3">
-          <div className="text-white/70 text-[10px] mb-1.5">הלינק האישי שלך (לשימוש ב-Apple / Outlook / יומן אחר)</div>
-          <div className="flex gap-2">
-            <div className="flex-1 bg-white/10 rounded-[8px] px-2.5 py-1.5 text-[10px] text-white/60 font-mono truncate">
-              {icsUrl || "טוען..."}
-            </div>
-            <button onClick={copyLink}
-              className="flex-shrink-0 px-3 py-1.5 bg-[#60A5FA] text-[#0D2744] text-xs font-bold rounded-[8px] hover:bg-[#93C5FD] transition-colors">
-              {copied ? "✓ הועתק" : "העתק"}
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xl font-extrabold">לוח שנה</div>
+        <CalendarPopup token={calToken}/>
       </div>
 
       {/* Month navigation */}
