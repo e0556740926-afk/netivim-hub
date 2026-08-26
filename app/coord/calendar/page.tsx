@@ -70,7 +70,7 @@ export default function CoordCalendar() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-xl font-extrabold">לוח שנה</div>
-        <CalendarPopup coordId={coord?.id}/>
+        <CalendarPopup token={calToken} label="לינק יומן"/>
       </div>
 
       {/* Month navigation */}
