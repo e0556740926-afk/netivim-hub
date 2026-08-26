@@ -27,14 +27,19 @@ export default function TasksPage() {
 
   async function load() {
     setLoading(true)
-    const [tr, cr, er, cor] = await Promise.all([
-      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/events"), fetch("/api/targets")
+    const [tr, cr, er, ua] = await Promise.all([
+      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/events"), fetch("/api/users/all")
     ])
     const { tasks } = await tr.json()
     const { contacts } = await cr.json()
     const { events } = await er.json()
-    const { coordinators } = await cor.json()
-    setTasks(tasks||[]); setContacts(contacts||[]); setEvents(events||[]); setCoords(coordinators||[])
+    const { coordinators, admins } = await ua.json()
+    const allPeople = [
+      ...(coordinators||[]).map((c:any) => ({...c, _isManager: false})),
+      ...(admins||[]).filter((a:any) => !(coordinators||[]).find((c:any) => c.name===a.name))
+        .map((a:any) => ({...a, _isManager: true}))
+    ]
+    setTasks(tasks||[]); setContacts(contacts||[]); setEvents(events||[]); setCoords(allPeople)
   }
 
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
@@ -86,8 +91,9 @@ export default function TasksPage() {
       </div>
       <div className="flex gap-2">
         <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="px-3 py-2 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-          <option value="">כל הרכזים</option>
-          {coords.map((c:any)=><option key={c.id} value={c.name}>{c.name}</option>)}
+          <option value="">כל המשתמשים</option>
+          <optgroup label="רכזים">{coords.filter((c:any)=>!c._isManager).map((c:any)=><option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>
+          <optgroup label="מנהלים">{coords.filter((c:any)=>c._isManager).map((c:any)=><option key={c.id} value={c.name}>👑 {c.name}</option>)}</optgroup>
         </select>
         <Button onClick={startAdd}>+ משימה חדשה</Button>
       </div>
@@ -115,11 +121,20 @@ export default function TasksPage() {
             {events.map((e:any)=><option key={e.id} value={e.id}>{e.name}</option>)}
           </select></div>
       </div>
-      <div className="mb-3"><label className="text-xs font-semibold block mb-1">שיוך רכזים</label>
+      <div className="mb-3"><label className="text-xs font-semibold block mb-1">שיוך משתמשים</label>
         <div className="flex flex-wrap gap-2">
-          {coords.map((c:any)=><label key={c.id} className="flex items-center gap-1.5 text-sm cursor-pointer">
-            <input type="checkbox" checked={form.assignees.includes(c.name)} onChange={()=>toggleAssignee(c.name)} className="accent-[#00488D]"/>{c.name}
-          </label>)}
+          {coords.map((c:any)=>(
+            <label key={`${c.id}-${c._isManager}`}
+              className={`flex items-center gap-1.5 text-xs cursor-pointer border rounded-[8px] px-2.5 py-1.5 select-none transition-colors ${
+                form.assignees.includes(c.name)
+                  ? c._isManager ? "bg-[#EDE9FE] border-[#C4B5FD] text-[#5B21B6]" : "bg-[#DBEAFE] border-[#BFDBFE] text-[#1E40AF]"
+                  : "bg-white border-[#E2E8F0] text-[#374151] hover:bg-[#F8FAFC]"
+              }`}>
+              <input type="checkbox" checked={form.assignees.includes(c.name)} onChange={()=>toggleAssignee(c.name)} className="w-3 h-3" style={{accentColor: c._isManager?"#5B21B6":"#00488D"}}/>
+              {c._isManager && <span>👑</span>}
+              <span>{c.name}</span>
+            </label>
+          ))}
         </div></div>
       <div className="mb-3"><label className="text-xs font-semibold block mb-1">הערות</label>
         <input value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
