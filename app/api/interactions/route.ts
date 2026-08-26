@@ -16,3 +16,13 @@ export async function DELETE(req: NextRequest) {
   await sql`DELETE FROM interactions WHERE id=${id}`;
   return NextResponse.json({ ok: true });
 }
+export async function PATCH(req: NextRequest) {
+  const d = await req.json();
+  await sql`UPDATE interactions SET
+    date=${d.date},
+    type=${d.type},
+    summary=${d.summary||''},
+    next_step=${d.next_step||''}
+    WHERE id=${d.id}`;
+  return NextResponse.json({ ok: true });
+}

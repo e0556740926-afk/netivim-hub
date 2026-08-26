@@ -25,14 +25,20 @@ export default function CoordTasks() {
   const today = new Date().toISOString().slice(0,10)
 
   async function load() {
-    const [tr, cr, cor, er] = await Promise.all([
-      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/targets"), fetch("/api/events")
+    const [tr, cr, cor, er, ur] = await Promise.all([
+      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/targets"),
+      fetch("/api/events"), fetch("/api/users/assignees")
     ])
     const { tasks } = await tr.json()
     const { contacts } = await cr.json()
     const { coordinators } = await cor.json()
     const { events } = await er.json()
-    setTasks(tasks||[]); setContacts(contacts||[]); setCoords(coordinators||[]); setEvents(events||[])
+    const { managers } = await ur.json()
+    const allPeople = [
+      ...coordinators,
+      ...(managers||[]).map((m:any)=>({...m, name:m.name+" 👑"}))
+    ]
+    setTasks(tasks||[]); setContacts(contacts||[]); setCoords(allPeople); setEvents(events||[])
   }
   useEffect(() => { load() }, [])
 
