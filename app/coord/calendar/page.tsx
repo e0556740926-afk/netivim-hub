@@ -21,6 +21,7 @@ export default function CoordCalendar() {
   const [now, setNow] = useState(new Date())
   const [selected, setSelected] = useState<string|null>(null)
   const [coord, setCoord] = useState<any>(null)
+  const [calToken, setCalToken] = useState("")
 
   useEffect(() => {
     if (!user) return
