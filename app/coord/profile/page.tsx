@@ -20,7 +20,12 @@ export default function CoordProfile() {
   useEffect(() => { if (user) { load(); loadCalToken() } }, [user])
 
   async function loadCalToken() {
-    const res = await fetch(`/api/calendar-token?user_id=${user!.id}`)
+    const cRes2 = await fetch(`/api/coord?user_id=${user!.id}`)
+    const { coord: cData } = await cRes2.json()
+    const tokenParams = new URLSearchParams()
+    if (cData?.id) tokenParams.set("coordinator_id", String(cData.id))
+    else if (user!.email) tokenParams.set("email", user!.email)
+    const res = await fetch(`/api/calendar-token?${tokenParams}`)
     const d = await res.json()
     setCalToken(d.token||"")
   }
