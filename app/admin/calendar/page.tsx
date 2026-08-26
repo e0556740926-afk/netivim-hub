@@ -13,11 +13,11 @@ const STATUS_COLORS: Record<string,string> = {
 
 export default function CalendarPage() {
   const { user } = useAuth()
-
-    const [events, setEvents] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [now, setNow] = useState(new Date())
   const [selected, setSelected] = useState<string|null>(null)
+  const [adminToken, setAdminToken] = useState("")
   const router = useRouter()
 
   useEffect(()=>{
@@ -26,6 +26,15 @@ export default function CalendarPage() {
       setEvents(events||[]); setTasks(tasks||[])
     })
   },[])
+
+  useEffect(()=>{
+    if (!user) return
+    const params = new URLSearchParams()
+    if (user.id && user.id !== 0) params.set("user_id", String(user.id))
+    if (user.email) params.set("email", user.email)
+    fetch(`/api/calendar-token?${params}`)
+      .then(r=>r.json()).then(d=>setAdminToken(d.token||"")).catch(()=>{})
+  },[user])
 
   const year=now.getFullYear(), month=now.getMonth()
   const firstDay=new Date(year,month,1).getDay()
@@ -57,6 +66,7 @@ export default function CalendarPage() {
         <div className="text-base font-bold min-w-[140px] text-center">{MONTHS[month]} {year}</div>
         <button onClick={()=>setNow(new Date(year,month+1,1))} className="w-8 h-8 rounded-[8px] border border-[#E2E8F0] hover:bg-[#F0F7FF] flex items-center justify-center text-[#64748B]">‹</button>
         <button onClick={()=>setNow(new Date())} className="px-3 py-1.5 text-xs border border-[#E2E8F0] rounded-[8px] hover:bg-[#F0F7FF]">היום</button>
+        <CalendarPopup token={adminToken} label="לינק יומן"/>
       </div>
     </div>
 
