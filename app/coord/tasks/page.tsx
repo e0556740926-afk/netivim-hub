@@ -113,10 +113,17 @@ export default function CoordTasks() {
         <div>
           <div className="text-xs font-semibold mb-1.5">שיוך רכזים</div>
           <div className="flex flex-wrap gap-2">
-            {coords.map((c:any)=><label key={c.id} className="flex items-center gap-1.5 text-xs cursor-pointer">
-              <input type="checkbox" checked={form.assignees.includes(c.name)} onChange={()=>toggleAssignee(c.name)} className="accent-[#00488D]"/>
-              {c.name}
-            </label>)}
+            {coords.map((c:any)=>(
+            <label key={`${c.id}-${c._isManager}`}
+              className={`flex items-center gap-1.5 text-xs cursor-pointer border rounded-[8px] px-2.5 py-1 select-none transition-colors ${
+                form.assignees.includes(c.name)
+                  ? c._isManager?"bg-[#EDE9FE] border-[#C4B5FD] text-[#5B21B6]":"bg-[#DBEAFE] border-[#BFDBFE] text-[#1E40AF]"
+                  : "bg-white border-[#E2E8F0]"
+              }`}>
+              <input type="checkbox" checked={form.assignees.includes(c.name)} onChange={()=>toggleAssignee(c.name)} className="w-3 h-3" style={{accentColor:c._isManager?"#5B21B6":"#00488D"}}/>
+              {c._isManager && "👑"} {c.name}
+            </label>
+          ))}
           </div>
         </div>
         <div className="flex gap-2 pt-1">
