@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { randomBytes } from "crypto";
+
+function makeToken() {
+  return randomBytes(24).toString("hex");
+}
 
 async function ensureColumns() {
   try {
@@ -9,40 +14,46 @@ async function ensureColumns() {
 }
 
 export async function GET(req: NextRequest) {
-  const userId = req.nextUrl.searchParams.get("user_id");
-  const coordId = req.nextUrl.searchParams.get("coordinator_id");
-  const email = req.nextUrl.searchParams.get("email");
+  const coordId  = req.nextUrl.searchParams.get("coordinator_id");
+  const email    = req.nextUrl.searchParams.get("email");
+  const userId   = req.nextUrl.searchParams.get("user_id");
 
   await ensureColumns();
 
-  // By coordinator_id
+  // ── By coordinator_id ──────────────────────────────────────────
   if (coordId && coordId !== "0") {
-    let rows = await sql`SELECT calendar_token FROM coordinators WHERE id=${parseInt(coordId)} LIMIT 1`;
-    if (!rows[0]?.calendar_token) {
-      await sql`UPDATE coordinators SET calendar_token=encode(gen_random_bytes(24),'hex') WHERE id=${parseInt(coordId)}`;
-      rows = await sql`SELECT calendar_token FROM coordinators WHERE id=${parseInt(coordId)} LIMIT 1`;
+    const rows = await sql`SELECT id, calendar_token FROM coordinators WHERE id=${parseInt(coordId)} LIMIT 1`;
+    if (!rows.length) return NextResponse.json({ token: null });
+    if (!rows[0].calendar_token) {
+      const t = makeToken();
+      await sql`UPDATE coordinators SET calendar_token=${t} WHERE id=${parseInt(coordId)}`;
+      return NextResponse.json({ token: t });
     }
-    return NextResponse.json({ token: rows[0]?.calendar_token || null });
+    return NextResponse.json({ token: rows[0].calendar_token });
   }
 
-  // By email
+  // ── By email ───────────────────────────────────────────────────
   if (email) {
-    let rows = await sql`SELECT calendar_token FROM users WHERE email=${email} LIMIT 1`;
-    if (!rows[0]?.calendar_token) {
-      await sql`UPDATE users SET calendar_token=encode(gen_random_bytes(24),'hex') WHERE email=${email}`;
-      rows = await sql`SELECT calendar_token FROM users WHERE email=${email} LIMIT 1`;
+    const rows = await sql`SELECT id, calendar_token FROM users WHERE email=${email} LIMIT 1`;
+    if (!rows.length) return NextResponse.json({ token: null });
+    if (!rows[0].calendar_token) {
+      const t = makeToken();
+      await sql`UPDATE users SET calendar_token=${t} WHERE email=${email}`;
+      return NextResponse.json({ token: t });
     }
-    return NextResponse.json({ token: rows[0]?.calendar_token || null });
+    return NextResponse.json({ token: rows[0].calendar_token });
   }
 
-  // By user_id (only if not 0)
+  // ── By user_id ─────────────────────────────────────────────────
   if (userId && userId !== "0") {
-    let rows = await sql`SELECT calendar_token FROM users WHERE id=${parseInt(userId)} LIMIT 1`;
-    if (!rows[0]?.calendar_token) {
-      await sql`UPDATE users SET calendar_token=encode(gen_random_bytes(24),'hex') WHERE id=${parseInt(userId)}`;
-      rows = await sql`SELECT calendar_token FROM users WHERE id=${parseInt(userId)} LIMIT 1`;
+    const rows = await sql`SELECT id, calendar_token FROM users WHERE id=${parseInt(userId)} LIMIT 1`;
+    if (!rows.length) return NextResponse.json({ token: null });
+    if (!rows[0].calendar_token) {
+      const t = makeToken();
+      await sql`UPDATE users SET calendar_token=${t} WHERE id=${parseInt(userId)}`;
+      return NextResponse.json({ token: t });
     }
-    return NextResponse.json({ token: rows[0]?.calendar_token || null });
+    return NextResponse.json({ token: rows[0].calendar_token });
   }
 
   return NextResponse.json({ token: null });
