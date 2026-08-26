@@ -12,26 +12,9 @@ const STATUS_COLORS: Record<string,string> = {
 }
 
 export default function CalendarPage() {
-  const [adminToken, setAdminToken] = useState("")
-  const [copied, setCopied] = useState(false)
   const { user } = useAuth()
 
-  useEffect(()=>{
-    if (!user?.id) return
-    fetch(`/api/calendar-token?user_id=${user.id}`).then(r=>r.json()).then(d=>setAdminToken(d.token||"")).catch(()=>{})
-  },[user])
-
-  const origin = typeof window !== "undefined" ? window.location.origin : ""
-  const icsUrl = adminToken ? origin+"/api/calendar.ics/"+adminToken : ""
-  const googleCalUrl = icsUrl ? "https://calendar.google.com/calendar/r?cid="+encodeURIComponent(icsUrl) : ""
-
-  async function copyLink() {
-    if (!icsUrl) return
-    await navigator.clipboard.writeText(icsUrl)
-    setCopied(true); setTimeout(()=>setCopied(false), 2500)
-  }
-
-  const [events, setEvents] = useState<any[]>([])
+    const [events, setEvents] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [now, setNow] = useState(new Date())
   const [selected, setSelected] = useState<string|null>(null)

@@ -20,7 +20,6 @@ export default function CoordCalendar() {
   const [tasks, setTasks] = useState<any[]>([])
   const [now, setNow] = useState(new Date())
   const [selected, setSelected] = useState<string|null>(null)
-  const [calToken, setCalToken] = useState("")
   const [coord, setCoord] = useState<any>(null)
 
   useEffect(() => {
@@ -30,18 +29,14 @@ export default function CoordCalendar() {
       if (!coord) return
       setCoord(coord)
       // Load events and tasks
-      const [er, tr, tok] = await Promise.all([
+      const [er, tr] = await Promise.all([
         fetch("/api/events"),
-        fetch(`/api/tasks?name=${encodeURIComponent(user.name)}`),
-        fetch(`/api/calendar-token?user_id=${user.id}`)
+        fetch(`/api/tasks?name=${encodeURIComponent(user.name)}`)
       ])
       const { events } = await er.json()
       const { tasks } = await tr.json()
-      const { token } = await tok.json()
-      // Filter events for this coordinator
       setEvents((events||[]).filter((e:any) => e.coordinator_id === coord.id && e.status !== "cancelled"))
       setTasks(tasks||[])
-      setCalToken(token||"")
     })
   }, [user])
 
@@ -75,7 +70,7 @@ export default function CoordCalendar() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="text-xl font-extrabold">לוח שנה</div>
-        <CalendarPopup token={calToken}/>
+        <CalendarPopup coordId={coord?.id}/>
       </div>
 
       {/* Month navigation */}
