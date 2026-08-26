@@ -10,8 +10,17 @@ const STATUS_COLORS: Record<string,string> = {
 }
 
 export default function CalendarPage() {
-  const icsUrl = typeof window !== "undefined" ? `${window.location.origin}/api/calendar.ics` : "";
-  const googleCalUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(typeof window !== "undefined" ? window.location.origin + "/api/calendar.ics" : "")}`;
+  const [adminToken, setAdminToken] = useState("")
+  const { user } = useAuth()
+
+  useEffect(()=>{
+    if (user?.id) {
+      fetch(`/api/calendar-token?user_id=${user.id}`).then(r=>r.json()).then(d=>setAdminToken(d.token||""))
+    }
+  },[user])
+
+  const icsUrl = adminToken ? `${typeof window!=="undefined"?window.location.origin:""}/api/calendar.ics/${adminToken}` : ""
+  const googleCalUrl = icsUrl ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(icsUrl)}` : ""
 
   const [events, setEvents] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])

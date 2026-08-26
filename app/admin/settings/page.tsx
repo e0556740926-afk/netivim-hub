@@ -22,6 +22,17 @@ export default function SettingsPage() {
   const [activity, setActivity] = useState<any>(null)
   const [actTab, setActTab] = useState<"tasks"|"leads"|"interactions"|"reports">("tasks")
   const [saving, setSaving] = useState(false)
+  const [calTokens, setCalTokens] = useState<Record<number,string>>({})
+
+  async function loadCalTokens(userList: any[]) {
+    const tokens: Record<number,string> = {}
+    for (const u of userList) {
+      const res = await fetch(`/api/calendar-token?user_id=${u.id}`)
+      const d = await res.json()
+      if (d.token) tokens[u.id] = d.token
+    }
+    setCalTokens(tokens)
+  }
   const [err, setErr] = useState("")
   const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"" })
 
@@ -30,7 +41,7 @@ export default function SettingsPage() {
     const [ur, cr] = await Promise.all([fetch("/api/users"), fetch("/api/targets")])
     const { users } = await ur.json()
     const { coordinators } = await cr.json()
-    setUsers(users||[])
+    setUsers(users||[]); loadCalTokens(users||[])
     setCoords(coordinators||[])
   }
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
