@@ -1,23 +1,15 @@
 "use client"
 import { useState, useEffect } from "react"
-import { useAuth } from "@/lib/auth-context"
 
-export default function CalendarPopup({ coordId, label }: { coordId?: number; label?: string }) {
-  const { user } = useAuth()
+export default function CalendarPopup({ token, label }: { token: string; label?: string }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [url, setUrl] = useState("")
 
   useEffect(() => {
-    if (!user) return
-    const param = coordId ? `coordinator_id=${coordId}` : `user_id=${user.id}`
-    fetch(`/api/calendar-token?${param}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.token) setUrl(`${window.location.origin}/api/calendar.ics/${d.token}`)
-      })
-      .catch(() => {})
-  }, [user, coordId])
+    if (token && typeof window !== "undefined")
+      setUrl(`${window.location.origin}/api/calendar.ics/${token}`)
+  }, [token])
 
   async function copy() {
     if (!url) return
@@ -45,21 +37,16 @@ export default function CalendarPopup({ coordId, label }: { coordId?: number; la
             <div className="text-sm font-bold text-[#0D2744]">הלינק האישי שלך ליומן</div>
             <button onClick={() => setOpen(false)} className="text-[#94A3B8] hover:text-[#374151]">✕</button>
           </div>
-          <div className="text-xs text-[#64748B] mb-3 leading-relaxed">
-            העתק את הלינק ← פתח Google Calendar ← לחץ <strong>"+"</strong> ← <strong>"מ-URL"</strong> ← הדבק ← הוסף
+          <div className="text-xs text-[#64748B] mb-3">
+            העתק את הלינק ← Google Calendar ← הגדרות ← יומנים אחרים ← הוסף לפי URL
           </div>
-          {url
-            ? <>
-                <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[9px] px-3 py-2.5 text-[11px] font-mono text-[#475569] break-all mb-3 select-all cursor-text">
-                  {url}
-                </div>
-                <button onClick={copy}
-                  className={`w-full py-2.5 rounded-[9px] text-sm font-bold transition-colors ${copied ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#0D2744] text-white hover:bg-[#00488D]"}`}>
-                  {copied ? "✓ הועתק!" : "העתק לינק"}
-                </button>
-              </>
-            : <div className="text-center text-sm text-[#94A3B8] py-3">טוען לינק...</div>
-          }
+          <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[9px] px-3 py-2 text-[11px] font-mono text-[#475569] break-all mb-3 select-all">
+            {url || "טוען..."}
+          </div>
+          <button onClick={copy}
+            className={`w-full py-2.5 rounded-[9px] text-sm font-bold transition-colors ${copied ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#0D2744] text-white hover:bg-[#00488D]"}`}>
+            {copied ? "✓ הועתק!" : "העתק לינק"}
+          </button>
         </div>
       )}
     </div>
