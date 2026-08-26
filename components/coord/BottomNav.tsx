@@ -4,11 +4,11 @@ import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
 
 const tabs = [
-  { label:"בית",    path:"/coord/home",    icon:"🏠" },
-  { label:"לידים",  path:"/coord/leads",   icon:"⭐" },
-  { label:"משימות", path:"/coord/tasks",   icon:"✅", badge:true },
-  { label:"אירועים",path:"/coord/events",  icon:"📅" },
-  { label:"קשרים",  path:"/coord/contacts",icon:"👥" },
+  { label:"בית",    path:"/coord/home",     icon:"🏠" },
+  { label:"לידים",  path:"/coord/leads",    icon:"⭐" },
+  { label:"יומן",   path:"/coord/calendar", icon:"📅" },
+  { label:"משימות", path:"/coord/tasks",    icon:"✅", badge:true },
+  { label:"קשרים",  path:"/coord/contacts", icon:"👥" },
 ]
 
 export default function BottomNav() {
