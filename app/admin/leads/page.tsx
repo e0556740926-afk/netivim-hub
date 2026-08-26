@@ -17,11 +17,12 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
   advanced:{bg:"#EDE9FE",color:"#5B21B6"},
   irrelevant:{bg:"#FEE2E2",color:"#991B1B"}
 }
-const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"" }
+const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_type:"coordinator", owner_admin_name:"" }
 
 export default function AdminLeads() {
   const [leads, setLeads] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
+  const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -36,20 +37,14 @@ export default function AdminLeads() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [lr, cr, ur] = await Promise.all([
-        fetch("/api/leads"), fetch("/api/targets"), fetch("/api/users/assignees")
+      const [lr, ua] = await Promise.all([
+        fetch("/api/leads"), fetch("/api/users/all")
       ])
       const { leads } = await lr.json()
-      const { coordinators } = await cr.json()
-      const { managers } = await ur.json()
+      const { coordinators, admins } = await ua.json()
       setLeads(leads||[])
-      // All people who can be assigned a lead
-      const allCoords = [
-        ...coordinators,
-        ...(managers||[]).filter((m:any)=>!coordinators.find((c:any)=>c.name===m.name))
-          .map((m:any)=>({...m, name:m.name+" 👑"}))
-      ]
-      setCoords(allCoords)
+      setCoords(coordinators||[])
+      setAdminUsers(admins||[])
     } catch { setError(true) }
     finally { setLoading(false) }
   }
@@ -58,14 +53,17 @@ export default function AdminLeads() {
 
   async function addLead() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
-    if (!form.coordinator_id) { setErr("יש לבחור רכז"); return }
+    if (form.owner_type==="coordinator" && !form.coordinator_id) { setErr("יש לבחור רכז"); return }
+    if (form.owner_type==="admin" && !form.owner_admin_name) { setErr("יש לבחור מנהל"); return }
     setErr(""); setDupWarning(null); setSaving(true)
     const fullName = `${form.firstName} ${form.lastName}`.trim()
+    const isAdmin = form.owner_type === "admin"
     const res = await fetch("/api/leads",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
-        coordinator_id: +form.coordinator_id,
+        coordinator_id: isAdmin ? null : (form.coordinator_id ? +form.coordinator_id : null),
+        owner_name: isAdmin ? form.owner_admin_name : "",
         name: fullName,
         phone: form.phone,
         age: form.age ? +form.age : null,
@@ -139,12 +137,29 @@ export default function AdminLeads() {
                   placeholder="050-0000000" type="tel" className={InputClass}/>
               </div>
               <div>
-                <label className="text-xs font-semibold block mb-1">רכז *</label>
-                <select value={form.coordinator_id} onChange={e=>setForm(f=>({...f,coordinator_id:e.target.value}))}
-                  className={InputClass+" bg-white"}>
-                  <option value="">— בחר רכז —</option>
-                  {coords.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <label className="text-xs font-semibold block mb-1">שיוך ל</label>
+                <div className="flex gap-2 mb-2">
+                  <button type="button" onClick={()=>setForm(f=>({...f,owner_type:"coordinator"}))}
+                    className={`flex-1 py-1.5 rounded-[8px] text-xs font-semibold border transition-colors ${form.owner_type==="coordinator"?"bg-[#DBEAFE] border-[#BFDBFE] text-[#1E40AF]":"bg-white border-[#E2E8F0] text-[#64748B]"}`}>
+                    רכז
+                  </button>
+                  <button type="button" onClick={()=>setForm(f=>({...f,owner_type:"admin"}))}
+                    className={`flex-1 py-1.5 rounded-[8px] text-xs font-semibold border transition-colors ${form.owner_type==="admin"?"bg-[#EDE9FE] border-[#C4B5FD] text-[#5B21B6]":"bg-white border-[#E2E8F0] text-[#64748B]"}`}>
+                    👑 מנהל
+                  </button>
+                </div>
+                {form.owner_type==="coordinator"
+                  ? <select value={form.coordinator_id} onChange={e=>setForm(f=>({...f,coordinator_id:e.target.value}))}
+                      className={InputClass+" bg-white"}>
+                      <option value="">— בחר רכז —</option>
+                      {coords.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  : <select value={form.owner_admin_name} onChange={e=>setForm(f=>({...f,owner_admin_name:e.target.value}))}
+                      className={InputClass+" bg-white"}>
+                      <option value="">— בחר מנהל —</option>
+                      {adminUsers.map((a:any)=><option key={a.id} value={a.name}>👑 {a.name}</option>)}
+                    </select>
+                }
               </div>
               <div>
                 <label className="text-xs font-semibold block mb-1">גיל</label>
@@ -227,7 +242,7 @@ export default function AdminLeads() {
                       </td>
                       <td className="px-3 py-2.5 text-xs text-[#94A3B8]">{l.id_number||"—"}</td>
                       <td className="px-3 py-2.5 text-[#475569]">{l.age||"—"}</td>
-                      <td className="px-3 py-2.5 text-xs text-[#475569]">{coord?.name||"—"}</td>
+                      <td className="px-3 py-2.5 text-xs text-[#475569]">{l.owner_display||coord?.name||l.owner_name||"—"}</td>
                       <td className="px-3 py-2.5">
                         <span style={sc} className="px-2 py-0.5 rounded-full text-xs font-semibold">
                           {STATUS_LABEL[l.status]||l.status}

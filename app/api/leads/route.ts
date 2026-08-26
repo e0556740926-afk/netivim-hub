@@ -3,11 +3,20 @@ import sql from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
+  // Auto-add owner_name column
+  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS owner_name text default ''`; } catch {}
   if (!cid) {
-    const all = await sql`SELECT * FROM leads ORDER BY created_at DESC`;
+    const all = await sql`
+      SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display
+      FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
+      ORDER BY l.created_at DESC`;
     return NextResponse.json({ leads: all });
   }
-  const leads = await sql`SELECT * FROM leads WHERE coordinator_id = ${parseInt(cid)} ORDER BY created_at DESC`;
+  const leads = await sql`
+    SELECT l.*, c.name as owner_display
+    FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
+    WHERE l.coordinator_id = ${parseInt(cid)}
+    ORDER BY l.created_at DESC`;
   return NextResponse.json({ leads });
 }
 
