@@ -11,7 +11,6 @@ const STATUS_COLORS: Record<string,string> = {
 
 export default function CalendarPage() {
   const [adminToken, setAdminToken] = useState("")
-  const { user } = useAuth()
 
   useEffect(()=>{
     if (user?.id) {
