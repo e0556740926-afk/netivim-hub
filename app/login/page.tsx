@@ -14,18 +14,15 @@ export default function LoginPage() {
   const { login } = useAuth()
   const router = useRouter()
 
-  // Read error from URL (?error=OAuthAccountNotLinked etc)
-  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null
-  const urlErr = searchParams?.get("error")
+  const urlErr = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("error")
+    : null
 
   async function handleGoogle() {
     setGLoading(true)
-    try {
-      await signIn("google", { callbackUrl: "/" })
-    } catch(e) {
-      // Fallback: navigate directly
-      window.location.href = "/api/auth/signin/google"
-    }
+    // After Google auth, NextAuth will set the session.
+    // We redirect based on role via the callback URL.
+    signIn("google", { callbackUrl: "/api/auth/redirect" })
   }
 
   async function handleLogin() {
@@ -33,28 +30,32 @@ export default function LoginPage() {
     setLoading(true); setErr("")
     const e = await login(email, pass)
     if (e) { setErr(e); setLoading(false); return }
-    // Read role from the cookie user to redirect correctly
+    // Get role from cookie session and redirect
     const res = await fetch("/api/session/me")
     const { user } = await res.json()
-    router.push(user?.role === "coordinator" ? "/coord/home" : "/admin/dashboard")
+    router.replace(user?.role === "coordinator" ? "/coord/home" : "/admin/dashboard")
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg,#0D2744,#1a5c8a)" }}>
+    <div className="min-h-screen flex items-center justify-center"
+      style={{ background: "linear-gradient(135deg,#0D2744,#1a5c8a)" }}>
       <div className="bg-white rounded-2xl shadow-2xl overflow-hidden w-[340px]">
         <div className="bg-[#0D2744] px-8 py-6 flex flex-col items-center gap-2">
-          <Image src="/netivim-logo.png" alt="נתיבים" width={150} height={48} className="brightness-0 invert" priority/>
+          <Image src="/netivim-logo.png" alt="נתיבים" width={150} height={48}
+            className="brightness-0 invert" priority/>
           <div className="text-[#60A5FA] text-xs font-medium tracking-wide">מערכת ניהול שטח</div>
         </div>
+
         <div className="p-7 space-y-4">
           {urlErr === "AccessDenied" && (
             <div className="bg-[#FEF3C7] text-[#92400E] rounded-lg px-3 py-2.5 text-xs text-center font-medium">
-              כתובת הגוגל שלך אינה רשומה במערכת.<br/>צור קשר עם המנהל להוספה.
+              כתובת הגוגל שלך אינה רשומה במערכת.<br/>צור קשר עם המנהל.
             </div>
           )}
-          {err && <div className="bg-[#FEE2E2] text-[#991B1B] rounded-lg px-3 py-2 text-sm">{err}</div>}
+          {err && (
+            <div className="bg-[#FEE2E2] text-[#991B1B] rounded-lg px-3 py-2 text-sm">{err}</div>
+          )}
 
-          {/* Google */}
           <button onClick={handleGoogle} disabled={gLoading}
             className="w-full py-2.5 bg-white border-2 border-[#E2E8F0] rounded-[10px] text-sm font-semibold text-[#0D2744] hover:border-[#00488D] hover:bg-[#F0F7FF] disabled:opacity-60 transition-all flex items-center justify-center gap-3">
             <svg width="18" height="18" viewBox="0 0 24 24">
@@ -74,17 +75,21 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-xs font-semibold text-[#374151] mb-1.5">דואל</label>
-            <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="your@email.com"
+            <input value={email} onChange={e => setEmail(e.target.value)} type="email"
+              placeholder="your@email.com"
+              onKeyDown={e => e.key==="Enter" && handleLogin()}
               className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
           </div>
           <div>
             <label className="block text-xs font-semibold text-[#374151] mb-1.5">סיסמה</label>
-            <input value={pass} onChange={e => setPass(e.target.value)} onKeyDown={e => e.key==="Enter" && handleLogin()} type="password" placeholder="••••••"
+            <input value={pass} onChange={e => setPass(e.target.value)} type="password"
+              placeholder="••••••"
+              onKeyDown={e => e.key==="Enter" && handleLogin()}
               className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
           </div>
           <button onClick={handleLogin} disabled={loading}
             className="w-full py-2.5 bg-[#0D2744] text-white rounded-[10px] font-bold text-sm hover:bg-[#00488D] disabled:opacity-50 transition-colors">
-            {loading ? "מתחבר..." : "כניסה עם סיסמה"}
+            {loading ? "מתחבר..." : "כניסה"}
           </button>
           <div className="text-center text-xs text-[#94A3B8]">נתיבים שטח · כל הזכויות שמורות</div>
         </div>

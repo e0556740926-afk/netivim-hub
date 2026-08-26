@@ -1,5 +1,5 @@
 "use client"
-import { createContext, useContext, useEffect, useState, useRef } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { useSession, signOut } from "next-auth/react"
 
 interface User { id: number; name: string; email: string; role: string; status: string; area?: string }
@@ -10,47 +10,42 @@ interface AuthCtx {
   logout: () => Promise<void>
 }
 
-const Ctx = createContext<AuthCtx>({ user: null, loading: true, login: async () => null, logout: async () => {} })
+const Ctx = createContext<AuthCtx>({
+  user: null, loading: true,
+  login: async () => null,
+  logout: async () => {}
+})
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: googleSession, status } = useSession()
   const [cookieUser, setCookieUser] = useState<User | null>(null)
-  const [cookieLoading, setCookieLoading] = useState(true)
-  const didRedirect = useRef(false) // prevent repeated redirects on tab switch
+  const [cookieLoaded, setCookieLoaded] = useState(false)
 
   // Load cookie session once on mount
   useEffect(() => {
     fetch("/api/session/me")
       .then(r => r.json())
-      .then(d => { setCookieUser(d.user || null); setCookieLoading(false) })
-      .catch(() => setCookieLoading(false))
+      .then(d => { setCookieUser(d.user || null) })
+      .catch(() => {})
+      .finally(() => setCookieLoaded(true))
   }, [])
 
-  // Redirect after Google login — only ONCE, not on every tab switch
-  useEffect(() => {
-    if (status === "authenticated" && googleSession?.user && !didRedirect.current) {
-      didRedirect.current = true
-      const role = (googleSession.user as any).role || "coordinator"
-      const dest = role === "coordinator" ? "/coord/home" : "/admin/dashboard"
-      // Only redirect if not already there
-      if (typeof window !== "undefined" && !window.location.pathname.startsWith(dest.split("/")[1])) {
-        window.location.href = dest
+  // Build user from Google session
+  const googleUser: User | null = (status === "authenticated" && googleSession?.user)
+    ? {
+        id: (googleSession.user as any).id || 0,
+        name: (googleSession.user as any).dbName || googleSession.user.name || "",
+        email: googleSession.user.email || "",
+        role: (googleSession.user as any).role || "coordinator",
+        area: (googleSession.user as any).area || "",
+        status: "active",
       }
-    }
-  }, [status]) // only depends on status, not googleSession (avoids re-fire)
-
-  const googleUser: User | null = googleSession?.user ? {
-    id: (googleSession.user as any).id || 0,
-    name: (googleSession.user as any).dbName || googleSession.user.name || "",
-    email: googleSession.user.email || "",
-    role: (googleSession.user as any).role || "coordinator",
-    area: (googleSession.user as any).area || "",
-    status: "active",
-  } : null
+    : null
 
   const user = googleUser || cookieUser
-  // Don't go back to loading if we already have a user (prevents flash on tab switch)
-  const loading = !user && (status === "loading" || cookieLoading)
+
+  // Loading = true only when we genuinely don't know yet
+  const loading = !cookieLoaded || status === "loading"
 
   async function login(email: string, password: string): Promise<string | null> {
     const r = await fetch("/api/session/login", {
@@ -68,11 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (status === "authenticated") await signOut({ redirect: false })
     await fetch("/api/session/logout", { method: "POST" })
     setCookieUser(null)
-    didRedirect.current = false
     window.location.href = "/login"
   }
 
-  return <Ctx.Provider value={{ user, loading, login, logout }}>{children}</Ctx.Provider>
+  return (
+    <Ctx.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </Ctx.Provider>
+  )
 }
 
 export const useAuth = () => useContext(Ctx)
