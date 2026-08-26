@@ -3,7 +3,10 @@ import sql from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
-  if (!cid) return NextResponse.json({ leads: [] });
+  if (!cid) {
+    const all = await sql`SELECT * FROM leads ORDER BY created_at DESC`;
+    return NextResponse.json({ leads: all });
+  }
   const leads = await sql`SELECT * FROM leads WHERE coordinator_id = ${parseInt(cid)} ORDER BY created_at DESC`;
   return NextResponse.json({ leads });
 }
@@ -34,9 +37,12 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
+  // Auto-add id_number column if not exists
+  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS id_number text default ''`; } catch {}
+  const notes_full = [d.notes, "ציון: " + score].filter(Boolean).join(" | ");
   const rows = await sql`
-    INSERT INTO leads (coordinator_id, name, phone, city, age, interest, source, status, event_id, notes)
-    VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${d.notes ? d.notes + ' | ציון: ' + score : 'ציון: ' + score})
+    INSERT INTO leads (coordinator_id, name, phone, city, age, interest, source, status, event_id, notes, id_number)
+    VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${notes_full}, ${d.id_number||''})
     RETURNING *
   `;
   return NextResponse.json({ lead: rows[0], score });

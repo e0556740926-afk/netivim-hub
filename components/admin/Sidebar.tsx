@@ -12,6 +12,7 @@ const nav = [
   null,
   { label:"לוח שנה",    path:"/admin/calendar",   dot:"#60A5FA" },
   { label:"אנשי קשר",   path:"/admin/contacts",   dot:"#A78BFA" },
+  { label:"לידים",       path:"/admin/leads",      dot:"#34D399" },
   { label:"אירועים",    path:"/admin/events",     dot:"#F472B6", badgeKey:"pending" },
   { label:"משימות",     path:"/admin/tasks",      dot:"#60A5FA", badgeKey:"late" },
   null,
