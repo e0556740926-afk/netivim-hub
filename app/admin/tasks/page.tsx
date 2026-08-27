@@ -1,4 +1,5 @@
 "use client"
+import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
 import Badge from "@/components/ui/Badge"
@@ -13,6 +14,7 @@ const COLS = [
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
 
 export default function TasksPage() {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
@@ -63,7 +65,7 @@ export default function TasksPage() {
     if (editTask) {
       await fetch("/api/tasks", { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...body, id:editTask.id}) })
     } else {
-      await fetch("/api/tasks", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) })
+      await fetch("/api/tasks", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...body,assigned_by:user?.name}) })
     }
     setSaving(false); setShowForm(false); load()
   }

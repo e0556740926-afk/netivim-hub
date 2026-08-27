@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { sendEmail, taskAssignedEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
   const cid = req.nextUrl.searchParams.get("coordinator_id");
-  const all = req.nextUrl.searchParams.get("all");
   if (name) {
     const rows = await sql`SELECT * FROM tasks WHERE ${name}=ANY(assignees) AND status!='done' ORDER BY due_date LIMIT 10`;
     return NextResponse.json({ tasks: rows });
@@ -17,23 +17,86 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ tasks: rows });
 }
 
+// Look up emails for a list of assignee names
+async function getEmailsFor(names: string[]) {
+  if (!names?.length) return [];
+  const clean = names.map(n => n.replace(/\s*👑\s*/g, "").trim()).filter(Boolean);
+  if (!clean.length) return [];
+
+  const [coordRows, userRows] = await Promise.all([
+    sql`SELECT c.name, u.email FROM coordinators c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.name = ANY(${clean}) AND u.email IS NOT NULL`,
+    sql`SELECT name, email, role FROM users
+        WHERE name = ANY(${clean}) AND email IS NOT NULL AND status='active'`,
+  ]);
+
+  const map = new Map<string, { email: string; isCoordinator: boolean }>();
+  for (const r of coordRows as any[]) map.set(r.name, { email: r.email, isCoordinator: true });
+  for (const r of userRows as any[]) {
+    if (!map.has(r.name)) map.set(r.name, { email: r.email, isCoordinator: r.role === "coordinator" });
+  }
+  return Array.from(map.entries()).map(([name, v]) => ({ name, ...v }));
+}
+
+// Fire-and-forget notifications
+async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: string) {
+  try {
+    const recipients = await getEmailsFor(newAssignees);
+    await Promise.all(recipients.map(r => {
+      const { subject, html } = taskAssignedEmail({
+        assigneeName: r.name,
+        taskTitle: task.title,
+        taskType: task.type,
+        dueDate: task.due_date ? String(task.due_date).slice(0, 10) : null,
+        details: task.details,
+        assignedBy,
+        isCoordinator: r.isCoordinator,
+      });
+      return sendEmail({ to: r.email, subject, html });
+    }));
+  } catch (e) {
+    console.error("[notify] failed:", e);
+  }
+}
+
 export async function POST(req: NextRequest) {
   const d = await req.json();
   const rows = await sql`
     INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status)
     VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'})
     RETURNING *`;
-  return NextResponse.json({ task: rows[0] });
+
+  const task = rows[0];
+  if (d.notify !== false && d.assignees?.length) {
+    await notifyAssignees(task, d.assignees, d.assigned_by);
+  }
+  return NextResponse.json({ task });
 }
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
   if (d.status_only) {
     await sql`UPDATE tasks SET status=${d.status} WHERE id=${d.id}`;
-  } else {
-    await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${d.assignees||[]},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
+    return NextResponse.json({ ok: true });
   }
-  return NextResponse.json({ ok: true });
+
+  // Find newly-added assignees so we only email them
+  const before = await sql`SELECT assignees FROM tasks WHERE id=${d.id} LIMIT 1`;
+  const prev: string[] = (before[0] as any)?.assignees || [];
+  const next: string[] = d.assignees || [];
+  const added = next.filter(n => !prev.includes(n));
+
+  await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
+
+  if (d.notify !== false && added.length) {
+    await notifyAssignees(
+      { title: d.title, type: d.type, due_date: d.due_date, details: d.details },
+      added,
+      d.assigned_by
+    );
+  }
+  return NextResponse.json({ ok: true, notified: added.length });
 }
 
 export async function DELETE(req: NextRequest) {

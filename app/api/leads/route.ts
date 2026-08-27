@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { sendEmail, newLeadEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
@@ -54,6 +55,22 @@ export async function POST(req: NextRequest) {
     VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${notes_full}, ${d.id_number||''})
     RETURNING *
   `;
+  // Notify coordinator when lead comes from their public link
+  if (d.source === "link" && d.coordinator_id) {
+    try {
+      const cr = await sql`
+        SELECT c.name, u.email FROM coordinators c
+        JOIN users u ON u.id = c.user_id
+        WHERE c.id = ${d.coordinator_id} LIMIT 1`;
+      const c: any = cr[0];
+      if (c?.email) {
+        const { subject, html } = newLeadEmail({
+          coordName: c.name, leadName: d.name, leadPhone: d.phone, leadAge: d.age,
+        });
+        await sendEmail({ to: c.email, subject, html });
+      }
+    } catch (e) { console.error("[notify lead]", e); }
+  }
   return NextResponse.json({ lead: rows[0], score });
 }
 

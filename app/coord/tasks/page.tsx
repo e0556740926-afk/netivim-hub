@@ -61,8 +61,8 @@ export default function CoordTasks() {
     if (!form.title.trim()) return
     setSaving(true)
     const body = { ...form, event_id:form.event_id||null, contact_id:form.contact_id||null }
-    if (editId) await fetch("/api/tasks",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,id:editId})})
-    else await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})
+    if (editId) await fetch("/api/tasks",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,id:editId,assigned_by:user?.name})})
+    else await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...body,assigned_by:user?.name})})
     setSaving(false); setShowForm(false); load()
   }
 
