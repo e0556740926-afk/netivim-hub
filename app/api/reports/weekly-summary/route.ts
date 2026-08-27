@@ -1,66 +1,110 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 
+/** Monday of the week containing `weekStr` (or of last week when omitted). */
+function weekBounds(weekStr?: string | null) {
+  let start: Date;
+  if (weekStr) {
+    start = new Date(weekStr + "T00:00:00");
+    const dow = start.getDay();               // 0 = Sunday
+    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1));
+  } else {
+    start = new Date();
+    const dow = start.getDay();
+    start.setDate(start.getDate() - (dow === 0 ? 6 : dow - 1) - 7);
+  }
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  return { ws: start.toISOString().slice(0, 10), we: end.toISOString().slice(0, 10) };
+}
+
 export async function GET(req: NextRequest) {
   const coordId = req.nextUrl.searchParams.get("coordinator_id");
-  const weekStr = req.nextUrl.searchParams.get("week"); // YYYY-MM-DD (monday)
   if (!coordId) return NextResponse.json({ error: "missing coordinator_id" }, { status: 400 });
+  const cid = parseInt(coordId, 10);
+  if (Number.isNaN(cid)) return NextResponse.json({ error: "bad coordinator_id" }, { status: 400 });
 
-  // Calculate week range
-  const weekStart = weekStr ? new Date(weekStr) : (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - d.getDay() - 6); // last monday
-    return d;
-  })();
-  const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
-  const ws = weekStart.toISOString().slice(0,10);
-  const we = weekEnd.toISOString().slice(0,10);
+  const { ws, we } = weekBounds(req.nextUrl.searchParams.get("week"));
 
-  const cid = parseInt(coordId);
+  // Coordinator first — the tasks query needs the name.
+  const coordRows = await sql`
+    SELECT c.*, u.email FROM coordinators c
+    LEFT JOIN users u ON u.id = c.user_id
+    WHERE c.id = ${cid} LIMIT 1`;
+  const coordinator: any = coordRows[0] || null;
+  if (!coordinator) return NextResponse.json({ error: "coordinator not found" }, { status: 404 });
+  const coordName: string = coordinator.name;
 
-  const [
-    coordRows, leadsRows, interactionsRows,
-    tasksRows, reportRows, eventsRows, contactsRows
-  ] = await Promise.all([
-    sql`SELECT c.*, u.email FROM coordinators c LEFT JOIN users u ON u.id=c.user_id WHERE c.id=${cid}`,
-    sql`SELECT * FROM leads WHERE coordinator_id=${cid} AND created_at::date BETWEEN ${ws} AND ${we} ORDER BY created_at`,
-    sql`SELECT i.*, c.name as contact_name, c.org as contact_org FROM interactions i
-        LEFT JOIN contacts c ON c.id=i.contact_id
-        WHERE i.coordinator_id=${cid} AND i.date BETWEEN ${ws} AND ${we} ORDER BY i.date`,
-    sql`SELECT * FROM tasks WHERE ${cid}=ANY(
-          SELECT id::int FROM coordinators WHERE id=${cid}
-        ) OR (SELECT name FROM coordinators WHERE id=${cid})=ANY(assignees)
-        ORDER BY due_date`,
-    sql`SELECT * FROM weekly_reports WHERE coordinator_id=${cid} AND week_start BETWEEN ${ws} AND ${we} ORDER BY submitted_at DESC LIMIT 1`,
-    sql`SELECT * FROM events WHERE coordinator_id=${cid} AND date BETWEEN ${ws} AND ${we} ORDER BY date`,
-    sql`SELECT * FROM contacts WHERE coordinator_id=${cid} AND last_contact BETWEEN ${ws} AND ${we} ORDER BY last_contact DESC`,
+  const [leads, interactions, tasksRows, reportRows, events, contacts] = await Promise.all([
+    sql`SELECT * FROM leads
+        WHERE coordinator_id = ${cid}
+          AND created_at::date BETWEEN ${ws} AND ${we}
+        ORDER BY created_at`,
+
+    sql`SELECT i.*, c.name AS contact_name, c.org AS contact_org
+        FROM interactions i
+        LEFT JOIN contacts c ON c.id = i.contact_id
+        WHERE i.coordinator_id = ${cid}
+          AND i.date BETWEEN ${ws} AND ${we}
+        ORDER BY i.date`,
+
+    // Tasks belonging to this coordinator that touch the week:
+    // due in it, created in it, or still open and already overdue.
+    sql`SELECT * FROM tasks
+        WHERE (coordinator_id = ${cid} OR ${coordName} = ANY(assignees))
+          AND (
+            due_date BETWEEN ${ws} AND ${we}
+            OR created_at::date BETWEEN ${ws} AND ${we}
+            OR (status <> 'done' AND due_date < ${ws})
+          )
+        ORDER BY due_date NULLS LAST`,
+
+    sql`SELECT * FROM weekly_reports
+        WHERE coordinator_id = ${cid} AND week_start BETWEEN ${ws} AND ${we}
+        ORDER BY submitted_at DESC LIMIT 1`,
+
+    sql`SELECT * FROM events
+        WHERE coordinator_id = ${cid} AND date BETWEEN ${ws} AND ${we}
+        ORDER BY date`,
+
+    sql`SELECT * FROM contacts
+        WHERE (coordinator_id = ${cid} OR owner = ${coordName})
+          AND last_contact BETWEEN ${ws} AND ${we}
+        ORDER BY last_contact DESC`,
   ]);
 
-  // Tasks categorized
-  const today = new Date().toISOString().slice(0,10);
-  const allTasks = tasksRows;
-  const tasksDone = allTasks.filter((t:any) => t.status === "done");
-  const tasksInProgress = allTasks.filter((t:any) => t.status === "inprogress" || t.status === "waiting");
-  const tasksLate = allTasks.filter((t:any) => t.status !== "done" && t.due_date && t.due_date.toISOString().slice(0,10) < today);
-  const tasksTodo = allTasks.filter((t:any) => t.status === "todo" && (!t.due_date || t.due_date.toISOString().slice(0,10) >= today));
+  const asDate = (v: any) =>
+    v ? String(v instanceof Date ? v.toISOString() : v).slice(0, 10) : null;
 
-  // Score
-  const leadsScore = Math.min(leadsRows.length * 5, 30);
-  const intScore = Math.min(interactionsRows.length * 8, 30);
-  const taskScore = tasksDone.length > 0 ? Math.min(tasksDone.length * 5, 20) : 0;
+  const all = tasksRows as any[];
+  const done = all.filter(t => t.status === "done");
+  const late = all.filter(t => {
+    const d = asDate(t.due_date);
+    return t.status !== "done" && d !== null && d < we;
+  });
+  const lateIds = new Set(late.map(t => t.id));
+  const inProgress = all.filter(
+    t => (t.status === "inprogress" || t.status === "waiting") && !lateIds.has(t.id)
+  );
+  const todo = all.filter(t => t.status === "todo" && !lateIds.has(t.id));
+
+  const leadsScore  = Math.min(leads.length * 5, 30);
+  const intScore    = Math.min(interactions.length * 8, 30);
+  const taskScore   = Math.min(done.length * 5, 20);
   const reportScore = reportRows.length > 0 ? 20 : 0;
-  const totalScore = leadsScore + intScore + taskScore + reportScore;
 
   return NextResponse.json({
-    coordinator: coordRows[0] || null,
+    coordinator,
     week: { start: ws, end: we },
-    leads: leadsRows,
-    interactions: interactionsRows,
-    tasks: { done: tasksDone, inProgress: tasksInProgress, late: tasksLate, todo: tasksTodo, all: allTasks },
+    leads,
+    interactions,
+    tasks: { done, inProgress, late, todo, all },
     report: reportRows[0] || null,
-    events: eventsRows,
-    contacts: contactsRows,
-    score: { total: totalScore, leads: leadsScore, interactions: intScore, tasks: taskScore, report: reportScore },
+    events,
+    contacts,
+    score: {
+      total: leadsScore + intScore + taskScore + reportScore,
+      leads: leadsScore, interactions: intScore, tasks: taskScore, report: reportScore,
+    },
   });
 }
