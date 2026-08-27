@@ -57,7 +57,7 @@ export default function CoordHome() {
   }
 
   async function doneTask(id: number) {
-    await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status: "done" }) })
+    await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status: "done", status_only: true }) })
     setTasks(t => t.filter(x => x.id !== id))
   }
 

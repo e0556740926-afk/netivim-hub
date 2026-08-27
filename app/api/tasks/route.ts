@@ -87,7 +87,10 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
-  if (d.status_only) {
+  // Guard: a payload without a title is a status-only update, never a full one.
+  // Without this, a partial PATCH wipes title/assignees/due_date.
+  if (d.status_only || d.title === undefined) {
+    if (d.status === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
     await sql`UPDATE tasks SET status=${d.status} WHERE id=${d.id}`;
     return NextResponse.json({ ok: true });
   }
