@@ -21,6 +21,11 @@ export default function CoordManagementPage() {
   const [activeCoord, setActiveCoord] = useState<any>(null)
   const [activity, setActivity] = useState<any>(null)
   const [actTab, setActTab] = useState<"tasks"|"leads"|"interactions"|"reports">("tasks")
+  const [weekDate, setWeekDate] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - d.getDay() - 6)
+    return d.toISOString().slice(0,10)
+  })
 
   // Meeting form
   const [showMtgForm, setShowMtgForm] = useState(false)
@@ -285,7 +290,14 @@ export default function CoordManagementPage() {
       {/* ===== TRACKING TAB ===== */}
       {tab==="tracking" && (
         <div>
-          <div className="text-sm text-[#64748B] mb-4">לחץ על רכז לצפייה בכל הפעילות שלו</div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="text-sm text-[#64748B]">לחץ על רכז לצפייה בכל הפעילות שלו</div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-[#374151]">שבוע לדו״ח:</label>
+              <input type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)}
+                className="text-xs border border-[#E2E8F0] rounded-[8px] px-2.5 py-1.5 bg-white focus:outline-none focus:border-[#00488D]"/>
+            </div>
+          </div>
           <div className="space-y-2">
             {coords.map((coord:any) => (
               <div key={coord.id}>
@@ -298,6 +310,10 @@ export default function CoordManagementPage() {
                     <div className="text-sm font-semibold">{coord.name}</div>
                     <div className="text-xs text-[#64748B]">{coord.area||""}</div>
                   </div>
+                  <button onClick={(e)=>{e.stopPropagation();window.open(`/admin/reports/weekly?coordinator_id=${coord.id}&week=${weekDate}`,"_blank")}}
+                    className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors whitespace-nowrap">
+                    📋 דו״ח שבועי
+                  </button>
                   <span className={`text-lg transition-transform ${activeCoord?.id===coord.id?"rotate-90":""}`}>›</span>
                 </div>
 
