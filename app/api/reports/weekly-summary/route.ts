@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { currentUser, isAdmin } from "@/lib/auth-server";
 
 /** Monday of the week containing `weekStr` (or of last week when omitted). */
 function weekBounds(weekStr?: string | null) {
@@ -33,6 +34,13 @@ export async function GET(req: NextRequest) {
     WHERE c.id = ${cid} LIMIT 1`;
   const coordinator: any = coordRows[0] || null;
   if (!coordinator) return NextResponse.json({ error: "coordinator not found" }, { status: 404 });
+
+  // A coordinator may only read their own report; admins may read any.
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+  if (!isAdmin(me) && coordinator.user_id !== me.id && coordinator.email !== me.email) {
+    return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+  }
   const coordName: string = coordinator.name;
 
   const [leads, interactions, tasksRows, reportRows, events, contacts] = await Promise.all([
