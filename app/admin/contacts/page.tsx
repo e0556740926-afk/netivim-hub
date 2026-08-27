@@ -1,4 +1,5 @@
 "use client"
+import Pagination, { usePagination } from "@/components/ui/Pagination"
 import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
 import EmptyState from "@/components/ui/EmptyState"
@@ -215,6 +216,7 @@ export default function ContactsPage() {
     return true
   })
   const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "name")
+  const pg = usePagination(filtered, 50)
   const today = new Date().toISOString().slice(0,10)
   const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
 
@@ -432,7 +434,7 @@ export default function ContactsPage() {
             </tr></thead>
             <tbody>
               {filtered.length===0&&<tr><td colSpan={8}><EmptyState icon="👥" title={q||fType||fStatus||fOwner?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={q||fType||fStatus||fOwner?"נסה לשנות את הסינון או החיפוש":"כאן ינוהלו השותפים, גורמי הרשות והספקים של הארגון"} actionLabel={q||fType||fStatus||fOwner?undefined:"+ הוסף איש קשר ראשון"} onAction={startAdd} onClearFilters={q||fType||fStatus||fOwner?()=>{setQ("");setFType("");setFStatus("");setFOwner("")}:undefined}/></td></tr>}
-              {filtered.map(c=>{
+              {pg.paged.map(c=>{
                 const d=ds(c.last_contact); const isOpen=openId===c.id
                 const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
                 return <tr key={c.id} className={`border-b border-[#F1F5F9] last:border-0 transition-colors ${d>=30?"bg-[#FFF8F8]":""} ${isOpen?"!bg-[#F0F7FF]":"hover:bg-[#F8FAFC]"}`}>
@@ -455,6 +457,9 @@ export default function ContactsPage() {
             </tbody>
           </table>
         </div>
+        <div className="hidden md:block">
+          <Pagination {...pg} onChange={pg.setPage}/>
+        </div>
 
         {/* Mobile: cards instead of an 8-column table */}
         <div className="md:hidden divide-y divide-[#F1F5F9]">
@@ -464,7 +469,7 @@ export default function ContactsPage() {
               actionLabel={q||fType||fStatus||fOwner?undefined:"+ הוסף איש קשר ראשון"} onAction={startAdd}
               onClearFilters={q||fType||fStatus||fOwner?()=>{setQ("");setFType("");setFStatus("");setFOwner("")}:undefined}/>
           )}
-          {filtered.map(c => {
+          {pg.paged.map(c => {
             const d = ds(c.last_contact)
             const sc = STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
             const isOpen = openId===c.id
@@ -502,6 +507,7 @@ export default function ContactsPage() {
               </div>
             )
           })}
+          <Pagination {...pg} onChange={pg.setPage}/>
         </div>
       </Card>}
     </div>

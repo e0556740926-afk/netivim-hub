@@ -32,33 +32,35 @@ export default function Dashboard() {
       const res = await fetch("/api/dashboard")
       if (!res.ok) throw new Error()
       const d = await res.json()
-      const { coordinators, targets, leads, events, expenses, tasks, reports } = d
+      const { coordinators, targets, events, leadCounts, expenseByEvent, reports, totals } = d
 
-      const b: Board[] = (coordinators||[]).map((c:any)=>{
-        const t = (targets||[]).find((x:any)=>x.coordinator_id===c.id)?.target_leads||0
-        const a = (leads||[]).filter((l:any)=>l.coordinator_id===c.id).length
-        return { name:c.name, area:c.area, actual:a, target:t }
-      }).sort((a:Board,b:Board)=>b.actual-a.actual)
+      // Counting now happens in SQL; these are small lookup maps.
+      const leadsByCoord = new Map<number,number>(
+        (leadCounts||[]).map((r:any)=>[r.coordinator_id, r.count])
+      )
+      const expByEvent: Record<number,number> = {}
+      ;(expenseByEvent||[]).forEach((r:any)=>{ expByEvent[r.event_id] = r.total })
+
+      const b: Board[] = (coordinators||[]).map((c:any)=>({
+        name: c.name,
+        area: c.area,
+        actual: leadsByCoord.get(c.id) || 0,
+        target: (targets||[]).find((x:any)=>x.coordinator_id===c.id)?.target_leads || 0,
+      })).sort((a:Board,b:Board)=>b.actual-a.actual)
       setBoard(b)
 
-      const totLeads = (leads||[]).length
       const totTarget = (targets||[]).reduce((s:number,t:any)=>s+(+t.target_leads||0),0)
-      setOrgLeads(totLeads); setOrgTarget(totTarget)
+      setOrgLeads(totals?.leads||0); setOrgTarget(totTarget)
 
       const active = (events||[]).filter((e:any)=>e.status!=="done"&&e.status!=="cancelled")
       const pend = (events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval")
       setPending(pend.slice(0,3))
 
-      const totBudget = (events||[]).reduce((s:number,e:any)=>s+(+e.budget_planned||0),0)
-      const totSpent = (expenses||[]).reduce((s:number,e:any)=>s+(+e.amount||0),0)
-      const budgetPct = totBudget>0?Math.round(totSpent/totBudget*100):0
-      const today = new Date().toISOString().slice(0,10)
-      const lateTasks = (tasks||[]).filter((t:any)=>t.status!=="done"&&t.due_date&&t.due_date<today).length
+      const budgetPct = totals?.budget>0 ? Math.round(totals.spent/totals.budget*100) : 0
+      const lateTasks = totals?.lateTasks || 0
 
       setKpis({ events:active.length, budgetPct, lateTasks, pendingCount:pend.length })
 
-      const expByEvent: Record<number,number>={}
-      ;(expenses||[]).forEach((e:any)=>{ if(e.event_id) expByEvent[e.event_id]=(expByEvent[e.event_id]||0)+(+e.amount||0) })
       setRadar(active.slice(0,4).map((e:any)=>({...e,spent:expByEvent[e.id]||0})))
 
       const al: any[]=[]

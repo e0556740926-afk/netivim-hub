@@ -1,4 +1,5 @@
 "use client"
+import Pagination, { usePagination } from "@/components/ui/Pagination"
 import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
 import EmptyState from "@/components/ui/EmptyState"
@@ -101,6 +102,7 @@ export default function AdminLeads() {
     return true
   })
   const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "created_at", "desc")
+  const pg = usePagination(filtered, 50)
 
   const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
 
@@ -235,7 +237,7 @@ export default function AdminLeads() {
                 {filtered.length===0 && (
                   <tr><td colSpan={9}><EmptyState icon="⭐" title={q||filterCoord||filterStatus?"לא נמצאו לידים":"אין עדיין לידים"} hint={q||filterCoord||filterStatus?"נסה לשנות את הסינון":"לידים נכנסים מהלינק האישי של הרכזים, מאירועים, או בהוספה ידנית"} actionLabel={q||filterCoord||filterStatus?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)} onClearFilters={q||filterCoord||filterStatus?()=>{setQ("");setFilterCoord("");setFilterStatus("")}:undefined}/></td></tr>
                 )}
-                {filtered.map(l => {
+                {pg.paged.map(l => {
                   const coord = coords.find(c=>c.id===l.coordinator_id)
                   const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
                   return (
@@ -277,6 +279,9 @@ export default function AdminLeads() {
               </tbody>
             </table>
           </div>
+          <div className="hidden md:block">
+            <Pagination {...pg} onChange={pg.setPage}/>
+          </div>
 
           {/* Mobile: cards instead of a 9-column table */}
           <div className="md:hidden divide-y divide-[#F1F5F9]">
@@ -286,7 +291,7 @@ export default function AdminLeads() {
                 actionLabel={q||filterCoord||filterStatus?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)}
                 onClearFilters={q||filterCoord||filterStatus?()=>{setQ("");setFilterCoord("");setFilterStatus("")}:undefined}/>
             )}
-            {filtered.map(l => {
+            {pg.paged.map(l => {
               const coord = coords.find(c=>c.id===l.coordinator_id)
               const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
               return (
@@ -329,6 +334,7 @@ export default function AdminLeads() {
                 </div>
               )
             })}
+            <Pagination {...pg} onChange={pg.setPage}/>
           </div>
         </Card>
       )}
