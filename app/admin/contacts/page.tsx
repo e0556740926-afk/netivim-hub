@@ -420,7 +420,7 @@ export default function ContactsPage() {
 
       {/* Table */}
       {loading ? <SkeletonTable rows={5} cols={7}/> : <Card>
-        <div className="overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead><tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
               {[["שם","name"],["ארגון","org"],["סוג","type"],["רכז","owner"],
@@ -454,6 +454,54 @@ export default function ContactsPage() {
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile: cards instead of an 8-column table */}
+        <div className="md:hidden divide-y divide-[#F1F5F9]">
+          {filtered.length === 0 && (
+            <EmptyState icon="👥" title={q||fType||fStatus||fOwner?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"}
+              hint={q||fType||fStatus||fOwner?"נסה לשנות את הסינון או החיפוש":"כאן ינוהלו השותפים, גורמי הרשות והספקים של הארגון"}
+              actionLabel={q||fType||fStatus||fOwner?undefined:"+ הוסף איש קשר ראשון"} onAction={startAdd}
+              onClearFilters={q||fType||fStatus||fOwner?()=>{setQ("");setFType("");setFStatus("");setFOwner("")}:undefined}/>
+          )}
+          {filtered.map(c => {
+            const d = ds(c.last_contact)
+            const sc = STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
+            const isOpen = openId===c.id
+            return (
+              <div key={c.id} className={`p-3.5 ${isOpen?"bg-[#F0F7FF]":d>=30?"bg-[#FFF8F8]":""}`}>
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {(c.name||"").split(" ").map((w:string)=>w[0]).join("")}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-[#0D2744]">{c.name}</div>
+                    <div className="text-xs text-[#64748B] truncate">{c.role}{c.org?` · ${c.org}`:""}</div>
+                    <div className="text-xs text-[#94A3B8] mt-0.5">
+                      {c.owner||"ללא רכז"} · <span className={d>=30?"text-[#960010] font-semibold":""}>{fd(c.last_contact)}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span style={sc} className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap">
+                      {STATUS_LABEL[c.status]||c.status}
+                    </span>
+                    <span className="text-[#f59e0b] text-xs">{"★".repeat(c.potential||1)}</span>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2.5">
+                  <button onClick={()=>openDetail(c.id)}
+                    className={`flex-1 py-1.5 rounded-[8px] text-xs font-semibold ${isOpen?"bg-[#DBEAFE] text-[#1E40AF]":"bg-[#F0F4F8] text-[#475569]"}`}>
+                    {isOpen?"סגור":"פרטים"}
+                  </button>
+                  <button onClick={()=>startEdit(c)} className="px-3 py-1.5 rounded-[8px] text-xs font-semibold bg-[#F0F4F8] text-[#475569]">✎</button>
+                  {c.phone && (
+                    <a href={`https://wa.me/972${c.phone.replace(/^0/,"").replace(/-/g,"")}`} target="_blank"
+                      className="px-3 py-1.5 rounded-[8px] text-xs font-semibold bg-[#DCFCE7] text-[#166534]">↗</a>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </Card>}
     </div>

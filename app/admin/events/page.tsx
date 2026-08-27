@@ -1,4 +1,5 @@
 "use client"
+import Modal from "@/components/ui/Modal"
 import { useUrlState } from "@/lib/use-url-state"
 import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
@@ -71,8 +72,6 @@ export default function EventsPage() {
       approved: e.approved||false
     })
     setShowNew(false); setResultsId(null)
-    // Scroll to top
-    window.scrollTo({top:0,behavior:"smooth"})
   }
 
   // Open results panel
@@ -85,7 +84,6 @@ export default function EventsPage() {
       follow_up: ""
     })
     setEditId(null); setShowNew(false)
-    window.scrollTo({top:0,behavior:"smooth"})
   }
 
   async function saveEdit() {
@@ -174,120 +172,106 @@ export default function EventsPage() {
       </div>
 
       {/* NEW / EDIT FORM */}
-      {(showNew || editId) && (
-        <Card className="mb-5 border-2 border-[#00488D]">
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm font-bold text-[#00488D]">
-                {editId ? `✎ עריכת אירוע — ${editEvent?.name||""}` : "אירוע חדש"}
-              </div>
-              <button onClick={()=>{setEditId(null);setShowNew(false)}} className="text-[#94A3B8] hover:text-[#374151] text-lg leading-none">✕</button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <div className="sm:col-span-2">
-                <label className="text-xs font-semibold block mb-1">שם האירוע *</label>
-                <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className={InputClass} placeholder="לדוגמה: יריד תעסוקה בני ברק"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">תאריך</label>
-                <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">שעה</label>
-                <input type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))} className={InputClass}/>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-semibold block mb-1">מיקום</label>
-                <input value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} className={InputClass} placeholder="עיר / אולם"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">תקציב מתוכנן (₪)</label>
-                <input type="number" value={form.budget_planned} onChange={e=>setForm(f=>({...f,budget_planned:e.target.value}))} className={InputClass} placeholder="0"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">יעד משתתפים</label>
-                <input type="number" value={form.target_attendees} onChange={e=>setForm(f=>({...f,target_attendees:e.target.value}))} className={InputClass} placeholder="0"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">סטטוס</label>
-                <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className={InputClass+" bg-white"}>
-                  {STATUS_OPTIONS.map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 pt-5">
-                <input type="checkbox" checked={form.approved} onChange={e=>setForm(f=>({...f,approved:e.target.checked}))} className="accent-[#00488D] w-4 h-4"/>
-                <label className="text-sm font-medium text-[#374151]">מאושר על ידי הנהלה</label>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={saveEdit} disabled={saving}>{saving?"שומר...":"שמור שינויים"}</Button>
-              <Button variant="secondary" onClick={()=>{setEditId(null);setShowNew(false)}}>ביטול</Button>
-            </div>
+      <Modal
+        open={showNew || editId !== null}
+        onClose={() => { setEditId(null); setShowNew(false) }}
+        title={editId ? `✎ עריכת אירוע — ${editEvent?.name||""}` : "אירוע חדש"}
+        footer={<>
+          <Button onClick={saveEdit} disabled={saving}>{saving?"שומר...":"שמור שינויים"}</Button>
+          <Button variant="secondary" onClick={()=>{setEditId(null);setShowNew(false)}}>ביטול</Button>
+        </>}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <label className="text-xs font-semibold block mb-1">שם האירוע *</label>
+            <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className={InputClass} placeholder="לדוגמה: יריד תעסוקה בני ברק"/>
           </div>
-        </Card>
-      )}
+          <div>
+            <label className="text-xs font-semibold block mb-1">תאריך</label>
+            <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} className={InputClass}/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">שעה</label>
+            <input type="time" value={form.time} onChange={e=>setForm(f=>({...f,time:e.target.value}))} className={InputClass}/>
+          </div>
+          <div className="sm:col-span-2">
+            <label className="text-xs font-semibold block mb-1">מיקום</label>
+            <input value={form.location} onChange={e=>setForm(f=>({...f,location:e.target.value}))} className={InputClass} placeholder="עיר / אולם"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">תקציב מתוכנן (₪)</label>
+            <input type="number" value={form.budget_planned} onChange={e=>setForm(f=>({...f,budget_planned:e.target.value}))} className={InputClass} placeholder="0"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">יעד משתתפים</label>
+            <input type="number" value={form.target_attendees} onChange={e=>setForm(f=>({...f,target_attendees:e.target.value}))} className={InputClass} placeholder="0"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">סטטוס</label>
+            <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className={InputClass+" bg-white"}>
+              {STATUS_OPTIONS.map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 pt-5">
+            <input type="checkbox" checked={form.approved} onChange={e=>setForm(f=>({...f,approved:e.target.checked}))} className="accent-[#00488D] w-4 h-4"/>
+            <label className="text-sm font-medium text-[#374151]">מאושר על ידי הנהלה</label>
+          </div>
+        </div>
+      </Modal>
 
       {/* RESULTS PANEL */}
-      {resultsId && resultsEvent && (
-        <Card className="mb-5 border-2 border-[#166534]">
-          <div className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-sm font-bold text-[#166534]">📊 עדכון תוצאות — {resultsEvent.name}</div>
-                <div className="text-xs text-[#64748B] mt-0.5">{fd(resultsEvent.date)} · {resultsEvent.location}</div>
+      <Modal
+        open={resultsId !== null}
+        onClose={() => setResultsId(null)}
+        title={`📊 עדכון תוצאות — ${resultsEvent?.name||""}`}
+        subtitle={resultsEvent ? `${fd(resultsEvent.date)} · ${resultsEvent.location||""}` : undefined}
+        accent="#166534"
+        footer={<>
+          <Button onClick={()=>resultsEvent&&saveResults()} disabled={saving}>{saving?"שומר...":"שמור תוצאות ✓"}</Button>
+          <Button variant="secondary" onClick={()=>setResultsId(null)}>ביטול</Button>
+        </>}
+      >
+        {resultsEvent && <>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-[#F0F4F8] rounded-[11px] p-3">
+              <div className="text-xs font-bold text-[#64748B] mb-2">יעדים מקוריים</div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm"><span className="text-[#64748B]">משתתפים יעד</span><span className="font-bold">{resultsEvent.target_attendees||0}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-[#64748B]">תקציב</span><span className="font-bold">₪{(+resultsEvent.budget_planned||0).toLocaleString()}</span></div>
               </div>
-              <button onClick={()=>setResultsId(null)} className="text-[#94A3B8] hover:text-[#374151] text-lg leading-none">✕</button>
             </div>
-
-            {/* Before/After comparison */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-[#F0F4F8] rounded-[11px] p-3">
-                <div className="text-xs font-bold text-[#64748B] mb-2">יעדים מקוריים</div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-sm"><span className="text-[#64748B]">משתתפים יעד</span><span className="font-bold">{resultsEvent.target_attendees||0}</span></div>
-                  <div className="flex justify-between text-sm"><span className="text-[#64748B]">תקציב</span><span className="font-bold">₪{(+resultsEvent.budget_planned||0).toLocaleString()}</span></div>
+            <div className="bg-[#F0FFF4] border border-[#BBF7D0] rounded-[11px] p-3">
+              <div className="text-xs font-bold text-[#166534] mb-2">תוצאות בפועל</div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-[#64748B]">משתתפים</span>
+                  <input type="number" value={results.actual_attendees} onChange={e=>setResults(r=>({...r,actual_attendees:e.target.value}))}
+                    className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold" placeholder="0"/>
+                </div>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="text-[#64748B]">לידים</span>
+                  <input type="number" value={results.leads_collected} onChange={e=>setResults(r=>({...r,leads_collected:e.target.value}))}
+                    className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold text-[#00488D]" placeholder="0"/>
                 </div>
               </div>
-              <div className="bg-[#F0FFF4] border border-[#BBF7D0] rounded-[11px] p-3">
-                <div className="text-xs font-bold text-[#166534] mb-2">תוצאות בפועל</div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-[#64748B]">משתתפים</span>
-                    <input type="number" value={results.actual_attendees} onChange={e=>setResults(r=>({...r,actual_attendees:e.target.value}))}
-                      className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold" placeholder="0"/>
-                  </div>
-                  <div className="flex justify-between text-sm items-center">
-                    <span className="text-[#64748B]">לידים</span>
-                    <input type="number" value={results.leads_collected} onChange={e=>setResults(r=>({...r,leads_collected:e.target.value}))}
-                      className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold text-[#00488D]" placeholder="0"/>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="text-xs font-semibold block mb-1">סיכום האירוע</label>
-              <textarea value={results.summary} onChange={e=>setResults(r=>({...r,summary:e.target.value}))} rows={3}
-                placeholder="מה הלך טוב? מה ניתן לשפר? תובנות לאירוע הבא..."
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#166534]"/>
-            </div>
-
-            <div className="mb-4">
-              <label className="text-xs font-semibold block mb-1">
-                משימת מעקב <span className="text-[#64748B] font-normal">(תיצור משימה אוטומטית — אופציונלי)</span>
-              </label>
-              <input value={results.follow_up} onChange={e=>setResults(r=>({...r,follow_up:e.target.value}))}
-                placeholder='לדוגמה: "ליצור קשר עם 31 הלידים תוך 3 ימים"'
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#166534]"/>
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={saveResults} disabled={saving}>{saving?"שומר...":"שמור תוצאות ✓"}</Button>
-              <Button variant="secondary" onClick={()=>setResultsId(null)}>ביטול</Button>
             </div>
           </div>
-        </Card>
-      )}
+          <div className="mb-3">
+            <label className="text-xs font-semibold block mb-1">סיכום האירוע</label>
+            <textarea value={results.summary} onChange={e=>setResults(r=>({...r,summary:e.target.value}))} rows={3}
+              placeholder="מה הלך טוב? מה ניתן לשפר? תובנות לאירוע הבא..."
+              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#166534]"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">
+              משימת מעקב <span className="text-[#64748B] font-normal">(תיצור משימה אוטומטית — אופציונלי)</span>
+            </label>
+            <input value={results.follow_up} onChange={e=>setResults(r=>({...r,follow_up:e.target.value}))}
+              placeholder='לדוגמה: "ליצור קשר עם 31 הלידים תוך 3 ימים"'
+              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#166534]"/>
+          </div>
+        </>}
+      </Modal>
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-4 flex-wrap">

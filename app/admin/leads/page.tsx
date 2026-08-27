@@ -219,7 +219,7 @@ export default function AdminLeads() {
       {/* Table */}
       {loading ? <SkeletonTable rows={6} cols={6}/> : (
         <Card>
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
@@ -276,6 +276,59 @@ export default function AdminLeads() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: cards instead of a 9-column table */}
+          <div className="md:hidden divide-y divide-[#F1F5F9]">
+            {filtered.length === 0 && (
+              <EmptyState icon="⭐" title={q||filterCoord||filterStatus?"לא נמצאו לידים":"אין עדיין לידים"}
+                hint={q||filterCoord||filterStatus?"נסה לשנות את הסינון":"לידים נכנסים מהלינק האישי של הרכזים, מאירועים, או בהוספה ידנית"}
+                actionLabel={q||filterCoord||filterStatus?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)}
+                onClearFilters={q||filterCoord||filterStatus?()=>{setQ("");setFilterCoord("");setFilterStatus("")}:undefined}/>
+            )}
+            {filtered.map(l => {
+              const coord = coords.find(c=>c.id===l.coordinator_id)
+              const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
+              return (
+                <div key={l.id} className="p-3.5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-[#0D2744]">{l.name}</div>
+                      <div className="text-xs text-[#64748B] mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+                        <span>{l.phone}</span>
+                        {l.age && <span>גיל {l.age}</span>}
+                        {l.id_number && <span>ת.ז {l.id_number}</span>}
+                      </div>
+                      <div className="text-xs text-[#94A3B8] mt-0.5">
+                        {l.owner_display||coord?.name||l.owner_name||"ללא שיוך"} · {fd(l.created_at?.slice(0,10))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <span style={sc} className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap">
+                        {STATUS_LABEL[l.status]||l.status}
+                      </span>
+                      {l.score!=null && (
+                        <span className="text-xs font-bold" style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>
+                          ★ {l.score}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2.5">
+                    <a href={`https://wa.me/972${l.phone?.replace(/^0/,"").replace(/-/g,"")}`} target="_blank"
+                      className="flex-1 text-center py-1.5 rounded-[8px] text-xs font-semibold bg-[#DCFCE7] text-[#166534]">
+                      ↗ וואטסאפ
+                    </a>
+                    {l.status==="contacted" && (
+                      <button onClick={()=>convertToContact(l)}
+                        className="flex-1 py-1.5 rounded-[8px] text-xs font-semibold bg-[#DBEAFE] text-[#1E40AF]">
+                        → איש קשר
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </Card>
       )}
