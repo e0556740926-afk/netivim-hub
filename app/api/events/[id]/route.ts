@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, eventApprovedEmail } from "@/lib/email";
+import { sendWhatsApp, eventApprovedMsg } from "@/lib/whatsapp";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -12,21 +13,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     // Notify the coordinator
     try {
       const rows = await sql`
-        SELECT e.name, e.date, e.location, c.name as coord_name, u.email
+        SELECT e.name, e.date, e.location, c.name as coord_name, u.email, COALESCE(c.phone, u.phone) as phone
         FROM events e
         LEFT JOIN coordinators c ON c.id = e.coordinator_id
         LEFT JOIN users u ON u.id = c.user_id
         WHERE e.id = ${eid} LIMIT 1`;
       const r: any = rows[0];
+      const p = {
+        coordName: r?.coord_name || "",
+        eventName: r?.name,
+        eventDate: r?.date ? String(r.date).slice(0,10) : undefined,
+        location: r?.location,
+      };
       if (r?.email) {
-        const { subject, html } = eventApprovedEmail({
-          coordName: r.coord_name || "",
-          eventName: r.name,
-          eventDate: r.date ? String(r.date).slice(0,10) : undefined,
-          location: r.location,
-        });
+        const { subject, html } = eventApprovedEmail(p);
         await sendEmail({ to: r.email, subject, html });
       }
+      if (r?.phone) await sendWhatsApp(r.phone, eventApprovedMsg(p));
     } catch (e) { console.error("[notify event]", e); }
   } else if (d.results) {
     // Update results only

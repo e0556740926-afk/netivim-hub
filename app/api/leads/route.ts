@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, newLeadEmail } from "@/lib/email";
+import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
@@ -59,16 +60,16 @@ export async function POST(req: NextRequest) {
   if (d.source === "link" && d.coordinator_id) {
     try {
       const cr = await sql`
-        SELECT c.name, u.email FROM coordinators c
+        SELECT c.name, u.email, COALESCE(c.phone, u.phone) as phone FROM coordinators c
         JOIN users u ON u.id = c.user_id
         WHERE c.id = ${d.coordinator_id} LIMIT 1`;
       const c: any = cr[0];
+      const p = { coordName: c?.name, leadName: d.name, leadPhone: d.phone, leadAge: d.age };
       if (c?.email) {
-        const { subject, html } = newLeadEmail({
-          coordName: c.name, leadName: d.name, leadPhone: d.phone, leadAge: d.age,
-        });
+        const { subject, html } = newLeadEmail(p);
         await sendEmail({ to: c.email, subject, html });
       }
+      if (c?.phone) await sendWhatsApp(c.phone, newLeadMsg(p));
     } catch (e) { console.error("[notify lead]", e); }
   }
   return NextResponse.json({ lead: rows[0], score });

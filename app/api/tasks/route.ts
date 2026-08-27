@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, taskAssignedEmail } from "@/lib/email";
+import { sendWhatsApp, taskAssignedMsg } from "@/lib/whatsapp";
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
@@ -23,18 +24,20 @@ async function getEmailsFor(names: string[]) {
   const clean = names.map(n => n.replace(/\s*👑\s*/g, "").trim()).filter(Boolean);
   if (!clean.length) return [];
 
+  try { await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text`; } catch {}
+
   const [coordRows, userRows] = await Promise.all([
-    sql`SELECT c.name, u.email FROM coordinators c
+    sql`SELECT c.name, u.email, COALESCE(c.phone, u.phone) as phone FROM coordinators c
         JOIN users u ON u.id = c.user_id
-        WHERE c.name = ANY(${clean}) AND u.email IS NOT NULL`,
-    sql`SELECT name, email, role FROM users
-        WHERE name = ANY(${clean}) AND email IS NOT NULL AND status='active'`,
+        WHERE c.name = ANY(${clean})`,
+    sql`SELECT name, email, phone, role FROM users
+        WHERE name = ANY(${clean}) AND status='active'`,
   ]);
 
-  const map = new Map<string, { email: string; isCoordinator: boolean }>();
-  for (const r of coordRows as any[]) map.set(r.name, { email: r.email, isCoordinator: true });
+  const map = new Map<string, { email?: string; phone?: string; isCoordinator: boolean }>();
+  for (const r of coordRows as any[]) map.set(r.name, { email: r.email, phone: r.phone, isCoordinator: true });
   for (const r of userRows as any[]) {
-    if (!map.has(r.name)) map.set(r.name, { email: r.email, isCoordinator: r.role === "coordinator" });
+    if (!map.has(r.name)) map.set(r.name, { email: r.email, phone: r.phone, isCoordinator: r.role === "coordinator" });
   }
   return Array.from(map.entries()).map(([name, v]) => ({ name, ...v }));
 }
@@ -43,17 +46,25 @@ async function getEmailsFor(names: string[]) {
 async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: string) {
   try {
     const recipients = await getEmailsFor(newAssignees);
-    await Promise.all(recipients.map(r => {
-      const { subject, html } = taskAssignedEmail({
-        assigneeName: r.name,
-        taskTitle: task.title,
-        taskType: task.type,
-        dueDate: task.due_date ? String(task.due_date).slice(0, 10) : null,
-        details: task.details,
-        assignedBy,
-        isCoordinator: r.isCoordinator,
-      });
-      return sendEmail({ to: r.email, subject, html });
+    const payload = (r: any) => ({
+      assigneeName: r.name,
+      taskTitle: task.title,
+      taskType: task.type,
+      dueDate: task.due_date ? String(task.due_date).slice(0, 10) : null,
+      details: task.details,
+      assignedBy,
+      isCoordinator: r.isCoordinator,
+    });
+    await Promise.all(recipients.flatMap(r => {
+      const jobs: Promise<any>[] = [];
+      if (r.email) {
+        const { subject, html } = taskAssignedEmail(payload(r));
+        jobs.push(sendEmail({ to: r.email, subject, html }));
+      }
+      if (r.phone) {
+        jobs.push(sendWhatsApp(r.phone, taskAssignedMsg(payload(r))));
+      }
+      return jobs;
     }));
   } catch (e) {
     console.error("[notify] failed:", e);
