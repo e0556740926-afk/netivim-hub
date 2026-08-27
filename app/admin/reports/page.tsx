@@ -305,6 +305,10 @@ export default function CoordManagementPage() {
               <label className="text-xs font-semibold text-[#374151]">שבוע לדו״ח:</label>
               <input type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)}
                 className="text-xs border border-[#E2E8F0] rounded-[8px] px-2.5 py-1.5 bg-white focus:outline-none focus:border-[#00488D]"/>
+              <button onClick={()=>window.open(`/admin/reports/monthly?month=${new Date().toISOString().slice(0,7)}`,"_blank")}
+                className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors whitespace-nowrap">
+                📊 דו״ח חודשי ארגוני
+              </button>
             </div>
           </div>
           <div className="space-y-2">
