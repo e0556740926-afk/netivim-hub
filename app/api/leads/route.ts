@@ -2,24 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, newLeadEmail } from "@/lib/email";
 import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
+import { hasColumn } from "@/lib/schema";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
-  // Auto-add owner_name column
-  if (!cid) {
-    const all = await sql`
-      SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display
-      FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
-      WHERE l.deleted_at IS NULL
-      ORDER BY l.created_at DESC`;
-    return NextResponse.json({ leads: all });
+  const [soft, hasOwner] = await Promise.all([
+    hasColumn("leads", "deleted_at"),
+    hasColumn("leads", "owner_name"),
+  ]);
+
+  let rows;
+  if (cid) {
+    const id = parseInt(cid);
+    rows = soft
+      ? await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.coordinator_id=${id} AND l.deleted_at IS NULL ORDER BY l.created_at DESC`
+      : await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.coordinator_id=${id} ORDER BY l.created_at DESC`;
+  } else if (hasOwner && soft) {
+    rows = await sql`SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.deleted_at IS NULL ORDER BY l.created_at DESC`;
+  } else if (hasOwner) {
+    rows = await sql`SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
+  } else if (soft) {
+    rows = await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.deleted_at IS NULL ORDER BY l.created_at DESC`;
+  } else {
+    rows = await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
   }
-  const leads = await sql`
-    SELECT l.*, c.name as owner_display
-    FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
-    WHERE l.coordinator_id = ${parseInt(cid)} AND l.deleted_at IS NULL
-    ORDER BY l.created_at DESC`;
-  return NextResponse.json({ leads });
+  return NextResponse.json({ leads: rows });
 }
 
 
@@ -48,11 +55,24 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
-  const rows = await sql`
-    INSERT INTO leads (coordinator_id, name, phone, city, age, interest, source, status, event_id, notes, id_number)
-    VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${d.notes||''}, ${d.id_number||''})
-    RETURNING *
-  `;
+  const [hasScore, hasId, hasOwnerCol] = await Promise.all([
+    hasColumn("leads", "score"),
+    hasColumn("leads", "id_number"),
+    hasColumn("leads", "owner_name"),
+  ]);
+
+  // Build the insert from whichever optional columns actually exist,
+  // so a pending migration cannot break lead creation.
+  const cols = ["coordinator_id","name","phone","city","age","interest","source","status","event_id","notes"];
+  const vals: any[] = [d.coordinator_id||null, d.name, d.phone, d.city||'', d.age||null,
+                       d.interest||'training', d.source||'manual', 'new', d.event_id||null, d.notes||''];
+  if (hasId)       { cols.push("id_number");  vals.push(d.id_number||''); }
+  if (hasOwnerCol) { cols.push("owner_name"); vals.push(d.owner_name||''); }
+  if (hasScore)    { cols.push("score");      vals.push(score); }
+
+  const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
+  const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;
+  const rows = await sql.query(text, vals);
   // Notify coordinator when lead comes from their public link
   if (d.source === "link" && d.coordinator_id) {
     try {
@@ -81,14 +101,21 @@ export async function PATCH(req: NextRequest) {
 /** Soft delete a lead. */
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
-  await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
-  return NextResponse.json({ ok: true });
+  if (await hasColumn("leads", "deleted_at")) {
+    await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
+    return NextResponse.json({ ok: true, soft: true });
+  }
+  await sql`DELETE FROM leads WHERE id=${id}`;
+  return NextResponse.json({ ok: true, soft: false });
 }
 
 /** Undo a soft delete. */
 export async function PUT(req: NextRequest) {
   const { id, restore } = await req.json();
   if (!restore) return NextResponse.json({ error: "bad request" }, { status: 400 });
+  if (!(await hasColumn("leads", "deleted_at"))) {
+    return NextResponse.json({ error: "restore unavailable" }, { status: 409 });
+  }
   await sql`UPDATE leads SET deleted_at=NULL WHERE id=${id}`;
   return NextResponse.json({ ok: true });
 }
