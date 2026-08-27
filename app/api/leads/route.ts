@@ -5,6 +5,7 @@ import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { sendToSilfrus } from "@/lib/silfrus";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
@@ -57,10 +58,11 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
-  const [hasScore, hasId, hasOwnerCol] = await Promise.all([
+  const [hasScore, hasId, hasOwnerCol, hasEmail] = await Promise.all([
     hasColumn("leads", "score"),
     hasColumn("leads", "id_number"),
     hasColumn("leads", "owner_name"),
+    hasColumn("leads", "email"),
   ]);
 
   // Build the insert from whichever optional columns actually exist,
@@ -71,6 +73,7 @@ export async function POST(req: NextRequest) {
   if (hasId)       { cols.push("id_number");  vals.push(d.id_number||''); }
   if (hasOwnerCol) { cols.push("owner_name"); vals.push(d.owner_name||''); }
   if (hasScore)    { cols.push("score");      vals.push(score); }
+  if (hasEmail)    { cols.push("email");      vals.push(d.email||''); }
 
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
   const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;
@@ -93,6 +96,27 @@ export async function POST(req: NextRequest) {
       if (c?.phone) await sendWhatsApp(c.phone, newLeadMsg(p));
     } catch (e) { console.error("[notify lead]", e); }
   }
+
+  // Sync to Silfrus (Salesforce) — leads added via the personal link
+  // or entered manually on the site. Event-sourced leads are not sent.
+  if (d.source === "link" || d.source === "manual") {
+    try {
+      let ownerName = d.owner_name || "";
+      if (!ownerName && d.coordinator_id) {
+        const cr = await sql`SELECT name FROM coordinators WHERE id=${d.coordinator_id} LIMIT 1`;
+        ownerName = (cr[0] as any)?.name || "";
+      }
+      const [firstName, ...rest] = String(d.name || "").trim().split(" ");
+      await sendToSilfrus({
+        firstName: firstName || d.name || "",
+        lastName: rest.join(" "),
+        phone: d.phone,
+        email: d.email || "",
+        ownerName,
+      });
+    } catch (e) { console.error("[silfrus sync]", e); }
+  }
+
   return NextResponse.json({ lead: rows[0], score });
 }
 

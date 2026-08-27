@@ -26,10 +26,7 @@ export default function PublicForm({ params }: { params: { slug: string } }) {
     if (!coordId) { setErr("קישור לא תקין — פנה לרכז ישירות"); return }
     setLoading(true); setErr("")
     const fullName = `${form.firstName} ${form.lastName}`.trim()
-    const notes = [
-      form.email ? `מייל: ${form.email}` : "",
-      form.notes ? `פרטים: ${form.notes}` : "",
-    ].filter(Boolean).join(" | ")
+    const notes = form.notes || ""
     const res = await fetch("/api/leads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,6 +34,7 @@ export default function PublicForm({ params }: { params: { slug: string } }) {
         coordinator_id: coordId,
         name: fullName,
         phone: form.phone,
+        email: form.email,
         age: form.age ? +form.age : null,
         source: "link",
         interest: "training",

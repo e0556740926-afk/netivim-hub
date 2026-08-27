@@ -114,3 +114,8 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+
+-- ============================================================
+-- Lead email field, for Silfrus (Salesforce) integration
+-- ============================================================
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS email text DEFAULT '';
