@@ -1,4 +1,5 @@
 "use client"
+import EmptyState from "@/components/ui/EmptyState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
@@ -95,7 +96,7 @@ export default function CoordEvents() {
 
     {/* Events list */}
     <div className="space-y-3">
-      {filtered.length===0&&<div className="text-sm text-[#94A3B8] text-center py-8">אין אירועים</div>}
+      {filtered.length===0&&<EmptyState icon="📅" title={filter?"אין אירועים בסטטוס זה":"אין אירועים"} hint={filter?undefined:"תוכל להציע אירוע חדש — הוא יישלח לאישור המנהל"} actionLabel={filter?undefined:"+ הצע אירוע"} onAction={()=>setShowForm(true)} onClearFilters={filter?()=>setFilter(""):undefined}/>}
       {filtered.map(e=>{
         const d=new Date(e.date)
         const spent=expenses[e.id]||0

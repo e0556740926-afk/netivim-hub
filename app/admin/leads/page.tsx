@@ -1,4 +1,7 @@
 "use client"
+import { useSort, Th } from "@/components/ui/SortableTable"
+import { useUrlState } from "@/lib/use-url-state"
+import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
 import Card from "@/components/ui/Card"
@@ -32,9 +35,9 @@ export default function AdminLeads() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState("")
   const [dupWarning, setDupWarning] = useState<any>(null)
-  const [filterCoord, setFilterCoord] = useState("")
-  const [filterStatus, setFilterStatus] = useState("")
-  const [q, setQ] = useState("")
+  const [filterCoord, setFilterCoord] = useUrlState("coord")
+  const [filterStatus, setFilterStatus] = useUrlState("status")
+  const [q, setQ] = useUrlState("q")
 
   async function load() {
     setLoading(true); setError(false)
@@ -91,12 +94,13 @@ export default function AdminLeads() {
     if (d.contact_id || d.error) load()
   }
 
-  const filtered = leads.filter(l => {
+  const filteredRaw = leads.filter(l => {
     if (q && !((l.name||"")+(l.phone||"")).includes(q)) return false
     if (filterCoord && String(l.coordinator_id)!==filterCoord) return false
     if (filterStatus && l.status!==filterStatus) return false
     return true
   })
+  const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "created_at", "desc")
 
   const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
 
@@ -219,14 +223,17 @@ export default function AdminLeads() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                  {["שם","טלפון","ת.ז","גיל","ציון","רכז","סטטוס","תאריך",""].map(h=>(
-                    <th key={h} className="px-3 py-2.5 text-right text-xs font-bold text-[#64748B] whitespace-nowrap">{h}</th>
+                  {[["שם","name"],["טלפון","phone"],["ת.ז","id_number"],["גיל","age"],
+                    ["ציון","score"],["רכז","owner_display"],["סטטוס","status"],
+                    ["תאריך","created_at"],["",""]].map(([label,key])=>(
+                    <Th key={label||"actions"} label={label} k={key||undefined}
+                      sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}/>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length===0 && (
-                  <tr><td colSpan={8} className="text-center py-10 text-sm text-[#94A3B8]">אין לידים</td></tr>
+                  <tr><td colSpan={9}><EmptyState icon="⭐" title={q||filterCoord||filterStatus?"לא נמצאו לידים":"אין עדיין לידים"} hint={q||filterCoord||filterStatus?"נסה לשנות את הסינון":"לידים נכנסים מהלינק האישי של הרכזים, מאירועים, או בהוספה ידנית"} actionLabel={q||filterCoord||filterStatus?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)} onClearFilters={q||filterCoord||filterStatus?()=>{setQ("");setFilterCoord("");setFilterStatus("")}:undefined}/></td></tr>
                 )}
                 {filtered.map(l => {
                   const coord = coords.find(c=>c.id===l.coordinator_id)

@@ -1,4 +1,6 @@
 "use client"
+import { useUrlState } from "@/lib/use-url-state"
+import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
 import Badge from "@/components/ui/Badge"
@@ -28,7 +30,7 @@ export default function EventsPage() {
   const [expenses, setExpenses] = useState<Record<number,number>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [filter, setFilter] = useState("")
+  const [filter, setFilter] = useUrlState("status")
 
   // Edit state
   const [editId, setEditId] = useState<number|null>(null)
@@ -302,7 +304,7 @@ export default function EventsPage() {
       {loading
         ? <div className="space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
         : <div className="space-y-3">
-            {filtered.length===0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין אירועים</div>}
+            {filtered.length===0 && <EmptyState icon="📅" title={filter?"אין אירועים בסטטוס זה":"אין עדיין אירועים"} hint={filter?undefined:"אירועים הם הדרך המרכזית לאסוף לידים חדשים"} actionLabel={filter?undefined:"+ צור אירוע ראשון"} onAction={()=>{setShowNew(true);setEditId(null);setResultsId(null)}} onClearFilters={filter?()=>setFilter(""):undefined}/>}
             {filtered.map(e=>{
               const spent=expenses[e.id]||0
               const bp=e.budget_planned>0?Math.round(spent/e.budget_planned*100):0

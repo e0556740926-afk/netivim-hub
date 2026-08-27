@@ -1,4 +1,5 @@
 "use client"
+import EmptyState from "@/components/ui/EmptyState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
@@ -103,7 +104,7 @@ export default function CoordHome() {
           <div className="flex-1"><div className="text-sm font-semibold">{t.title}</div><div style={{ color: accent }} className="text-xs font-semibold mt-0.5">{late ? "⚠ " : ""}{fd(t.due_date?.slice(0,10))}</div></div>
         </div>
       })}
-      {tasks.length === 0 && <div className="text-sm text-[#94A3B8] text-center py-3">אין משימות פתוחות 🎉</div>}
+      {tasks.length === 0 && <EmptyState icon="🎉" title="אין משימות פתוחות" hint="הכל מטופל. כל הכבוד!"/>}
     </div>
 
     {events.length > 0 && <>

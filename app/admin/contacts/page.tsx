@@ -1,4 +1,7 @@
 "use client"
+import { useSort, Th } from "@/components/ui/SortableTable"
+import { useUrlState } from "@/lib/use-url-state"
+import EmptyState from "@/components/ui/EmptyState"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState, useCallback } from "react"
 import { fd, ds } from "@/lib/utils"
@@ -34,10 +37,10 @@ export default function ContactsPage() {
   const [coords, setCoords] = useState<any[]>([])
   const [managers, setManagers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [q, setQ] = useState("")
-  const [fType, setFType] = useState("")
-  const [fStatus, setFStatus] = useState("")
-  const [fOwner, setFOwner] = useState("")
+  const [q, setQ] = useUrlState("q")
+  const [fType, setFType] = useUrlState("type")
+  const [fStatus, setFStatus] = useUrlState("status")
+  const [fOwner, setFOwner] = useUrlState("owner")
 
   // Panel state
   const [openId, setOpenId] = useState<number|null>(null)
@@ -204,13 +207,14 @@ export default function ContactsPage() {
     ...managers.map((m:any)=>({name:m.name, label:m.name, role:m.role==="admin"?"מנהל":"צופה"})),
   ]
 
-  const filtered = contacts.filter(c => {
+  const filteredRaw = contacts.filter(c => {
     if (q && !((c.name||"")+(c.org||"")+(c.owner||"")).includes(q)) return false
     if (fType && c.type!==fType) return false
     if (fStatus && c.status!==fStatus) return false
     if (fOwner && c.owner!==fOwner) return false
     return true
   })
+  const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "name")
   const today = new Date().toISOString().slice(0,10)
   const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
 
@@ -419,12 +423,15 @@ export default function ContactsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead><tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-              {["שם","ארגון","סוג","רכז","סטטוס","פוטנציאל","קשר אחרון",""].map(h=>(
-                <th key={h} className="px-3 py-2.5 text-right text-xs font-bold text-[#64748B]">{h}</th>
+              {[["שם","name"],["ארגון","org"],["סוג","type"],["רכז","owner"],
+                ["סטטוס","status"],["פוטנציאל","potential"],["קשר אחרון","last_contact"],
+                ["",""]].map(([label,key])=>(
+                <Th key={label||"actions"} label={label} k={key||undefined}
+                  sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}/>
               ))}
             </tr></thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={8} className="text-center py-10 text-sm text-[#94A3B8]">לא נמצאו אנשי קשר</td></tr>}
+              {filtered.length===0&&<tr><td colSpan={8}><EmptyState icon="👥" title={q||fType||fStatus||fOwner?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={q||fType||fStatus||fOwner?"נסה לשנות את הסינון או החיפוש":"כאן ינוהלו השותפים, גורמי הרשות והספקים של הארגון"} actionLabel={q||fType||fStatus||fOwner?undefined:"+ הוסף איש קשר ראשון"} onAction={startAdd} onClearFilters={q||fType||fStatus||fOwner?()=>{setQ("");setFType("");setFStatus("");setFOwner("")}:undefined}/></td></tr>}
               {filtered.map(c=>{
                 const d=ds(c.last_contact); const isOpen=openId===c.id
                 const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}

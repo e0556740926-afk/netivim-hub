@@ -1,4 +1,5 @@
 "use client"
+import EmptyState from "@/components/ui/EmptyState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
@@ -184,7 +185,7 @@ export default function CoordContacts() {
 
     {/* List */}
     <div className="space-y-2">
-      {filtered.length===0&&<div className="text-sm text-[#94A3B8] text-center py-8">לא נמצאו אנשי קשר</div>}
+      {filtered.length===0&&<EmptyState icon="👥" title={q||fStatus?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={q||fStatus?"נסה חיפוש אחר":"כאן מופיעים כל אנשי הקשר של הארגון"} actionLabel={q||fStatus?undefined:"+ הוסף איש קשר"} onAction={startAdd} onClearFilters={q||fStatus?()=>{setQ("");setFStatus("")}:undefined}/>}
       {filtered.map(c=>{
         const d=ds(c.last_contact); const isOpen=openId===c.id
         const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
