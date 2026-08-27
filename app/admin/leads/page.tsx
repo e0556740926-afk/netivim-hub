@@ -7,6 +7,7 @@ import ExportButton from "@/components/ui/ExportButton"
 import Badge from "@/components/ui/Badge"
 import { SkeletonTable } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
+import { useToast } from "@/components/ui/Toast"
 
 const STATUS_LABEL: Record<string,string> = {
   new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי"
@@ -20,6 +21,7 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
 const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"" }
 
 export default function AdminLeads() {
+  const { success, undoable } = useToast()
   const [leads, setLeads] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [adminUsers, setAdminUsers] = useState<any[]>([])
@@ -75,6 +77,7 @@ export default function AdminLeads() {
     if (d.error==="כפילות") { setDupWarning(d.duplicate); return }
     if (d.error) { setErr(d.error); return }
     setForm({...EMPTY_FORM}); setShowForm(false); load()
+    success("הליד נוסף")
   }
 
   async function convertToContact(lead: any) {

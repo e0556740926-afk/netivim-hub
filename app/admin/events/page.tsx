@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button"
 import ExportButton from "@/components/ui/ExportButton"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
+import { useToast } from "@/components/ui/Toast"
 
 const STATUS_OPTIONS = [
   { v:"planning", l:"תכנון ראשוני" },
@@ -22,6 +23,7 @@ const EMPTY_FORM = { name:"", date:"", time:"", location:"", budget_planned:"", 
 const EMPTY_RESULTS = { actual_attendees:"", leads_collected:"", summary:"", follow_up:"" }
 
 export default function EventsPage() {
+  const { success } = useToast()
   const [events, setEvents] = useState<any[]>([])
   const [expenses, setExpenses] = useState<Record<number,number>>({})
   const [loading, setLoading] = useState(true)
@@ -99,6 +101,7 @@ export default function EventsPage() {
       })
     }
     setSaving(false); setEditId(null); setShowNew(false); load()
+    success(editId ? "האירוע עודכן" : "האירוע נוצר")
   }
 
   async function saveResults() {
@@ -130,6 +133,7 @@ export default function EventsPage() {
       })
     }
     setSaving(false); setResultsId(null); load()
+    success("התוצאות נשמרו")
   }
 
   async function approve(id: number) {

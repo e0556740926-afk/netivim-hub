@@ -10,13 +10,14 @@ export async function GET(req: NextRequest) {
     const all = await sql`
       SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display
       FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
+      WHERE l.deleted_at IS NULL
       ORDER BY l.created_at DESC`;
     return NextResponse.json({ leads: all });
   }
   const leads = await sql`
     SELECT l.*, c.name as owner_display
     FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id
-    WHERE l.coordinator_id = ${parseInt(cid)}
+    WHERE l.coordinator_id = ${parseInt(cid)} AND l.deleted_at IS NULL
     ORDER BY l.created_at DESC`;
   return NextResponse.json({ leads });
 }
@@ -74,5 +75,20 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { id, status } = await req.json();
   await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
+  return NextResponse.json({ ok: true });
+}
+
+/** Soft delete a lead. */
+export async function DELETE(req: NextRequest) {
+  const { id } = await req.json();
+  await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
+  return NextResponse.json({ ok: true });
+}
+
+/** Undo a soft delete. */
+export async function PUT(req: NextRequest) {
+  const { id, restore } = await req.json();
+  if (!restore) return NextResponse.json({ error: "bad request" }, { status: 400 });
+  await sql`UPDATE leads SET deleted_at=NULL WHERE id=${id}`;
   return NextResponse.json({ ok: true });
 }

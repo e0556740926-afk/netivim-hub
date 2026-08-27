@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import { AuthProvider } from "@/lib/auth-context"
 import SessionWrapper from "@/components/SessionWrapper"
+import { ToastProvider } from "@/components/ui/Toast"
 
 export const metadata: Metadata = {
   title: "נתיבים שטח",
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <SessionWrapper>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </AuthProvider>
         </SessionWrapper>
       </body>
     </html>

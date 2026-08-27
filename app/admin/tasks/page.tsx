@@ -1,4 +1,5 @@
 "use client"
+import { useToast } from "@/components/ui/Toast"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
@@ -15,6 +16,7 @@ const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה
 
 export default function TasksPage() {
   const { user } = useAuth()
+  const { success } = useToast()
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
@@ -76,6 +78,7 @@ export default function TasksPage() {
   }
 
   async function deleteTask(id: number) {
+    if (!confirm("למחוק משימה זו?")) return
     await fetch("/api/tasks", { method:"DELETE", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id}) })
     setTasks(t => t.filter(x => x.id!==id))
   }

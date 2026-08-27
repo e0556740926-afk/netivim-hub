@@ -89,3 +89,12 @@ CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
 
 -- ── Done ──
 SELECT 'migration 001 complete' AS status;
+
+-- ============================================================
+-- B6: soft delete — deleting a contact or lead is recoverable
+-- ============================================================
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE leads    ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+CREATE INDEX IF NOT EXISTS idx_contacts_not_deleted ON contacts(deleted_at) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_leads_not_deleted    ON leads(deleted_at)    WHERE deleted_at IS NULL;

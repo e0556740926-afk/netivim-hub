@@ -72,6 +72,7 @@ export default function CoordTasks() {
   }
 
   async function del(id:number) {
+    if (!confirm("למחוק משימה זו?")) return
     await fetch("/api/tasks",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})
     setTasks(t=>t.filter(x=>x.id!==id))
   }

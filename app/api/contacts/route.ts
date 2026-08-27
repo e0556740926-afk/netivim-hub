@@ -4,8 +4,8 @@ import sql from "@/lib/db";
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
   const rows = cid
-    ? await sql`SELECT c.*, COALESCE(i.cnt,0)::int as interaction_count FROM contacts c LEFT JOIN (SELECT contact_id, COUNT(*) as cnt FROM interactions GROUP BY contact_id) i ON i.contact_id=c.id WHERE c.coordinator_id=${parseInt(cid)} ORDER BY c.name`
-    : await sql`SELECT c.*, COALESCE(i.cnt,0)::int as interaction_count FROM contacts c LEFT JOIN (SELECT contact_id, COUNT(*) as cnt FROM interactions GROUP BY contact_id) i ON i.contact_id=c.id ORDER BY c.name`;
+    ? await sql`SELECT c.*, COALESCE(i.cnt,0)::int as interaction_count FROM contacts c LEFT JOIN (SELECT contact_id, COUNT(*) as cnt FROM interactions GROUP BY contact_id) i ON i.contact_id=c.id WHERE c.coordinator_id=${parseInt(cid)} AND c.deleted_at IS NULL ORDER BY c.name`
+    : await sql`SELECT c.*, COALESCE(i.cnt,0)::int as interaction_count FROM contacts c LEFT JOIN (SELECT contact_id, COUNT(*) as cnt FROM interactions GROUP BY contact_id) i ON i.contact_id=c.id WHERE c.deleted_at IS NULL ORDER BY c.name`;
   return NextResponse.json({ contacts: rows });
 }
 
@@ -26,6 +26,13 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
-  await sql`DELETE FROM contacts WHERE id=${id}`;
+  await sql`UPDATE contacts SET deleted_at=now() WHERE id=${id}`;
+  return NextResponse.json({ ok: true });
+}
+/** Undo a soft delete. */
+export async function PUT(req: NextRequest) {
+  const { id, restore } = await req.json();
+  if (!restore) return NextResponse.json({ error: "bad request" }, { status: 400 });
+  await sql`UPDATE contacts SET deleted_at=NULL WHERE id=${id}`;
   return NextResponse.json({ ok: true });
 }

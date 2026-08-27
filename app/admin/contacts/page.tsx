@@ -5,6 +5,7 @@ import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 import ExportButton from "@/components/ui/ExportButton"
 import { SkeletonTable } from "@/components/ui/Skeleton"
+import { useToast } from "@/components/ui/Toast"
 
 const TYPE_LABEL: Record<string,string> = {
   partner:"שותף אסטרטגי", authority:"גורם רשות", vendor:"ספק חיצוני", lead:"ליד"
@@ -26,6 +27,7 @@ const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summ
 const EMPTY_TASK = { title:"", type:"call", due_date:"", status:"todo", details:"", assignees:[] as string[] }
 
 export default function ContactsPage() {
+  const { success, error: toastError, undoable } = useToast()
   const [contacts, setContacts] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [managers, setManagers] = useState<any[]>([])
@@ -102,13 +104,19 @@ export default function ContactsPage() {
     if (editContactId) await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...contactForm,id:editContactId})})
     else await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(contactForm)})
     setSaving(false); setShowContactForm(false); load()
+    success(editContactId ? "השינויים נשמרו" : "איש הקשר נוסף")
   }
 
   async function deleteContact(id: number) {
-    if (!confirm("למחוק איש קשר?")) return
+    const name = contacts.find(c => c.id === id)?.name || "איש הקשר"
     await fetch("/api/contacts",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})
     if (openId===id) { setOpenId(null); setDetail(null) }
-    load()
+    setContacts(cs => cs.filter(c => c.id !== id))
+    undoable(`${name} נמחק`, async () => {
+      await fetch("/api/contacts",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,restore:true})})
+      load()
+      success("השחזור הושלם")
+    })
   }
 
   // ---- INTERACTIONS ----
@@ -130,10 +138,12 @@ export default function ContactsPage() {
       await fetch("/api/interactions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...intForm,contact_id:openId})})
     }
     setSaving(false); setShowIntForm(false); setEditIntId(null); setIntForm({...EMPTY_INT})
+    success(editIntId ? "האינטראקציה עודכנה" : "האינטראקציה תועדה")
     if (openId) await loadDetail(openId); load()
   }
 
   async function deleteInt(id: number) {
+    if (!confirm("למחוק אינטראקציה זו?")) return
     await fetch("/api/interactions",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})
     if (openId) await loadDetail(openId)
   }
@@ -158,6 +168,7 @@ export default function ContactsPage() {
       body:JSON.stringify({...taskForm, contact_id:taskContactId||openId})
     })
     setSaving(false); setShowTaskForm(false); setTaskForm({...EMPTY_TASK})
+    success("המשימה נוצרה")
     if (openId) await loadDetail(openId)
   }
 
