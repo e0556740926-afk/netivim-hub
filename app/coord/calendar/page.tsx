@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import CalendarPopup from "@/components/ui/CalendarPopup"
@@ -15,6 +17,8 @@ const STATUS_LABEL: Record<string,string> = {
 }
 
 export default function CoordCalendar() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [events, setEvents] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])

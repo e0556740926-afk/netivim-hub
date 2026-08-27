@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd, ds } from "@/lib/utils"
@@ -16,6 +18,8 @@ const EMPTY_FORM = { name:"", org:"", role:"", phone:"", email:"", type:"partner
 const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summary:"", next_step:"" }
 
 export default function CoordContacts() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [contacts, setContacts] = useState<any[]>([])
   const [q, setQ] = useState("")
@@ -30,9 +34,13 @@ export default function CoordContacts() {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    const res = await fetch("/api/contacts")
-    const { contacts } = await res.json()
-    setContacts(contacts||[])
+    setLoading(true); setError(false)
+    try {
+      const res = await fetch("/api/contacts")
+      const { contacts } = await res.json()
+      setContacts(contacts||[])
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -75,6 +83,9 @@ export default function CoordContacts() {
     if(fStatus&&c.status!==fStatus) return false
     return true
   })
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return <div className="p-4">
     <div className="flex items-center justify-between mb-3">

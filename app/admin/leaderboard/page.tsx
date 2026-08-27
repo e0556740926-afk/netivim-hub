@@ -1,10 +1,13 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import {useEffect,useState} from "react"
 import {pct,leadColor} from "@/lib/utils"
 import Card from "@/components/ui/Card"
 import Speedometer from "@/components/ui/Speedometer"
 
 export default function LeaderboardPage(){
+  const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [board,setBoard]=useState<any[]>([])
   const [org,setOrg]=useState({actual:0,target:0})
@@ -21,6 +24,8 @@ export default function LeaderboardPage(){
       setOrg({actual:leads.length,target:targets.reduce((s:any,t:any)=>s+ +t.target_leads,0)})
     })
   },[])
+
+  if (error) return <div className="p-6"><ErrorState retry={()=>window.location.reload()}/></div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold mb-5">Leaderboard · לידים החודש</h1>

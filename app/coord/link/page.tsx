@@ -1,9 +1,13 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd } from "@/lib/utils"
 
 export default function CoordLink() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [coord, setCoord] = useState<any>(null)
   const [linkLeads, setLinkLeads] = useState<any[]>([])
@@ -34,6 +38,8 @@ export default function CoordLink() {
     const msg = encodeURIComponent(`היי! אני ${user?.name} מנתיבים.\nמעניין אותך לשמוע עוד? השאר פרטים ואחזור אליך:\n${shareUrl}`)
     window.open(`https://wa.me/?text=${msg}`, "_blank")
   }
+
+  if (error) return <div className="p-6"><ErrorState retry={()=>window.location.reload()}/></div>
 
   return <div className="p-4 space-y-4">
     <div className="text-lg font-extrabold">הלינק שלי</div>

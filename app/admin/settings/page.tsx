@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd } from "@/lib/utils"
@@ -12,6 +14,7 @@ const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:
 const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
 
 export default function SettingsPage() {
+  const [error, setError] = useState(false)
   const { user: me } = useAuth()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<any[]>([])
@@ -37,12 +40,15 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"" })
 
   async function load() {
-    setLoading(true)
-    const [ur, cr] = await Promise.all([fetch("/api/users"), fetch("/api/targets")])
-    const { users } = await ur.json()
-    const { coordinators } = await cr.json()
-    setUsers(users||[]); loadCalTokens(users||[])
-    setCoords(coordinators||[])
+    setLoading(true); setError(false)
+    try {
+      const [ur, cr] = await Promise.all([fetch("/api/users"), fetch("/api/targets")])
+      const { users } = await ur.json()
+      const { coordinators } = await cr.json()
+      setUsers(users||[]); loadCalTokens(users||[])
+      setCoords(coordinators||[])
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
@@ -88,6 +94,9 @@ export default function SettingsPage() {
 
   const coordUsers = users.filter(u => u.role === "coordinator")
   const otherUsers = users.filter(u => u.role !== "coordinator")
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <div className="flex items-center justify-between mb-5">

@@ -1,4 +1,5 @@
 "use client"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState, useCallback } from "react"
 import { fd, ds } from "@/lib/utils"
 import Card from "@/components/ui/Card"
@@ -27,6 +28,7 @@ const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summ
 const EMPTY_TASK = { title:"", type:"call", due_date:"", status:"todo", details:"", assignees:[] as string[] }
 
 export default function ContactsPage() {
+  const [error, setError] = useState(false)
   const { success, error: toastError, undoable } = useToast()
   const [contacts, setContacts] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
@@ -211,6 +213,8 @@ export default function ContactsPage() {
   })
   const today = new Date().toISOString().slice(0,10)
   const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
 
   return (
     <div className="p-4 md:p-6 lg:p-8 fade-up">

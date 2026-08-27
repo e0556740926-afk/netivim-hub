@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
 import Badge from "@/components/ui/Badge"
@@ -12,6 +14,7 @@ const STATUS_LABEL: Record<string,string> = { paid:"שולם", pending:"ממתי
 const SRC_CAT: Record<string,string> = { ministry:"משרד ממשלתי", municipality:"עירייה", foundation:"קרן", donation:"תרומה", self:"תקציב עצמי", other:"אחר" }
 
 export default function FinancePage() {
+  const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<"expenses"|"sources">("expenses")
   const [expenses, setExpenses] = useState<any[]>([])
@@ -29,14 +32,17 @@ export default function FinancePage() {
   const [srcForm, setSrcForm] = useState({ name:"", description:"", total_amount:0, used_amount:0, category:"ministry", year })
 
   async function load() {
-    setLoading(true)
-    const [er, ev, sr] = await Promise.all([
-      fetch("/api/expenses"), fetch("/api/events"), fetch(`/api/budget-sources?year=${year}`)
-    ])
-    const { expenses } = await er.json()
-    const { events } = await ev.json()
-    const { sources } = await sr.json()
-    setExpenses(expenses||[]); setEvents(events||[]); setSources(sources||[])
+    setLoading(true); setError(false)
+    try {
+      const [er, ev, sr] = await Promise.all([
+        fetch("/api/expenses"), fetch("/api/events"), fetch(`/api/budget-sources?year=${year}`)
+      ])
+      const { expenses } = await er.json()
+      const { events } = await ev.json()
+      const { sources } = await sr.json()
+      setExpenses(expenses||[]); setEvents(events||[]); setSources(sources||[])
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
@@ -65,6 +71,9 @@ export default function FinancePage() {
   const totSpent = expenses.filter(e=>e.status!=="cancelled").reduce((s:number,e:any)=>s+(+e.amount||0),0)
   const pending = expenses.filter(e=>e.status==="pending").reduce((s:number,e:any)=>s+(+e.amount||0),0)
   const pct = totBudget>0?Math.round(totSpent/totBudget*100):0
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold text-[#0D2744] mb-5">מרכז פיננסי</h1>

@@ -1,10 +1,13 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import {useEffect,useState} from "react"
 import {pct,leadColor} from "@/lib/utils"
 import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 
 export default function TargetsPage(){
+  const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [rows,setRows]=useState<any[]>([])
   const [def,setDef]=useState(50)
@@ -13,13 +16,17 @@ export default function TargetsPage(){
   useEffect(()=>{load()},[])
 
   async function load(){
-    const res=await fetch("/api/targets")
-    const {coordinators,targets,leads}=await res.json()
-    setRows(coordinators.map((c:any)=>{
-      const t=targets.find((x:any)=>x.coordinator_id===c.id)?.target_leads||0
-      const a=leads.filter((l:any)=>l.coordinator_id===c.id).length
-      return{coord_id:c.id,name:c.name,area:c.area,monthly:t,annual:t*12,actual:a}
-    }))
+    setLoading(true); setError(false)
+    try {
+      const res=await fetch("/api/targets")
+      const {coordinators,targets,leads}=await res.json()
+      setRows(coordinators.map((c:any)=>{
+        const t=targets.find((x:any)=>x.coordinator_id===c.id)?.target_leads||0
+        const a=leads.filter((l:any)=>l.coordinator_id===c.id).length
+        return{coord_id:c.id,name:c.name,area:c.area,monthly:t,annual:t*12,actual:a}
+      }))
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
 
   async function setTarget(coord_id:number,val:number){
@@ -28,6 +35,9 @@ export default function TargetsPage(){
   }
 
   async function applyDefault(){await Promise.all(rows.map(r=>setTarget(r.coord_id,def)))}
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <h1 className="text-2xl font-extrabold text-[#0D2744] mb-1">הגדרת יעדי לידים</h1>

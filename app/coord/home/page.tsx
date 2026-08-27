@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -10,6 +12,8 @@ const MONTHS = ["ינו","פבר","מרץ","אפר","מאי","יונ","יול","
 const STATUS_LABEL: Record<string, string> = { planning:"תכנון", pending_approval:"ממתין לאישור", approved:"מאושר", marketing:"בפרסום", done:"בוצע" }
 
 export default function CoordHome() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const router = useRouter()
   const [coord, setCoord] = useState<any>(null)
@@ -27,39 +31,46 @@ export default function CoordHome() {
   useEffect(() => { if (user) load() }, [user])
 
   async function load() {
-    const cRes = await fetch(`/api/coord?user_id=${user!.id}`)
-    const { coord: c } = await cRes.json()
-    if (!c) return
-    setCoord(c)
+    setLoading(true); setError(false)
+    try {
+      const cRes = await fetch(`/api/coord?user_id=${user!.id}`)
+      const { coord: c } = await cRes.json()
+      if (!c) return
+      setCoord(c)
 
-    const [leadsRes, tasksRes, eventsRes] = await Promise.all([
-      fetch(`/api/leads?coordinator_id=${c.id}`),
-      fetch(`/api/tasks?name=${encodeURIComponent(user!.name)}`),
-      fetch(`/api/events`),
-    ])
-    const { leads } = await leadsRes.json()
-    const { tasks: myTasks } = await tasksRes.json()
-    const { events: allEvents } = await eventsRes.json()
+      const [leadsRes, tasksRes, eventsRes] = await Promise.all([
+        fetch(`/api/leads?coordinator_id=${c.id}`),
+        fetch(`/api/tasks?name=${encodeURIComponent(user!.name)}`),
+        fetch(`/api/events`),
+      ])
+      const { leads } = await leadsRes.json()
+      const { tasks: myTasks } = await tasksRes.json()
+      const { events: allEvents } = await eventsRes.json()
 
-    const monthLeads = leads.filter((l: any) => l.created_at?.slice(0, 7) === `${y}-${String(m).padStart(2, "0")}`)
-    setMyLeads(monthLeads.length)
-    setLinkCount(leads.filter((l: any) => l.source === "link").length)
-    setTasks(myTasks.slice(0, 5))
+      const monthLeads = leads.filter((l: any) => l.created_at?.slice(0, 7) === `${y}-${String(m).padStart(2, "0")}`)
+      setMyLeads(monthLeads.length)
+      setLinkCount(leads.filter((l: any) => l.source === "link").length)
+      setTasks(myTasks.slice(0, 5))
 
-    const month = new Date().getMonth() + 1, yr = new Date().getFullYear()
-    const tRes = await fetch(`/api/targets`)
-    const { targets } = await tRes.json()
-    const myTarget = targets.find((t: any) => t.coordinator_id === c.id)?.target_leads || 0
-    setTarget(myTarget)
+      const month = new Date().getMonth() + 1, yr = new Date().getFullYear()
+      const tRes = await fetch(`/api/targets`)
+      const { targets } = await tRes.json()
+      const myTarget = targets.find((t: any) => t.coordinator_id === c.id)?.target_leads || 0
+      setTarget(myTarget)
 
-    const myEvents = allEvents.filter((e: any) => e.coordinator_id === c.id && e.status !== "done").slice(0, 3)
-    setEvents(myEvents)
+      const myEvents = allEvents.filter((e: any) => e.coordinator_id === c.id && e.status !== "done").slice(0, 3)
+      setEvents(myEvents)
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
 
   async function doneTask(id: number) {
     await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status: "done", status_only: true }) })
     setTasks(t => t.filter(x => x.id !== id))
   }
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
 
   return <div className="p-4 max-w-2xl mx-auto">
     <div className="text-xl font-extrabold mb-0.5">שלום {user?.name?.split(" ")[0]},</div>

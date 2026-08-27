@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useToast } from "@/components/ui/Toast"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
@@ -15,6 +17,7 @@ const COLS = [
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
 
 export default function TasksPage() {
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const { success } = useToast()
   const [loading, setLoading] = useState(true)
@@ -30,20 +33,23 @@ export default function TasksPage() {
   const today = new Date().toISOString().slice(0,10)
 
   async function load() {
-    setLoading(true)
-    const [tr, cr, er, ua] = await Promise.all([
-      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/events"), fetch("/api/users/all")
-    ])
-    const { tasks } = await tr.json()
-    const { contacts } = await cr.json()
-    const { events } = await er.json()
-    const { coordinators, admins } = await ua.json()
-    const allPeople = [
-      ...(coordinators||[]).map((c:any) => ({...c, _isManager: false})),
-      ...(admins||[]).filter((a:any) => !(coordinators||[]).find((c:any) => c.name===a.name))
-        .map((a:any) => ({...a, _isManager: true}))
-    ]
-    setTasks(tasks||[]); setContacts(contacts||[]); setEvents(events||[]); setCoords(allPeople)
+    setLoading(true); setError(false)
+    try {
+      const [tr, cr, er, ua] = await Promise.all([
+        fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/events"), fetch("/api/users/all")
+      ])
+      const { tasks } = await tr.json()
+      const { contacts } = await cr.json()
+      const { events } = await er.json()
+      const { coordinators, admins } = await ua.json()
+      const allPeople = [
+        ...(coordinators||[]).map((c:any) => ({...c, _isManager: false})),
+        ...(admins||[]).filter((a:any) => !(coordinators||[]).find((c:any) => c.name===a.name))
+          .map((a:any) => ({...a, _isManager: true}))
+      ]
+      setTasks(tasks||[]); setContacts(contacts||[]); setEvents(events||[]); setCoords(allPeople)
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
 
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
@@ -88,6 +94,9 @@ export default function TasksPage() {
   }
 
   const filtered = filterAssignee ? tasks.filter(t => t.assignees?.includes(filterAssignee)) : tasks
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <div className="flex items-center justify-between mb-5">

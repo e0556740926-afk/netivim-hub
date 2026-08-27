@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -12,6 +14,8 @@ const STATUS_COLORS: Record<string,string> = {
 }
 
 export default function CalendarPage() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [events, setEvents] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
@@ -57,6 +61,8 @@ export default function CalendarPage() {
     const dayNum=i-firstDay+1
     return dayNum>=1&&dayNum<=daysInMonth?dayNum:null
   })
+
+  if (error) return <div className="p-6"><ErrorState retry={()=>window.location.reload()}/></div>
 
   return <div className="p-4 md:p-6 lg:p-8 fade-up">
     <div className="flex items-center justify-between mb-5">

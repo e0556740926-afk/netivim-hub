@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
@@ -13,6 +15,7 @@ const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי
 const MTG_TYPE: Record<string,string> = { regular:"שגרתית", urgent:"חירום", goal:"מטרה מוגדרת" }
 
 export default function CoordManagementPage() {
+  const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<"meetings"|"reports"|"tracking">("meetings")
   const [meetings, setMeetings] = useState<any[]>([])
@@ -39,16 +42,19 @@ export default function CoordManagementPage() {
   const [openReport, setOpenReport] = useState<number|null>(null)
 
   async function load() {
-    setLoading(true)
-    const [mr, rr, cr] = await Promise.all([
-      fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")
-    ])
-    const { meetings } = await mr.json()
-    const { reports } = await rr.json()
-    const { coordinators } = await cr.json()
-    setMeetings(meetings||[])
-    setReports(reports||[])
-    setCoords(coordinators||[])
+    setLoading(true); setError(false)
+    try {
+      const [mr, rr, cr] = await Promise.all([
+        fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")
+      ])
+      const { meetings } = await mr.json()
+      const { reports } = await rr.json()
+      const { coordinators } = await cr.json()
+      setMeetings(meetings||[])
+      setReports(reports||[])
+      setCoords(coordinators||[])
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load().finally(()=>setLoading(false)) }, [])
 
@@ -105,6 +111,9 @@ export default function CoordManagementPage() {
 
   const filteredReports = rFilter ? reports.filter((r:any)=>r.coordinator_name===rFilter) : reports
   const coordNames = [...new Set(reports.map((r:any)=>r.coordinator_name))]
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return (
     <div className="p-4 md:p-6 lg:p-8 fade-up">

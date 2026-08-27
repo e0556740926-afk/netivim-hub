@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd } from "@/lib/utils"
@@ -12,6 +14,8 @@ const COLS = [
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
 
 export default function CoordTasks() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [tasks, setTasks] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
@@ -25,20 +29,24 @@ export default function CoordTasks() {
   const today = new Date().toISOString().slice(0,10)
 
   async function load() {
-    const [tr, cr, cor, er, ur] = await Promise.all([
-      fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/targets"),
-      fetch("/api/events"), fetch("/api/users/assignees")
-    ])
-    const { tasks } = await tr.json()
-    const { contacts } = await cr.json()
-    const { coordinators } = await cor.json()
-    const { events } = await er.json()
-    const { managers } = await ur.json()
-    const allPeople = [
-      ...coordinators,
-      ...(managers||[]).map((m:any)=>({...m, name:m.name+" 👑"}))
-    ]
-    setTasks(tasks||[]); setContacts(contacts||[]); setCoords(allPeople); setEvents(events||[])
+    setLoading(true); setError(false)
+    try {
+      const [tr, cr, cor, er, ur] = await Promise.all([
+        fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/targets"),
+        fetch("/api/events"), fetch("/api/users/assignees")
+      ])
+      const { tasks } = await tr.json()
+      const { contacts } = await cr.json()
+      const { coordinators } = await cor.json()
+      const { events } = await er.json()
+      const { managers } = await ur.json()
+      const allPeople = [
+        ...coordinators,
+        ...(managers||[]).map((m:any)=>({...m, name:m.name+" 👑"}))
+      ]
+      setTasks(tasks||[]); setContacts(contacts||[]); setCoords(allPeople); setEvents(events||[])
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -80,6 +88,9 @@ export default function CoordTasks() {
   function toggleAssignee(name:string) {
     setForm(f=>({...f, assignees: f.assignees.includes(name)?f.assignees.filter(x=>x!==name):[...f.assignees,name]}))
   }
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
 
   return <div className="p-4">
     <div className="flex items-center justify-between mb-3">

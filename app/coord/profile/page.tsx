@@ -1,8 +1,12 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 
 export default function CoordProfile() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user, logout } = useAuth()
   const [stats, setStats] = useState({ month:0, year:0 })
   const [coord, setCoord] = useState<any>(null)
@@ -37,14 +41,18 @@ export default function CoordProfile() {
   }
 
   async function load() {
-    const cRes = await fetch(`/api/coord?user_id=${user!.id}`)
-    const { coord: c } = await cRes.json()
-    if (!c) return
-    setCoord(c)
-    const lRes = await fetch(`/api/leads?coordinator_id=${c.id}`)
-    const { leads } = await lRes.json()
-    const monthLeads = (leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===String(m).padStart(2,"0"))
-    setStats({ month: monthLeads.length, year: (leads||[]).length })
+    setLoading(true); setError(false)
+    try {
+      const cRes = await fetch(`/api/coord?user_id=${user!.id}`)
+      const { coord: c } = await cRes.json()
+      if (!c) return
+      setCoord(c)
+      const lRes = await fetch(`/api/leads?coordinator_id=${c.id}`)
+      const { leads } = await lRes.json()
+      const monthLeads = (leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===String(m).padStart(2,"0"))
+      setStats({ month: monthLeads.length, year: (leads||[]).length })
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
 
   async function getAiSummary() {
@@ -72,6 +80,9 @@ export default function CoordProfile() {
     })
     setSent(true)
   }
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
 
   return (
     <div className="p-4 max-w-2xl mx-auto fade-up">

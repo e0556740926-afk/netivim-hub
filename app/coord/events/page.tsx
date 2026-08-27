@@ -1,4 +1,6 @@
 "use client"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd } from "@/lib/utils"
@@ -18,6 +20,8 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
 const MONTHS = ["ינו","פבר","מרץ","אפר","מאי","יונ","יול","אוג","ספט","אוק","נוב","דצמ"]
 
 export default function CoordEvents() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [events, setEvents] = useState<any[]>([])
   const [expenses, setExpenses] = useState<Record<number,number>>({})
@@ -27,13 +31,17 @@ export default function CoordEvents() {
   const [saving, setSaving] = useState(false)
 
   async function load() {
-    const [er, ex] = await Promise.all([fetch("/api/events"), fetch("/api/expenses")])
-    const { events } = await er.json()
-    const { expenses } = await ex.json()
-    setEvents(events||[])
-    const m: Record<number,number> = {}
-    ;(expenses||[]).forEach((e:any)=>{ if(e.event_id) m[e.event_id]=(m[e.event_id]||0)+(+e.amount||0) })
-    setExpenses(m)
+    setLoading(true); setError(false)
+    try {
+      const [er, ex] = await Promise.all([fetch("/api/events"), fetch("/api/expenses")])
+      const { events } = await er.json()
+      const { expenses } = await ex.json()
+      setEvents(events||[])
+      const m: Record<number,number> = {}
+      ;(expenses||[]).forEach((e:any)=>{ if(e.event_id) m[e.event_id]=(m[e.event_id]||0)+(+e.amount||0) })
+      setExpenses(m)
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
   useEffect(()=>{ load() },[])
 
@@ -45,6 +53,9 @@ export default function CoordEvents() {
   }
 
   const filtered = filter ? events.filter(e=>e.status===filter) : events
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
 
   return <div className="p-4">
     <div className="flex items-center justify-between mb-3">

@@ -1,4 +1,5 @@
 "use client"
+import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd, pct, leadColor } from "@/lib/utils"
@@ -22,6 +23,7 @@ const EMPTY_FORM = {
 }
 
 export default function CoordLeads() {
+  const [error, setError] = useState(false)
   const { user } = useAuth()
   const [leads, setLeads] = useState<any[]>([])
   const [myLeads, setMyLeads] = useState(0)
@@ -37,23 +39,27 @@ export default function CoordLeads() {
   const y = new Date().getFullYear()
 
   async function load() {
-    if (!user) return
-    setLoading(true)
-    const cRes = await fetch(`/api/coord?user_id=${user.id}`)
-    const { coord } = await cRes.json()
-    if (!coord) { setLoading(false); return }
-    setCoordId(coord.id)
-    const [lRes, tRes] = await Promise.all([
-      fetch(`/api/leads?coordinator_id=${coord.id}`),
-      fetch("/api/targets")
-    ])
-    const { leads } = await lRes.json()
-    const { targets } = await tRes.json()
-    setLeads(leads||[])
-    const monthStr = String(m).padStart(2,"0")
-    setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
-    setTarget(targets?.find((t:any)=>t.coordinator_id===coord.id)?.target_leads||0)
-    setLoading(false)
+    setLoading(true); setError(false)
+    try {
+      if (!user) return
+      setLoading(true)
+      const cRes = await fetch(`/api/coord?user_id=${user.id}`)
+      const { coord } = await cRes.json()
+      if (!coord) { setLoading(false); return }
+      setCoordId(coord.id)
+      const [lRes, tRes] = await Promise.all([
+        fetch(`/api/leads?coordinator_id=${coord.id}`),
+        fetch("/api/targets")
+      ])
+      const { leads } = await lRes.json()
+      const { targets } = await tRes.json()
+      setLeads(leads||[])
+      const monthStr = String(m).padStart(2,"0")
+      setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
+      setTarget(targets?.find((t:any)=>t.coordinator_id===coord.id)?.target_leads||0)
+      setLoading(false)
+    } catch (e) { console.error(e); setError(true) }
+    finally { setLoading(false) }
   }
 
   useEffect(()=>{ if(user) load() },[user])
@@ -90,6 +96,8 @@ export default function CoordLeads() {
 
   const p = pct(myLeads,target)
   const monthLeads = leads.filter(l=>l.created_at?.slice(5,7)===String(m).padStart(2,"0"))
+
+  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
 
   return (
     <div className="p-4 max-w-2xl mx-auto fade-up">
