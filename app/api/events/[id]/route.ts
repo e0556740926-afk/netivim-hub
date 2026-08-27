@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, eventApprovedEmail } from "@/lib/email";
 import { sendWhatsApp, eventApprovedMsg } from "@/lib/whatsapp";
+import { logAudit } from "@/lib/audit";
+import { currentUser } from "@/lib/auth-server";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const d = await req.json();
   const eid = parseInt(id);
+  const me = await currentUser(req);
 
   if (d.approve) {
     await sql`UPDATE events SET approved=true, status='marketing' WHERE id=${eid}`;
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:"אושר" });
     // Notify the coordinator
     try {
       const rows = await sql`
@@ -38,6 +42,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       leads_collected=${d.leads_collected||0},
       summary=${d.summary||''} 
       WHERE id=${eid}`;
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:`תוצאות: ${d.actual_attendees||0} משתתפים, ${d.leads_collected||0} לידים` });
   } else {
     // Full edit
     await sql`UPDATE events SET
@@ -50,12 +55,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       target_attendees=${d.target_attendees||0},
       approved=${d.approved||false}
       WHERE id=${eid}`;
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:`עודכן: ${d.name}` });
   }
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+  const me = await currentUser(req);
   await sql`DELETE FROM events WHERE id=${parseInt(id)}`;
+  logAudit({ entityType:"event", entityId:parseInt(id), action:"delete", actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,5 @@
 "use client"
+import AuditHistory from "@/components/ui/AuditHistory"
 import Pagination, { usePagination } from "@/components/ui/Pagination"
 import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
@@ -291,7 +292,7 @@ export default function ContactsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-4">
           {/* INTERACTIONS */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -395,6 +396,10 @@ export default function ContactsPage() {
               })}
             </div>
           </div>
+        </div>
+        <div className="pt-4 border-t border-[#E2E8F0]">
+          <div className="text-xs font-bold text-[#374151] uppercase tracking-wide mb-2">היסטוריית שינויים</div>
+          <AuditHistory entityType="contact" entityId={openId!}/>
         </div>
       </div></Card>}
 

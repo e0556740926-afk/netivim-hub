@@ -3,6 +3,8 @@ import sql from "@/lib/db";
 import { sendEmail, newLeadEmail } from "@/lib/email";
 import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
+import { logAudit } from "@/lib/audit";
+import { currentUser } from "@/lib/auth-server";
 
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
@@ -73,6 +75,8 @@ export async function POST(req: NextRequest) {
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
   const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;
   const rows = await sql.query(text, vals);
+  const me = await currentUser(req);
+  logAudit({ entityType:"lead", entityId:rows[0].id, action:"create", actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
   // Notify coordinator when lead comes from their public link
   if (d.source === "link" && d.coordinator_id) {
     try {
@@ -95,17 +99,22 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { id, status } = await req.json();
   await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
+  const me2 = await currentUser(req);
+  logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: status?`סטטוס: ${status}`:"עודכן" });
   return NextResponse.json({ ok: true });
 }
 
 /** Soft delete a lead. */
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
+  const me = await currentUser(req);
   if (await hasColumn("leads", "deleted_at")) {
     await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
+    logAudit({ entityType:"lead", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
     return NextResponse.json({ ok: true, soft: true });
   }
   await sql`DELETE FROM leads WHERE id=${id}`;
+  logAudit({ entityType:"lead", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true, soft: false });
 }
 

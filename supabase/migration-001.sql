@@ -98,3 +98,19 @@ ALTER TABLE leads    ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 CREATE INDEX IF NOT EXISTS idx_contacts_not_deleted ON contacts(deleted_at) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_leads_not_deleted    ON leads(deleted_at)    WHERE deleted_at IS NULL;
+
+-- ============================================================
+-- E1: audit log — who changed what, and when
+-- ============================================================
+CREATE TABLE IF NOT EXISTS audit_log (
+  id           bigserial PRIMARY KEY,
+  entity_type  text NOT NULL,     -- 'contact' | 'lead' | 'task' | 'event'
+  entity_id    integer NOT NULL,
+  action       text NOT NULL,     -- 'create' | 'update' | 'delete' | 'restore'
+  actor_name   text DEFAULT '',
+  actor_email  text DEFAULT '',
+  summary      text DEFAULT '',   -- short human-readable line, e.g. "סטטוס: חדש → פעיל"
+  created_at   timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
