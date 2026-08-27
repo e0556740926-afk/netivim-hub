@@ -1,4 +1,8 @@
 "use client"
+import {
+  DndContext, DragOverlay, useDraggable, useDroppable,
+  PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent,
+} from "@dnd-kit/core"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useToast } from "@/components/ui/Toast"
@@ -76,6 +80,20 @@ export default function TasksPage() {
       await fetch("/api/tasks", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({...body,assigned_by:user?.name}) })
     }
     setSaving(false); setShowForm(false); load()
+  }
+
+  const [activeTask, setActiveTask] = useState<any>(null)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  function onDragStart(e: DragStartEvent) {
+    setActiveTask(tasks.find(t => t.id === e.active.id) || null)
+  }
+  function onDragEnd(e: DragEndEvent) {
+    setActiveTask(null)
+    const overCol = e.over?.id as string | undefined
+    const taskId = e.active.id as number
+    const task = tasks.find(t => t.id === taskId)
+    if (overCol && task && task.status !== overCol) moveTask(taskId, overCol)
   }
 
   async function moveTask(id: number, status: string) {
@@ -156,34 +174,64 @@ export default function TasksPage() {
     </div>}
 
     {/* Kanban */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-      {COLS.map(col => {
-        const colTasks = filtered.filter(t => t.status===col.key)
-        return <div key={col.key} style={{background:col.bg,borderColor:col.border}} className="border rounded-[14px] p-3 min-h-[300px]">
-          <div style={{color:col.fg}} className="text-xs font-bold mb-3 flex items-center justify-between">
-            {col.label} <span className="w-5 h-5 rounded-full bg-white/80 flex items-center justify-center text-xs">{colTasks.length}</span>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {COLS.map(col => {
+          const colTasks = filtered.filter(t => t.status===col.key)
+          return <DroppableColumn key={col.key} id={col.key} col={col} count={colTasks.length}>
+            <div className="space-y-2">
+              {colTasks.map(t => {
+                const late = t.due_date && t.due_date.slice(0,10) < today && t.status!=="done"
+                const accent = late?"#960010":col.key==="waiting"?"#B45309":col.key==="done"?"#166534":"#00488D"
+                return <DraggableCard key={t.id} id={t.id}>
+                  <div style={{borderRight:`3px solid ${accent}`}} className="bg-white border border-[#E2E8F0] rounded-[11px] p-3 cursor-grab active:cursor-grabbing">
+                    <div className="text-xs font-semibold leading-snug mb-1.5">{t.title}</div>
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      <Badge text={TYPE_LABEL[t.type]||t.type}/>
+                      {t.assignees?.slice(0,1).map((a:string)=><span key={a} className="text-xs px-1.5 py-0.5 bg-[#F0F7FF] text-[#00488D] rounded-full">{a.split(" ")[0]}</span>)}
+                    </div>
+                    {t.due_date && <div style={{color:accent}} className="text-xs font-semibold mb-2">{late?"⚠ ":""}{fd(t.due_date.slice(0,10))}</div>}
+                    <div className="flex gap-1">
+                      {COLS.filter(c=>c.key!==col.key).slice(0,2).map(nc=><button key={nc.key} onClick={()=>moveTask(t.id,nc.key)} className="flex-1 text-center py-1 rounded-[7px] bg-[#F0F4F8] text-[#00488D] text-xs font-bold hover:bg-[#DBEAFE] transition-colors">{nc.key==="todo"?"←":nc.key==="inprogress"?"▶":nc.key==="waiting"?"⏳":"✓"}</button>)}
+                      <button onClick={()=>startEdit(t)} className="px-2 py-1 rounded-[7px] bg-[#F0F4F8] text-xs hover:bg-[#E2E8F0]">✎</button>
+                      <button onClick={()=>deleteTask(t.id)} className="px-2 py-1 rounded-[7px] bg-[#F0F4F8] text-xs hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
+                    </div>
+                  </div>
+                </DraggableCard>
+              })}
+            </div>
+          </DroppableColumn>
+        })}
+      </div>
+      <DragOverlay>
+        {activeTask && (
+          <div className="bg-white border-2 border-[#00488D] rounded-[11px] p-3 shadow-2xl rotate-2 w-64">
+            <div className="text-xs font-semibold">{activeTask.title}</div>
           </div>
-          <div className="space-y-2">
-            {colTasks.map(t => {
-              const late = t.due_date && t.due_date.slice(0,10) < today && t.status!=="done"
-              const accent = late?"#960010":col.key==="waiting"?"#B45309":col.key==="done"?"#166534":"#00488D"
-              return <div key={t.id} style={{borderRight:`3px solid ${accent}`}} className="bg-white border border-[#E2E8F0] rounded-[11px] p-3">
-                <div className="text-xs font-semibold leading-snug mb-1.5">{t.title}</div>
-                <div className="flex gap-1 mb-2 flex-wrap">
-                  <Badge text={TYPE_LABEL[t.type]||t.type}/>
-                  {t.assignees?.slice(0,1).map((a:string)=><span key={a} className="text-xs px-1.5 py-0.5 bg-[#F0F7FF] text-[#00488D] rounded-full">{a.split(" ")[0]}</span>)}
-                </div>
-                {t.due_date && <div style={{color:accent}} className="text-xs font-semibold mb-2">{late?"⚠ ":""}{fd(t.due_date.slice(0,10))}</div>}
-                <div className="flex gap-1">
-                  {COLS.filter(c=>c.key!==col.key).slice(0,2).map(nc=><button key={nc.key} onClick={()=>moveTask(t.id,nc.key)} className="flex-1 text-center py-1 rounded-[7px] bg-[#F0F4F8] text-[#00488D] text-xs font-bold hover:bg-[#DBEAFE] transition-colors">{nc.key==="todo"?"←":nc.key==="inprogress"?"▶":nc.key==="waiting"?"⏳":"✓"}</button>)}
-                  <button onClick={()=>startEdit(t)} className="px-2 py-1 rounded-[7px] bg-[#F0F4F8] text-xs hover:bg-[#E2E8F0]">✎</button>
-                  <button onClick={()=>deleteTask(t.id)} className="px-2 py-1 rounded-[7px] bg-[#F0F4F8] text-xs hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
-                </div>
-              </div>
-            })}
-          </div>
-        </div>
-      })}
-    </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   </div>
+}
+
+function DroppableColumn({ id, col, count, children }: { id: string; col: any; count: number; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div ref={setNodeRef}
+      style={{ background: isOver ? "#EFF6FF" : col.bg, borderColor: isOver ? "#00488D" : col.border }}
+      className="border rounded-[14px] p-3 min-h-[300px] transition-colors">
+      <div style={{color:col.fg}} className="text-xs font-bold mb-3 flex items-center justify-between">
+        {col.label} <span className="w-5 h-5 rounded-full bg-white/80 flex items-center justify-center text-xs">{count}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function DraggableCard({ id, children }: { id: number; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id })
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, opacity: isDragging ? 0.4 : 1, zIndex: isDragging ? 50 : "auto" }
+    : undefined
+  return <div ref={setNodeRef} style={style} {...listeners} {...attributes}>{children}</div>
 }
