@@ -1,17 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 
-// Auto-create calendar_token column if missing
-async function ensureToken() {
-  try {
-    await sql`ALTER TABLE coordinators ADD COLUMN IF NOT EXISTS calendar_token text`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_token text`;
-    // Generate tokens for anyone missing one
-    await sql`UPDATE coordinators SET calendar_token = encode(gen_random_bytes(24), 'hex') WHERE calendar_token IS NULL OR calendar_token = ''`;
-    await sql`UPDATE users SET calendar_token = encode(gen_random_bytes(24), 'hex') WHERE calendar_token IS NULL OR calendar_token = ''`;
-  } catch {}
-}
-
 function icsDate(dateStr: string, timeStr?: string): string {
   const d = new Date(dateStr);
   if (timeStr) {
@@ -35,7 +24,6 @@ const TASK_TYPE: Record<string,string> = {
 
 export async function GET(_: NextRequest, ctx: { params: Promise<{ token: string }> }) {
   const { token } = await ctx.params;
-  await ensureToken();
 
   // Find user/coordinator by token
   const [coordRows, userRows] = await Promise.all([

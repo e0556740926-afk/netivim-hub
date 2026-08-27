@@ -216,7 +216,7 @@ export default function AdminLeads() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                  {["שם","טלפון","ת.ז","גיל","רכז","סטטוס","תאריך",""].map(h=>(
+                  {["שם","טלפון","ת.ז","גיל","ציון","רכז","סטטוס","תאריך",""].map(h=>(
                     <th key={h} className="px-3 py-2.5 text-right text-xs font-bold text-[#64748B] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -239,6 +239,7 @@ export default function AdminLeads() {
                       </td>
                       <td className="px-3 py-2.5 text-xs text-[#94A3B8]">{l.id_number||"—"}</td>
                       <td className="px-3 py-2.5 text-[#475569]">{l.age||"—"}</td>
+                      <td className="px-3 py-2.5 font-bold" style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>{l.score??"—"}</td>
                       <td className="px-3 py-2.5 text-xs text-[#475569]">{l.owner_display||coord?.name||l.owner_name||"—"}</td>
                       <td className="px-3 py-2.5">
                         <span style={sc} className="px-2 py-0.5 rounded-full text-xs font-semibold">

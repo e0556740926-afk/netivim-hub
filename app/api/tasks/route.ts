@@ -24,7 +24,6 @@ async function getEmailsFor(names: string[]) {
   const clean = names.map(n => n.replace(/\s*👑\s*/g, "").trim()).filter(Boolean);
   if (!clean.length) return [];
 
-  try { await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone text`; } catch {}
 
   const [coordRows, userRows] = await Promise.all([
     sql`SELECT c.name, u.email, COALESCE(c.phone, u.phone) as phone FROM coordinators c

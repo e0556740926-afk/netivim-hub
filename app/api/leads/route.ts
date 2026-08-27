@@ -6,7 +6,6 @@ import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
   // Auto-add owner_name column
-  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS owner_name text default ''`; } catch {}
   if (!cid) {
     const all = await sql`
       SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display
@@ -48,12 +47,9 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
-  // Auto-add id_number column if not exists
-  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS id_number text default ''`; } catch {}
-  const notes_full = [d.notes, "ציון: " + score].filter(Boolean).join(" | ");
   const rows = await sql`
     INSERT INTO leads (coordinator_id, name, phone, city, age, interest, source, status, event_id, notes, id_number)
-    VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${notes_full}, ${d.id_number||''})
+    VALUES (${d.coordinator_id}, ${d.name}, ${d.phone}, ${d.city||''}, ${d.age||null}, ${d.interest||'training'}, ${d.source||'manual'}, 'new', ${d.event_id||null}, ${d.notes||''}, ${d.id_number||''})
     RETURNING *
   `;
   // Notify coordinator when lead comes from their public link

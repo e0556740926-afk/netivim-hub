@@ -216,8 +216,9 @@ export default function CoordLeads() {
                       <span>{l.phone}</span>
                       {l.age&&<span>גיל {l.age}</span>}
                       {l.id_number&&<span>ת.ז {l.id_number}</span>}
+                      {l.score!=null&&<span style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>★ {l.score}</span>}
                     </div>
-                    {l.notes&&<div className="text-xs text-[#94A3B8] mt-0.5 truncate">{l.notes.replace(/ציון: \d+/,'').replace('| ','').trim()}</div>}
+                    {l.notes&&<div className="text-xs text-[#94A3B8] mt-0.5 truncate">{l.notes}</div>}
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <span onClick={()=>cycleStatus(l.id,l.status)}

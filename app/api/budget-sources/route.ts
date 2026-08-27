@@ -1,32 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 
-// Create table if not exists on first call
-async function ensureTable() {
-  await sql`
-    CREATE TABLE IF NOT EXISTS budget_sources (
-      id bigserial primary key,
-      name text not null,
-      description text default \'\',
-      total_amount numeric default 0,
-      used_amount numeric default 0,
-      year integer not null,
-      category text default \'other\',
-      status text default \'active\',
-      created_at timestamptz default now()
-    )
-  `;
-}
-
 export async function GET(req: NextRequest) {
-  await ensureTable();
   const year = req.nextUrl.searchParams.get("year") || new Date().getFullYear().toString();
   const rows = await sql`SELECT * FROM budget_sources WHERE year = ${parseInt(year)} ORDER BY name`;
   return NextResponse.json({ sources: rows });
 }
 
 export async function POST(req: NextRequest) {
-  await ensureTable();
   const d = await req.json();
   const rows = await sql`
     INSERT INTO budget_sources (name, description, total_amount, used_amount, year, category, status)

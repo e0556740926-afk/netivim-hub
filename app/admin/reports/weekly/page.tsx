@@ -148,16 +148,17 @@ function WeeklyReportContent() {
           {leads.length === 0
             ? <div className="empty">אין לידים חדשים השבוע</div>
             : <table>
-                <thead><tr><th>שם</th><th>טלפון</th><th>גיל</th><th>מקור</th><th>סטטוס</th><th>הערות</th></tr></thead>
+                <thead><tr><th>שם</th><th>טלפון</th><th>גיל</th><th>ציון</th><th>מקור</th><th>סטטוס</th><th>הערות</th></tr></thead>
                 <tbody>
                   {leads.map((l:any) => (
                     <tr key={l.id}>
                       <td style={{fontWeight:600}}>{l.name}</td>
                       <td>{l.phone}</td>
                       <td>{l.age||"—"}</td>
+                      <td style={{fontWeight:700,color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>{l.score??"—"}</td>
                       <td>{l.source==="link"?"לינק אישי":l.source==="event"?"אירוע":"ידני"}</td>
                       <td><span className="badge" style={{background:l.status==="contacted"?"#DCFCE7":l.status==="advanced"?"#EDE9FE":"#DBEAFE",color:l.status==="contacted"?"#166534":l.status==="advanced"?"#5B21B6":"#1E40AF"}}>{STATUS_LABEL[l.status]||l.status}</span></td>
-                      <td style={{color:"#64748B",maxWidth:180}}>{(l.notes||"").replace(/ציון: \d+/,"").trim()}</td>
+                      <td style={{color:"#64748B",maxWidth:180}}>{l.notes||"—"}</td>
                     </tr>
                   ))}
                 </tbody>

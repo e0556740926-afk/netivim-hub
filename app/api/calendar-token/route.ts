@@ -5,13 +5,6 @@ import { currentUser, isAdmin } from "@/lib/auth-server";
 
 const makeToken = () => randomBytes(24).toString("hex");
 
-async function ensureColumns() {
-  try {
-    await sql`ALTER TABLE coordinators ADD COLUMN IF NOT EXISTS calendar_token text`;
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS calendar_token text`;
-  } catch {}
-}
-
 async function tokenForCoordinator(id: number) {
   const rows = await sql`SELECT calendar_token FROM coordinators WHERE id=${id} LIMIT 1`;
   if (!rows.length) return null;
@@ -34,7 +27,6 @@ export async function GET(req: NextRequest) {
   const me = await currentUser(req);
   if (!me) return NextResponse.json({ token: null }, { status: 401 });
 
-  await ensureColumns();
 
   const coordId = req.nextUrl.searchParams.get("coordinator_id");
   const admin = isAdmin(me);
