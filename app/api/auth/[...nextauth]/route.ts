@@ -27,20 +27,31 @@ const handler = NextAuth({
       const dbUser = await getUserByEmail(user.email);
       return dbUser !== null;
     },
-    async session({ session }) {
-      if (session?.user?.email) {
-        const dbUser = await getUserByEmail(session.user.email);
-        if (dbUser) {
-          (session.user as any).id = dbUser.id;
-          (session.user as any).role = dbUser.role;
-          (session.user as any).area = dbUser.area;
-          (session.user as any).dbName = dbUser.name;
+    // Enrich the JWT at sign-in so middleware can read the role
+    // without a DB round-trip on every request.
+    async jwt({ token, user, trigger }) {
+      if (user?.email || trigger === "signIn" || !token.role) {
+        const email = (user?.email || token.email) as string | undefined;
+        if (email) {
+          const dbUser = await getUserByEmail(email);
+          if (dbUser) {
+            (token as any).id = dbUser.id;
+            (token as any).role = dbUser.role;
+            (token as any).area = dbUser.area;
+            (token as any).dbName = dbUser.name;
+          }
         }
       }
-      return session;
-    },
-    async jwt({ token }) {
       return token;
+    },
+    async session({ session, token }) {
+      if (session?.user) {
+        (session.user as any).id = (token as any).id;
+        (session.user as any).role = (token as any).role;
+        (session.user as any).area = (token as any).area;
+        (session.user as any).dbName = (token as any).dbName;
+      }
+      return session;
     },
   },
   pages: {
