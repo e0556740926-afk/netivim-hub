@@ -29,6 +29,9 @@ export default function AdminLeads() {
   const [leads, setLeads] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [adminUsers, setAdminUsers] = useState<any[]>([])
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkTarget, setBulkTarget] = useState("")
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -218,6 +221,46 @@ export default function AdminLeads() {
         <span className="text-xs text-[#94A3B8]">{filtered.length} רשומות</span>
       </div>
 
+      {/* Bulk actions toolbar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 flex-wrap bg-[#0D2744] text-white rounded-[10px] px-3.5 py-2.5 mb-3">
+          <span className="text-sm font-semibold">{selected.size} נבחרו</span>
+          <select value={bulkTarget} onChange={e=>setBulkTarget(e.target.value)}
+            className="text-xs px-2 py-1.5 rounded-[7px] bg-white/15 text-white border-none outline-none">
+            <option value="" className="text-black">שייך ל...</option>
+            <optgroup label="רכזים" className="text-black">
+              {coords.map((c:any)=><option key={c.id} value={"coord_"+c.id} className="text-black">{c.name}</option>)}
+            </optgroup>
+            <optgroup label="מנהלים" className="text-black">
+              {adminUsers.map((a:any)=><option key={a.id} value={"admin_"+a.name} className="text-black">👑 {a.name}</option>)}
+            </optgroup>
+          </select>
+          <button disabled={!bulkTarget||bulkBusy} onClick={async ()=>{
+              setBulkBusy(true)
+              const isCoord = bulkTarget.startsWith("coord_")
+              await fetch("/api/leads/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"assign",
+                  coordinator_id: isCoord ? +bulkTarget.replace("coord_","") : undefined,
+                  owner_name: isCoord ? undefined : bulkTarget.replace("admin_","") })})
+              setBulkBusy(false); setSelected(new Set()); setBulkTarget(""); success("השיוך עודכן"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white text-[#0D2744] disabled:opacity-40">
+            {bulkBusy?"מעדכן...":"החל שיוך"}
+          </button>
+          <button disabled={bulkBusy} onClick={async ()=>{
+              if (!confirm(`למחוק ${selected.size} לידים?`)) return
+              setBulkBusy(true)
+              await fetch("/api/leads/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"delete" })})
+              setBulkBusy(false); setSelected(new Set()); success("הלידים נמחקו"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white/15 hover:bg-white/25">
+            מחק
+          </button>
+          <button onClick={()=>setSelected(new Set())} className="mr-auto text-xs text-white/60 hover:text-white">נקה בחירה</button>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? <SkeletonTable rows={6} cols={6}/> : (
         <Card>
@@ -225,6 +268,16 @@ export default function AdminLeads() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                  <th className="px-3 py-2.5 w-8">
+                    <input type="checkbox"
+                      checked={pg.paged.length>0 && pg.paged.every(l=>selected.has(l.id))}
+                      onChange={e=>{
+                        const next = new Set(selected)
+                        pg.paged.forEach(l=> e.target.checked ? next.add(l.id) : next.delete(l.id))
+                        setSelected(next)
+                      }}
+                      className="accent-[#00488D] w-3.5 h-3.5"/>
+                  </th>
                   {[["שם","name"],["טלפון","phone"],["ת.ז","id_number"],["גיל","age"],
                     ["ציון","score"],["רכז","owner_display"],["סטטוס","status"],
                     ["תאריך","created_at"],["",""]].map(([label,key])=>(
@@ -241,7 +294,16 @@ export default function AdminLeads() {
                   const coord = coords.find(c=>c.id===l.coordinator_id)
                   const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
                   return (
-                    <tr key={l.id} className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC]">
+                    <tr key={l.id} className={`border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] ${selected.has(l.id)?"!bg-[#F0F7FF]":""}`}>
+                      <td className="px-3 py-2.5">
+                        <input type="checkbox" checked={selected.has(l.id)}
+                          onChange={()=>{
+                            const next = new Set(selected)
+                            next.has(l.id) ? next.delete(l.id) : next.add(l.id)
+                            setSelected(next)
+                          }}
+                          className="accent-[#00488D] w-3.5 h-3.5"/>
+                      </td>
                       <td className="px-3 py-2.5">
                         <div className="font-semibold text-[#0D2744]">{l.name}</div>
                       </td>
