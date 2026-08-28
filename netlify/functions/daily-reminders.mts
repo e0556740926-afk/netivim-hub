@@ -76,12 +76,13 @@ function wrap(title: string, bodyHtml: string) {
 }
 
 export default async () => {
-  const results = { missingReports: 0, overdueTasks: 0, undebriefed: 0, errors: [] as string[] };
+  const results = { missingReports: 0, dueTodayTasks: 0, overdueTasks: 0, undebriefed: 0, errors: [] as string[] };
   // Collected in parallel with the per-person reminders below, so managers
   // get one end-of-run digest instead of a separate flood of per-item mail.
   const digest = {
     missingReports: [] as string[],
     overdueByPerson: [] as { name: string; count: number }[],
+    dueTodayByPerson: [] as { name: string; count: number }[],
     undebriefedEvents: [] as string[],
   };
   const today = new Date();
@@ -166,6 +167,54 @@ export default async () => {
     results.errors.push(`overdueTasks: ${e.message}`);
   }
 
+  // ── 2.5. Tasks due TODAY — not yet late, one last nudge before they
+  //        flip to overdue tonight. Deliberately separate from the
+  //        overdue query above (due_date < today) so nothing double-fires. ──
+  try {
+    const dueToday = await sql`
+      SELECT t.id, t.title, t.assignees
+      FROM tasks t
+      WHERE t.status <> 'done' AND t.due_date = CURRENT_DATE
+    `;
+    const byAssigneeToday = new Map<string, any[]>();
+    for (const t of dueToday as any[]) {
+      for (const raw of t.assignees || []) {
+        const name = String(raw).replace(/\s*👑\s*/g, "").trim();
+        if (!name) continue;
+        if (!byAssigneeToday.has(name)) byAssigneeToday.set(name, []);
+        byAssigneeToday.get(name)!.push(t);
+      }
+    }
+    if (byAssigneeToday.size) {
+      const names = [...byAssigneeToday.keys()];
+      const [coordRows, userRows] = await Promise.all([
+        sql`SELECT c.name, u.email, COALESCE(c.phone,u.phone) as phone FROM coordinators c JOIN users u ON u.id=c.user_id WHERE c.name = ANY(${names})`,
+        sql`SELECT name, email, phone FROM users WHERE name = ANY(${names}) AND status='active'`,
+      ]);
+      const contact = new Map<string, { email?: string; phone?: string }>();
+      for (const r of coordRows as any[]) contact.set(r.name, { email: r.email, phone: r.phone });
+      for (const r of userRows as any[]) if (!contact.has(r.name)) contact.set(r.name, { email: r.email, phone: r.phone });
+
+      for (const [name, list] of byAssigneeToday) {
+        const c = contact.get(name);
+        if (!c) continue;
+        const items = list.map(t => `<li style="margin-bottom:4px;">${t.title}</li>`).join("");
+        const html = wrap(
+          `⚠️ ${list.length} משימות שמועדן היום`,
+          `<div style="font-size:14px;color:#374151;margin-bottom:8px;">שלום ${name}, המועד של המשימות הבאות הוא היום — עוד רגע והן יהפכו לבאיחור:</div>
+           <ul style="font-size:13px;color:#475569;padding-right:18px;margin:0;">${items}</ul>
+           <a href="${APP_URL}/coord/tasks" style="display:inline-block;margin-top:16px;background:#B45309;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">צפה במשימות</a>`
+        );
+        if (c.email) await sendEmail(c.email, `⚠️ ${list.length} משימות שמועדן היום`, html);
+        if (c.phone) await sendWhatsApp(c.phone, `⚠️ *מועד היום*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\nעוד רגע והמשימות באיחור.\n👈 ${APP_URL}/coord/tasks`);
+        digest.dueTodayByPerson.push({ name, count: list.length });
+        results.dueTodayTasks++;
+      }
+    }
+  } catch (e: any) {
+    results.errors.push(`dueToday: ${e.message}`);
+  }
+
   // ── 3. Events that happened but have no results recorded ───────
   try {
     const undebriefed = await sql`
@@ -197,7 +246,7 @@ export default async () => {
   //      above, to every active admin, sent only if there's something
   //      to report (an empty inbox every day trains people to ignore it) ──
   try {
-    const hasAny = digest.missingReports.length || digest.overdueByPerson.length || digest.undebriefedEvents.length;
+    const hasAny = digest.missingReports.length || digest.overdueByPerson.length || digest.dueTodayByPerson.length || digest.undebriefedEvents.length;
     if (hasAny) {
       const admins = await sql`
         SELECT name, email, phone FROM users WHERE role='admin' AND status='active'`;
@@ -207,6 +256,13 @@ export default async () => {
         sections.push(`<div style="margin-bottom:14px;">
           <div style="font-size:13px;font-weight:700;color:#B45309;margin-bottom:6px;">📝 דיווח שבועי חסר (${digest.missingReports.length})</div>
           <div style="font-size:13px;color:#475569;">${digest.missingReports.join(", ")}</div>
+        </div>`);
+      }
+      if (digest.dueTodayByPerson.length) {
+        const items = digest.dueTodayByPerson.map(p => `<li>${p.name} — ${p.count} משימות</li>`).join("");
+        sections.push(`<div style="margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;color:#B45309;margin-bottom:6px;">⚠️ מועד היום (עוד רגע באיחור)</div>
+          <ul style="font-size:13px;color:#475569;padding-right:18px;margin:0;">${items}</ul>
         </div>`);
       }
       if (digest.overdueByPerson.length) {
@@ -231,6 +287,7 @@ export default async () => {
 
       const waLines = [
         digest.missingReports.length ? `📝 דיווח חסר: ${digest.missingReports.join(", ")}` : "",
+        digest.dueTodayByPerson.length ? `⚠️ מועד היום: ${digest.dueTodayByPerson.map(p=>`${p.name} (${p.count})`).join(", ")}` : "",
         digest.overdueByPerson.length ? `⏰ באיחור: ${digest.overdueByPerson.map(p=>`${p.name} (${p.count})`).join(", ")}` : "",
         digest.undebriefedEvents.length ? `📋 תחקיר ממתין: ${digest.undebriefedEvents.join(", ")}` : "",
       ].filter(Boolean).join("\n");
