@@ -28,8 +28,8 @@ export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; 
       body: JSON.stringify([{
         mail: a.email || "",
         phone: a.phone,
-        medium: "נתיבים שטח",
-        source: a.ownerName,
+        medium: a.ownerName,
+        source: "נתיבים שטח",
         campaign: "",
         last_name: a.lastName,
         "First name": a.firstName,
