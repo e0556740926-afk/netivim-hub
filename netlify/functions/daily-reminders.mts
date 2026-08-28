@@ -77,6 +77,13 @@ function wrap(title: string, bodyHtml: string) {
 
 export default async () => {
   const results = { missingReports: 0, overdueTasks: 0, undebriefed: 0, errors: [] as string[] };
+  // Collected in parallel with the per-person reminders below, so managers
+  // get one end-of-run digest instead of a separate flood of per-item mail.
+  const digest = {
+    missingReports: [] as string[],
+    overdueByPerson: [] as { name: string; count: number }[],
+    undebriefedEvents: [] as string[],
+  };
   const today = new Date();
   const isThursdayOrLater = today.getDay() >= 4 || today.getDay() === 0; // Thu, Fri, Sat, Sun
 
@@ -104,6 +111,7 @@ export default async () => {
         );
         if (c.email) await sendEmail(c.email, "תזכורת: דיווח שבועי טרם הוגש", html);
         if (c.phone) await sendWhatsApp(c.phone, `📝 *תזכורת*\n\nשלום ${c.name}, טרם הגשת דיווח שבועי.\n👈 ${APP_URL}/coord/profile`);
+        digest.missingReports.push(c.name);
         results.missingReports++;
       }
     } catch (e: any) {
@@ -150,6 +158,7 @@ export default async () => {
         );
         if (c.email) await sendEmail(c.email, `⏰ ${list.length} משימות באיחור`, html);
         if (c.phone) await sendWhatsApp(c.phone, `⏰ *${list.length} משימות באיחור*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\n👈 ${APP_URL}/coord/tasks`);
+        digest.overdueByPerson.push({ name, count: list.length });
         results.overdueTasks++;
       }
     }
@@ -178,9 +187,61 @@ export default async () => {
       if (e.email) await sendEmail(e.email, `תחקיר ממתין: ${e.name}`, html);
       if (e.phone) await sendWhatsApp(e.phone, `📋 *תחקיר אירוע ממתין*\n\n${e.name} — יש לעדכן תוצאות.\n👈 ${APP_URL}/coord/events`);
       results.undebriefed++;
+      digest.undebriefedEvents.push(`${e.name} (${e.coord_name})`);
     }
   } catch (e: any) {
     results.errors.push(`undebriefed: ${e.message}`);
+  }
+
+  // ── 4. Manager digest — one email/WhatsApp summarising everything
+  //      above, to every active admin, sent only if there's something
+  //      to report (an empty inbox every day trains people to ignore it) ──
+  try {
+    const hasAny = digest.missingReports.length || digest.overdueByPerson.length || digest.undebriefedEvents.length;
+    if (hasAny) {
+      const admins = await sql`
+        SELECT name, email, phone FROM users WHERE role='admin' AND status='active'`;
+
+      const sections: string[] = [];
+      if (digest.missingReports.length) {
+        sections.push(`<div style="margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;color:#B45309;margin-bottom:6px;">📝 דיווח שבועי חסר (${digest.missingReports.length})</div>
+          <div style="font-size:13px;color:#475569;">${digest.missingReports.join(", ")}</div>
+        </div>`);
+      }
+      if (digest.overdueByPerson.length) {
+        const items = digest.overdueByPerson.map(p => `<li>${p.name} — ${p.count} משימות</li>`).join("");
+        sections.push(`<div style="margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;color:#960010;margin-bottom:6px;">⏰ משימות באיחור</div>
+          <ul style="font-size:13px;color:#475569;padding-right:18px;margin:0;">${items}</ul>
+        </div>`);
+      }
+      if (digest.undebriefedEvents.length) {
+        sections.push(`<div>
+          <div style="font-size:13px;font-weight:700;color:#5B21B6;margin-bottom:6px;">📋 תחקירי אירוע ממתינים (${digest.undebriefedEvents.length})</div>
+          <div style="font-size:13px;color:#475569;">${digest.undebriefedEvents.join(" · ")}</div>
+        </div>`);
+      }
+
+      const html = wrap(
+        "📊 סיכום יומי — פריטים הדורשים תשומת לב",
+        sections.join("") +
+        `<a href="${APP_URL}/admin/dashboard" style="display:inline-block;margin-top:16px;background:#0D2744;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">פתח את המערכת</a>`
+      );
+
+      const waLines = [
+        digest.missingReports.length ? `📝 דיווח חסר: ${digest.missingReports.join(", ")}` : "",
+        digest.overdueByPerson.length ? `⏰ באיחור: ${digest.overdueByPerson.map(p=>`${p.name} (${p.count})`).join(", ")}` : "",
+        digest.undebriefedEvents.length ? `📋 תחקיר ממתין: ${digest.undebriefedEvents.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+
+      for (const a of admins as any[]) {
+        if (a.email) await sendEmail(a.email, "📊 סיכום יומי — פריטים לטיפול", html);
+        if (a.phone) await sendWhatsApp(a.phone, `📊 *סיכום יומי*\n\n${waLines}\n\n👈 ${APP_URL}/admin/dashboard`);
+      }
+    }
+  } catch (e: any) {
+    results.errors.push(`managerDigest: ${e.message}`);
   }
 
   console.log("[daily-reminders]", JSON.stringify(results));
