@@ -7,3 +7,26 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# ZAP scan (28.08.2026) findings closed here:
+#   P1 Content-Security-Policy missing
+#   P1 Clickjacking protection missing
+#   P2 X-Content-Type-Options missing
+# X-Powered-By (P2) is disabled in next.config.ts instead — that
+# header is set by Next.js itself, not something Netlify can strip.
+#
+# 'unsafe-inline' on script-src is a deliberate, temporary tradeoff:
+# the App Router injects inline hydration data and removing it needs
+# a per-request nonce wired through middleware. It still blocks the
+# far more common case — loading an attacker-controlled external
+# script — since script-src has no other origin listed. Fonts are
+# self-hosted via next/font (see app/layout.tsx), so no Google Fonts
+# domain needs to appear here at all.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

@@ -1,13 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --font-heebo: 'Heebo', system-ui, sans-serif;
   --color-navy: #0D2744;
   --color-blue: #00488D;
   --color-light-blue: #DBEAFE;
 }
-
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800&display=swap');
 
 * { box-sizing: border-box; }
 
