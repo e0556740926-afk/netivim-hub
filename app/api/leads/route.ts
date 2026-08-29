@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, newLeadEmail } from "@/lib/email";
+import { sendPush } from "@/lib/push";
 import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
@@ -92,6 +93,7 @@ export async function POST(req: NextRequest) {
       if (c?.email) {
         const { subject, html } = newLeadEmail(p);
         await sendEmail({ to: c.email, subject, html });
+        await sendPush(c.email, { title: "⭐ ליד חדש", body: `${d.name} · ${d.phone}`, url: "/coord/leads" });
       }
       if (c?.phone) await sendWhatsApp(c.phone, newLeadMsg(p));
     } catch (e) { console.error("[notify lead]", e); }

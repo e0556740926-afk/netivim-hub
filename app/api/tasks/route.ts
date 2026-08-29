@@ -4,6 +4,7 @@ import { sendEmail, taskAssignedEmail } from "@/lib/email";
 import { sendWhatsApp, taskAssignedMsg } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { sendPush } from "@/lib/push";
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
@@ -61,6 +62,11 @@ async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: s
       if (r.email) {
         const { subject, html } = taskAssignedEmail(payload(r));
         jobs.push(sendEmail({ to: r.email, subject, html }));
+        jobs.push(sendPush(r.email, {
+          title: "✅ משימה חדשה",
+          body: task.title,
+          url: r.isCoordinator ? "/coord/tasks" : "/admin/tasks",
+        }));
       }
       if (r.phone) {
         jobs.push(sendWhatsApp(r.phone, taskAssignedMsg(payload(r))));

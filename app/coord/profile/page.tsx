@@ -3,6 +3,7 @@ import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
+import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 
 export default function CoordProfile() {
   const [loading, setLoading] = useState(true)
@@ -95,6 +96,7 @@ export default function CoordProfile() {
           <div className="text-lg font-extrabold">{user?.name}</div>
           <div className="text-sm text-[#64748B]">רכז שטח{user?.area ? ` · ${user.area}` : ""}</div>
         </div>
+        <PushNotificationToggle/>
         <button onClick={logout} className="text-xs text-[#64748B] border border-[#E2E8F0] px-3 py-1.5 rounded-lg hover:bg-[#F8FAFC]">יציאה</button>
       </div>
 

@@ -119,3 +119,17 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 -- Lead email field, for Silfrus (Salesforce) integration
 -- ============================================================
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS email text DEFAULT '';
+
+-- ============================================================
+-- Web Push subscriptions — one row per device a user enabled
+-- push notifications on
+-- ============================================================
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         bigserial PRIMARY KEY,
+  email      text NOT NULL,
+  endpoint   text NOT NULL UNIQUE,
+  p256dh     text NOT NULL,
+  auth       text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions(email);

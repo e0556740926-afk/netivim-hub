@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { sendEmail, eventApprovedEmail } from "@/lib/email";
+import { sendPush } from "@/lib/push";
 import { sendWhatsApp, eventApprovedMsg } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
@@ -32,6 +33,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       if (r?.email) {
         const { subject, html } = eventApprovedEmail(p);
         await sendEmail({ to: r.email, subject, html });
+        await sendPush(r.email, { title: "🎉 האירוע שלך אושר", body: p.eventName, url: "/coord/events" });
       }
       if (r?.phone) await sendWhatsApp(r.phone, eventApprovedMsg(p));
     } catch (e) { console.error("[notify event]", e); }
