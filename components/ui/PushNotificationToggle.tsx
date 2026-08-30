@@ -46,11 +46,14 @@ export default function PushNotificationToggle() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subscription: sub.toJSON() }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || `שגיאת שרת (${res.status})`)
+      }
       setSubscribed(true)
       success("התראות הופעלו")
-    } catch {
-      error("לא הצלחנו להפעיל התראות")
+    } catch (e: any) {
+      error(e?.message || "לא הצלחנו להפעיל התראות")
     }
     setBusy(false)
   }
