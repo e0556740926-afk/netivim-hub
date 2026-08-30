@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<any[]>([])
   const [kpis, setKpis] = useState({ events:0, budgetPct:0, lateTasks:0, pendingCount:0 })
   const [orgLeads, setOrgLeads] = useState(0)
+  const [leadsTrend, setLeadsTrend] = useState(0)
   const [orgTarget, setOrgTarget] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -51,6 +52,7 @@ export default function Dashboard() {
 
       const totTarget = (targets||[]).reduce((s:number,t:any)=>s+(+t.target_leads||0),0)
       setOrgLeads(totals?.leads||0); setOrgTarget(totTarget)
+      setLeadsTrend(totals?.leadsTrendPct ?? 0)
 
       const active = (events||[]).filter((e:any)=>e.status!=="done"&&e.status!=="cancelled")
       const pend = (events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval")
@@ -117,7 +119,17 @@ export default function Dashboard() {
       {/* Speedometer + Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 mb-4">
         <Card className="p-5 flex flex-col items-center gap-3">
-          <div className="text-sm font-bold self-start">מד לידים ארגוני</div>
+          <div className="flex items-center justify-between w-full">
+            <div className="text-sm font-bold">מד לידים ארגוני</div>
+            {leadsTrend !== 0 && (
+              <span
+                style={{ color: leadsTrend > 0 ? "#166534" : "#960010", background: leadsTrend > 0 ? "#DCFCE7" : "#FFF0F0" }}
+                className="text-xs font-bold px-2 py-0.5 rounded-full"
+              >
+                {leadsTrend > 0 ? "▲" : "▼"} {Math.abs(leadsTrend)}%
+              </span>
+            )}
+          </div>
           <Speedometer actual={orgLeads} target={orgTarget} size={170}/>
           <div className="text-xs text-[#64748B] text-center">{orgLeads} / {orgTarget} לידים החודש</div>
         </Card>

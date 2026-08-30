@@ -41,6 +41,8 @@ export async function GET() {
     sql`SELECT
           (SELECT COUNT(*)::int FROM leads
              WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())) AS leads,
+          (SELECT COUNT(*)::int FROM leads
+             WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW() - INTERVAL '1 month')) AS leads_prev_month,
           (SELECT COALESCE(SUM(amount),0)::float FROM expenses)                  AS spent,
           (SELECT COALESCE(SUM(budget_planned),0)::float FROM events)            AS budget,
           (SELECT COUNT(*)::int FROM tasks
@@ -52,6 +54,11 @@ export async function GET() {
   ]);
 
   const t: any = totals[0] || {};
+  const prevLeads = t.leads_prev_month ?? 0;
+  const leadsTrendPct = prevLeads > 0
+    ? Math.round(((t.leads - prevLeads) / prevLeads) * 100)
+    : (t.leads > 0 ? 100 : 0);
+
   return NextResponse.json({
     coordinators,
     targets,
@@ -61,6 +68,8 @@ export async function GET() {
     reports,
     totals: {
       leads: t.leads ?? 0,
+      leadsPrevMonth: prevLeads,
+      leadsTrendPct,
       spent: t.spent ?? 0,
       budget: t.budget ?? 0,
       lateTasks: t.late_tasks ?? 0,
