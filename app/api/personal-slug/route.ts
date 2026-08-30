@@ -3,16 +3,26 @@ import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { hasColumn } from "@/lib/schema";
 
-function makeSlug(name: string, id: number) {
-  return name.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^\u0590-\u05FFa-z0-9-]/g, "") + "-" + id;
+/**
+ * ASCII-only, URL-safe slug. Coordinators already get Latin slugs
+ * (e.g. "michal-levi") derived from Latin names; a Hebrew name has no
+ * such source, so this prefers the email's local part (usually
+ * ASCII) and falls back to a short random suffix if nothing usable
+ * remains. Hebrew characters are deliberately never included — a
+ * non-ASCII path segment is fragile across sharing channels
+ * (WhatsApp previews, copy-paste, some link shorteners) even though
+ * it technically resolves when hit directly.
+ */
+function makeSlug(email: string, id: number): string {
+  const local = email.split("@")[0].toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const base = local || "user";
+  return `${base}-${id}`;
 }
 
-/**
- * Personal lead-form link for the CURRENT user. Coordinators already
- * have one via coordinators.slug (created when their account is set
- * up); this covers managers, who previously had no personal link at
- * all — only the /admin side of the system.
- */
+function isAsciiSafe(slug: string): boolean {
+  return /^[a-z0-9-]+$/.test(slug);
+}
+
 export async function GET(req: NextRequest) {
   const me = await currentUser(req);
   if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
@@ -24,9 +34,12 @@ export async function GET(req: NextRequest) {
   const row: any = rows[0];
   if (!row) return NextResponse.json({ error: "משתמש לא נמצא" }, { status: 404 });
 
-  if (row.slug) return NextResponse.json({ slug: row.slug, available: true });
+  // Self-heals any slug saved by the earlier Hebrew-permitting version.
+  if (row.slug && isAsciiSafe(row.slug)) {
+    return NextResponse.json({ slug: row.slug, available: true });
+  }
 
-  const slug = makeSlug(me.name || me.email, row.id);
+  const slug = makeSlug(me.email, row.id);
   await sql`UPDATE users SET slug=${slug} WHERE id=${row.id}`;
   return NextResponse.json({ slug, available: true });
 }
