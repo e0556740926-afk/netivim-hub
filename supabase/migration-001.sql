@@ -151,3 +151,28 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS next_run date;           -- when the 
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_series_id bigint; -- links generated occurrences back to their template, for display grouping
 CREATE INDEX IF NOT EXISTS idx_tasks_recurrence ON tasks(recurrence) WHERE recurrence IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run) WHERE next_run IS NOT NULL;
+
+-- ============================================================
+-- Recurring tasks — templates that spawn a new task instance
+-- automatically on their schedule
+-- ============================================================
+CREATE TABLE IF NOT EXISTS recurring_tasks (
+  id                  bigserial PRIMARY KEY,
+  title               text NOT NULL,
+  type                text DEFAULT 'call',
+  details             text DEFAULT '',
+  assignees           text[] DEFAULT '{}',
+  coordinator_id      bigint REFERENCES coordinators(id) ON DELETE SET NULL,
+  frequency           text NOT NULL,          -- 'daily' | 'weekly' | 'monthly'
+  day_of_week         integer,                -- 0=Sunday..6=Saturday, for weekly
+  day_of_month        integer,                -- 1-31, for monthly (clamped to month length)
+  active              boolean DEFAULT true,
+  last_generated_date date,
+  created_by          text DEFAULT '',
+  created_at          timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_recurring_active ON recurring_tasks(active);
+
+-- Traces which template a generated task came from (nullable — a
+-- one-off task has no template)
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurring_task_id bigint REFERENCES recurring_tasks(id) ON DELETE SET NULL;
