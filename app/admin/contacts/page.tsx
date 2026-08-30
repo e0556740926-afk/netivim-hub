@@ -37,6 +37,9 @@ export default function ContactsPage() {
   const { success, error: toastError, undoable } = useToast()
   const [contacts, setContacts] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkTarget, setBulkTarget] = useState("")
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [managers, setManagers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useUrlState("q")
@@ -105,11 +108,22 @@ export default function ContactsPage() {
     setShowContactForm(true); setOpenId(null); setDetail(null)
   }
 
-  async function saveContact() {
+  async function saveContact(force = false) {
     if (!contactForm.name.trim()) return
     setSaving(true)
-    if (editContactId) await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...contactForm,id:editContactId})})
-    else await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(contactForm)})
+    if (editContactId) {
+      await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...contactForm,id:editContactId})})
+    } else {
+      const res = await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...contactForm,force})})
+      if (res.status === 409) {
+        const d = await res.json()
+        setSaving(false)
+        if (confirm(`איש קשר עם טלפון זה כבר קיים (${d.duplicate.name}${d.duplicate.org?` · ${d.duplicate.org}`:""}). להוסיף בכל זאת?`)) {
+          return saveContact(true)
+        }
+        return
+      }
+    }
     setSaving(false); setShowContactForm(false); load()
     success(editContactId ? "השינויים נשמרו" : "איש הקשר נוסף")
   }
@@ -266,7 +280,7 @@ export default function ContactsPage() {
           <div className="sm:col-span-2"><label className="text-xs font-semibold block mb-1">הערות</label>
             <input value={contactForm.notes} onChange={e=>setContactForm(f=>({...f,notes:e.target.value}))} className={InputClass}/></div>
         </div>
-        <div className="flex gap-2"><Button onClick={saveContact} disabled={saving}>{saving?"שומר...":"שמור"}</Button><Button variant="secondary" onClick={()=>setShowContactForm(false)}>ביטול</Button></div>
+        <div className="flex gap-2"><Button onClick={()=>saveContact()} disabled={saving}>{saving?"שומר...":"שמור"}</Button><Button variant="secondary" onClick={()=>setShowContactForm(false)}>ביטול</Button></div>
       </div></Card>}
 
       {/* Detail panel */}
@@ -425,11 +439,53 @@ export default function ContactsPage() {
         <span className="text-xs text-[#94A3B8]">{filtered.length} רשומות</span>
       </div>
 
+      {/* Bulk actions toolbar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 flex-wrap bg-[#0D2744] text-white rounded-[10px] px-3.5 py-2.5 mb-3">
+          <span className="text-sm font-semibold">{selected.size} נבחרו</span>
+          <select value={bulkTarget} onChange={e=>setBulkTarget(e.target.value)}
+            className="text-xs px-2 py-1.5 rounded-[7px] bg-white/15 text-white border-none outline-none">
+            <option value="" className="text-black">שייך לרכז...</option>
+            {coords.map((c:any)=><option key={c.id} value={String(c.id)} className="text-black">{c.name}</option>)}
+          </select>
+          <button disabled={!bulkTarget||bulkBusy} onClick={async ()=>{
+              setBulkBusy(true)
+              await fetch("/api/contacts/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"assign", coordinator_id:+bulkTarget })})
+              setBulkBusy(false); setSelected(new Set()); setBulkTarget(""); success("השיוך עודכן"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white text-[#0D2744] disabled:opacity-40">
+            {bulkBusy?"מעדכן...":"החל שיוך"}
+          </button>
+          <button disabled={bulkBusy} onClick={async ()=>{
+              if (!confirm(`למחוק ${selected.size} אנשי קשר?`)) return
+              setBulkBusy(true)
+              await fetch("/api/contacts/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"delete" })})
+              setBulkBusy(false); setSelected(new Set()); success("נמחקו"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white/15 hover:bg-white/25">
+            מחק
+          </button>
+          <button onClick={()=>setSelected(new Set())} className="mr-auto text-xs text-white/60 hover:text-white">נקה בחירה</button>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? <SkeletonTable rows={5} cols={7}/> : <Card>
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead><tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+              <th className="px-3 py-2.5 w-8">
+                <input type="checkbox"
+                  checked={pg.paged.length>0 && pg.paged.every((c:any)=>selected.has(c.id))}
+                  onChange={e=>{
+                    const next = new Set(selected)
+                    pg.paged.forEach((c:any)=> e.target.checked ? next.add(c.id) : next.delete(c.id))
+                    setSelected(next)
+                  }}
+                  className="accent-[#00488D] w-3.5 h-3.5"/>
+              </th>
               {[["שם","name"],["ארגון","org"],["סוג","type"],["רכז","owner"],
                 ["סטטוס","status"],["פוטנציאל","potential"],["קשר אחרון","last_contact"],
                 ["",""]].map(([label,key])=>(
@@ -442,7 +498,16 @@ export default function ContactsPage() {
               {pg.paged.map(c=>{
                 const d=ds(c.last_contact); const isOpen=openId===c.id
                 const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
-                return <tr key={c.id} className={`border-b border-[#F1F5F9] last:border-0 transition-colors ${d>=30?"bg-[#FFF8F8]":""} ${isOpen?"!bg-[#F0F7FF]":"hover:bg-[#F8FAFC]"}`}>
+                return <tr key={c.id} className={`border-b border-[#F1F5F9] last:border-0 transition-colors ${d>=30?"bg-[#FFF8F8]":""} ${isOpen?"!bg-[#F0F7FF]":"hover:bg-[#F8FAFC]"} ${selected.has(c.id)?"!bg-[#F0F7FF]":""}`}>
+                  <td className="px-3 py-2.5">
+                    <input type="checkbox" checked={selected.has(c.id)}
+                      onChange={()=>{
+                        const next = new Set(selected)
+                        next.has(c.id) ? next.delete(c.id) : next.add(c.id)
+                        setSelected(next)
+                      }}
+                      className="accent-[#00488D] w-3.5 h-3.5"/>
+                  </td>
                   <td className="px-3 py-2.5"><div className="font-semibold text-[#0D2744]">{c.name}</div><div className="text-xs text-[#64748B]">{c.role}</div></td>
                   <td className="px-3 py-2.5 text-sm text-[#475569]">{c.org||"—"}</td>
                   <td className="px-3 py-2.5 text-xs text-[#475569]">{TYPE_LABEL[c.type]||c.type}</td>

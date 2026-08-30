@@ -30,6 +30,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  const soft = await hasColumn("contacts", "deleted_at");
+
+  if (d.phone && !d.force) {
+    const dup = soft
+      ? await sql`SELECT id, name, org FROM contacts WHERE phone=${d.phone} AND deleted_at IS NULL LIMIT 1`
+      : await sql`SELECT id, name, org FROM contacts WHERE phone=${d.phone} LIMIT 1`;
+    if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
+  }
+
   const rows = await sql`
     INSERT INTO contacts (coordinator_id,owner,name,org,role,phone,email,type,status,potential,last_contact,notes)
     VALUES (${d.coordinator_id||null},${d.owner||''},${d.name},${d.org||''},${d.role||''},${d.phone||''},${d.email||''},${d.type||'partner'},${d.status||'cold'},${d.potential||1},${d.last_contact||null},${d.notes||''})

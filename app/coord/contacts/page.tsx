@@ -63,11 +63,22 @@ export default function CoordContacts() {
     setShowForm(true); setOpenId(null); setDetail(null)
   }
 
-  async function save() {
+  async function save(force = false) {
     if (!form.name.trim()) return
     setSaving(true)
-    if (editId) await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,id:editId})})
-    else await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)})
+    if (editId) {
+      await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,id:editId})})
+    } else {
+      const res = await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,force})})
+      if (res.status === 409) {
+        const d = await res.json()
+        setSaving(false)
+        if (confirm(`איש קשר עם טלפון זה כבר קיים (${d.duplicate.name}${d.duplicate.org?` · ${d.duplicate.org}`:""}). להוסיף בכל זאת?`)) {
+          return save(true)
+        }
+        return
+      }
+    }
     setSaving(false); setShowForm(false); load()
   }
 
@@ -127,7 +138,7 @@ export default function CoordContacts() {
         <input value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="הערות" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
       </div>
       <div className="flex gap-2 mt-3">
-        <button onClick={save} disabled={saving} className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">{saving?"שומר...":"שמור"}</button>
+        <button onClick={()=>save()} disabled={saving} className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">{saving?"שומר...":"שמור"}</button>
         <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">ביטול</button>
       </div>
     </div>}
