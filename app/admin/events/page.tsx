@@ -37,6 +37,7 @@ export default function EventsPage() {
   const [editId, setEditId] = useState<number|null>(null)
   const [form, setForm] = useState({...EMPTY_FORM})
   const [saving, setSaving] = useState(false)
+  const [bulkApproving, setBulkApproving] = useState(false)
 
   // Results state
   const [resultsId, setResultsId] = useState<number|null>(null)
@@ -139,6 +140,22 @@ export default function EventsPage() {
   async function approve(id: number) {
     await fetch(`/api/events/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({approve:true}) })
     setEvents(e=>e.map(x=>x.id===id?{...x,approved:true,status:"marketing"}:x))
+  }
+
+  async function approveAllPending() {
+    const pending = events.filter(e => e.status === "pending_approval" && !e.approved)
+    if (!pending.length) return
+    if (!confirm(`לאשר ${pending.length} אירועים ממתינים?`)) return
+    setBulkApproving(true)
+    // Reuses the existing single-event endpoint (with all its
+    // notification logic) once per event, rather than duplicating
+    // that logic in a separate bulk route.
+    for (const e of pending) {
+      await fetch(`/api/events/${e.id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({approve:true}) })
+    }
+    setBulkApproving(false)
+    success(`${pending.length} אירועים אושרו`)
+    load()
   }
 
   async function deleteEvent(id: number) {
@@ -274,7 +291,7 @@ export default function EventsPage() {
       </Modal>
 
       {/* Filter tabs */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4 flex-wrap items-center">
         {["", "planning","pending_approval","approved","marketing","done","cancelled"].map(s=>(
           <button key={s} onClick={()=>setFilter(s)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${filter===s?"bg-[#00488D] text-white":"bg-white border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"}`}>
@@ -282,6 +299,12 @@ export default function EventsPage() {
             {s==="" && <span className="mr-1.5 text-[#94A3B8]">({events.length})</span>}
           </button>
         ))}
+        {filter === "pending_approval" && events.some(e=>e.status==="pending_approval"&&!e.approved) && (
+          <button onClick={approveAllPending} disabled={bulkApproving}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0] hover:bg-[#BBF7D0] disabled:opacity-50 mr-auto">
+            {bulkApproving ? "מאשר..." : "✓ אשר את כל הממתינים"}
+          </button>
+        )}
       </div>
 
       {/* Events list */}
