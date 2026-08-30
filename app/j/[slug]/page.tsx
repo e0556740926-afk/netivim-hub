@@ -1,8 +1,9 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, use } from "react"
 import Image from "next/image"
 
-export default function PublicForm({ params }: { params: { slug: string } }) {
+export default function PublicForm({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params)
   const [coordName, setCoordName] = useState("")
   const [coordId, setCoordId] = useState<number | null>(null)
   const [ownerType, setOwnerType] = useState<"coordinator" | "admin" | null>(null)
@@ -14,12 +15,12 @@ export default function PublicForm({ params }: { params: { slug: string } }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/coord/slug?slug=${params.slug}`)
+    fetch(`/api/coord/slug?slug=${encodeURIComponent(slug)}`)
       .then(r => r.json())
       .then(d => {
         if (d.coord) { setCoordName(d.coord.name); setCoordId(d.coord.id); setOwnerType(d.coord.type) }
       })
-  }, [params.slug])
+  }, [slug])
 
   async function submit() {
     if (!form.firstName || !form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
