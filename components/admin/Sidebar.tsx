@@ -17,7 +17,6 @@ const nav = [
   { label:"לידים",       path:"/admin/leads",      dot:"#34D399" },
   { label:"אירועים",    path:"/admin/events",     dot:"#F472B6", badgeKey:"pending" },
   { label:"משימות",     path:"/admin/tasks",      dot:"#60A5FA", badgeKey:"late" },
-  { label:"משימות חוזרות", path:"/admin/recurring-tasks", dot:"#5B21B6" },
   null,
   { label:"ניהול רכזים",path:"/admin/reports",    dot:"#34D399", badgeKey:"missingReports" },
   { label:"פיננסים",    path:"/admin/finance",    dot:"#FBBF24" },
