@@ -133,3 +133,9 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions(email);
+
+-- ============================================================
+-- Personal link (slug) for managers too — previously only
+-- coordinators had one via the coordinators table
+-- ============================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS slug text UNIQUE;

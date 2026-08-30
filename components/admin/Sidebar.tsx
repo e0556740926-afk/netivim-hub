@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import GlobalSearch from "./GlobalSearch"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
+import PersonalLinkPopup from "./PersonalLinkPopup"
 
 const nav = [
   { label:"מגדל פיקוח", path:"/admin/dashboard", dot:"#60A5FA" },
@@ -86,6 +87,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       {/* User */}
       <div className="p-3 border-t border-white/10 space-y-2">
+        <PersonalLinkPopup/>
         <PushNotificationToggle/>
         <div className="flex items-center gap-2.5 p-2.5 bg-white/8 rounded-[10px]">
           <div className="w-8 h-8 rounded-full bg-[#60A5FA] text-[#0D2744] flex items-center justify-center text-xs font-bold flex-shrink-0">

@@ -5,6 +5,7 @@ import Image from "next/image"
 export default function PublicForm({ params }: { params: { slug: string } }) {
   const [coordName, setCoordName] = useState("")
   const [coordId, setCoordId] = useState<number | null>(null)
+  const [ownerType, setOwnerType] = useState<"coordinator" | "admin" | null>(null)
   const [form, setForm] = useState({
     firstName: "", lastName: "", age: "", phone: "", email: "", notes: "", consent: false
   })
@@ -16,14 +17,14 @@ export default function PublicForm({ params }: { params: { slug: string } }) {
     fetch(`/api/coord/slug?slug=${params.slug}`)
       .then(r => r.json())
       .then(d => {
-        if (d.coord) { setCoordName(d.coord.name); setCoordId(d.coord.id) }
+        if (d.coord) { setCoordName(d.coord.name); setCoordId(d.coord.id); setOwnerType(d.coord.type) }
       })
   }, [params.slug])
 
   async function submit() {
     if (!form.firstName || !form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
     if (!form.consent) { setErr("יש לאשר קבלת עדכונים להמשך"); return }
-    if (!coordId) { setErr("קישור לא תקין — פנה לרכז ישירות"); return }
+    if (!coordId || !ownerType) { setErr("קישור לא תקין — פנה ישירות"); return }
     setLoading(true); setErr("")
     const fullName = `${form.firstName} ${form.lastName}`.trim()
     const notes = form.notes || ""
@@ -31,7 +32,8 @@ export default function PublicForm({ params }: { params: { slug: string } }) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        coordinator_id: coordId,
+        coordinator_id: ownerType === "coordinator" ? coordId : null,
+        owner_name: ownerType === "admin" ? coordName : "",
         name: fullName,
         phone: form.phone,
         email: form.email,

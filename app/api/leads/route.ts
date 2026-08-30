@@ -81,21 +81,29 @@ export async function POST(req: NextRequest) {
   const rows = await sql.query(text, vals);
   const me = await currentUser(req);
   logAudit({ entityType:"lead", entityId:rows[0].id, action:"create", actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
-  // Notify coordinator when lead comes from their public link
-  if (d.source === "link" && d.coordinator_id) {
+  // Notify whoever owns the public link the lead came through —
+  // a coordinator (via coordinator_id) or, now that managers have
+  // personal links too, an admin (via owner_name).
+  if (d.source === "link" && (d.coordinator_id || d.owner_name)) {
     try {
-      const cr = await sql`
-        SELECT c.name, u.email, COALESCE(c.phone, u.phone) as phone FROM coordinators c
-        JOIN users u ON u.id = c.user_id
-        WHERE c.id = ${d.coordinator_id} LIMIT 1`;
-      const c: any = cr[0];
-      const p = { coordName: c?.name, leadName: d.name, leadPhone: d.phone, leadAge: d.age };
-      if (c?.email) {
-        const { subject, html } = newLeadEmail(p);
-        await sendEmail({ to: c.email, subject, html });
-        await sendPush(c.email, { title: "⭐ ליד חדש", body: `${d.name} · ${d.phone}`, url: "/coord/leads" });
+      let target: { name?: string; email?: string; phone?: string } | undefined;
+      if (d.coordinator_id) {
+        const cr = await sql`
+          SELECT c.name, u.email, COALESCE(c.phone, u.phone) as phone FROM coordinators c
+          JOIN users u ON u.id = c.user_id
+          WHERE c.id = ${d.coordinator_id} LIMIT 1`;
+        target = cr[0] as any;
+      } else if (d.owner_name) {
+        const ur = await sql`SELECT name, email, phone FROM users WHERE name=${d.owner_name} AND role='admin' LIMIT 1`;
+        target = ur[0] as any;
       }
-      if (c?.phone) await sendWhatsApp(c.phone, newLeadMsg(p));
+      const p = { coordName: target?.name || "", leadName: d.name, leadPhone: d.phone, leadAge: d.age };
+      if (target?.email) {
+        const { subject, html } = newLeadEmail(p);
+        await sendEmail({ to: target.email, subject, html });
+        await sendPush(target.email, { title: "⭐ ליד חדש", body: `${d.name} · ${d.phone}`, url: d.coordinator_id ? "/coord/leads" : "/admin/leads" });
+      }
+      if (target?.phone) await sendWhatsApp(target.phone, newLeadMsg(p));
     } catch (e) { console.error("[notify lead]", e); }
   }
 
