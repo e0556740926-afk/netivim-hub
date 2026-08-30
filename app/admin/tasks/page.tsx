@@ -32,7 +32,7 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false)
   const [editTask, setEditTask] = useState<any>(null)
   const [filterAssignee, setFilterAssignee] = useState("")
-  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"" })
+  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"" })
   const [saving, setSaving] = useState(false)
   const today = new Date().toISOString().slice(0,10)
 
@@ -60,13 +60,13 @@ export default function TasksPage() {
 
   function startEdit(t: any) {
     setEditTask(t)
-    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, event_id:t.event_id||"", contact_id:t.contact_id||"", details:t.details||"" })
+    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, event_id:t.event_id||"", contact_id:t.contact_id||"", details:t.details||"", recurrence:t.recurrence||"" })
     setShowForm(true)
   }
 
   function startAdd() {
     setEditTask(null)
-    setForm({ title:"", type:"call", assignees:[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"" })
+    setForm({ title:"", type:"call", assignees:[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"" })
     setShowForm(true)
   }
 
@@ -147,6 +147,13 @@ export default function TasksPage() {
           </select></div>
         <div><label className="text-xs font-semibold block mb-1">תאריך יעד</label>
           <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">חזרה 🔁</label>
+          <select value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+            <option value="">חד-פעמית</option>
+            <option value="daily">כל יום</option>
+            <option value="weekly">כל שבוע</option>
+            <option value="monthly">כל חודש</option>
+          </select></div>
         <div><label className="text-xs font-semibold block mb-1">אירוע</label>
           <select value={form.event_id} onChange={e=>setForm(f=>({...f,event_id:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             <option value="">— ללא —</option>
@@ -185,7 +192,7 @@ export default function TasksPage() {
                 const accent = late?"#960010":col.key==="waiting"?"#B45309":col.key==="done"?"#166534":"#00488D"
                 return <DraggableCard key={t.id} id={t.id}>
                   <div style={{borderRight:`3px solid ${accent}`}} className="bg-white border border-[#E2E8F0] rounded-[11px] p-3 cursor-grab active:cursor-grabbing">
-                    <div className="text-xs font-semibold leading-snug mb-1.5">{t.title}</div>
+                    <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{t.title}</div>
                     <div className="flex gap-1 mb-2 flex-wrap">
                       <Badge text={TYPE_LABEL[t.type]||t.type}/>
                       {t.assignees?.slice(0,1).map((a:string)=><span key={a} className="text-xs px-1.5 py-0.5 bg-[#F0F7FF] text-[#00488D] rounded-full">{a.split(" ")[0]}</span>)}

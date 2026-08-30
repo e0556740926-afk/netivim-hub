@@ -5,6 +5,7 @@ import { sendWhatsApp, taskAssignedMsg } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
 import { sendPush } from "@/lib/push";
+import { hasColumn } from "@/lib/schema";
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
@@ -80,10 +81,23 @@ async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: s
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
-  const rows = await sql`
-    INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status)
-    VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'})
-    RETURNING *`;
+  const hasRecurrence = await hasColumn("tasks", "recurrence");
+
+  let rows;
+  if (hasRecurrence && d.recurrence) {
+    // A recurring task's due_date is its first occurrence; next_run
+    // starts at the same date so the scheduled generator spawns the
+    // SECOND occurrence exactly when the first one's date arrives.
+    rows = await sql`
+      INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status,recurrence,next_run)
+      VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'},${d.recurrence},${d.due_date||null})
+      RETURNING *`;
+  } else {
+    rows = await sql`
+      INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status)
+      VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'})
+      RETURNING *`;
+  }
 
   const task = rows[0];
   if (d.notify !== false && d.assignees?.length) {
@@ -112,7 +126,19 @@ export async function PATCH(req: NextRequest) {
   const next: string[] = d.assignees || [];
   const added = next.filter(n => !prev.includes(n));
 
-  await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
+  const hasRecurrence = await hasColumn("tasks", "recurrence");
+  if (hasRecurrence) {
+    // Editing a task keeps its existing next_run schedule untouched
+    // unless the recurrence rule itself changed; turning recurrence
+    // off clears next_run so the generator skips it going forward.
+    if (d.recurrence) {
+      await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=${d.recurrence} WHERE id=${d.id}`;
+    } else {
+      await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=NULL,next_run=NULL WHERE id=${d.id}`;
+    }
+  } else {
+    await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
+  }
 
   if (d.notify !== false && added.length) {
     await notifyAssignees(

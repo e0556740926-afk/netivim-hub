@@ -24,7 +24,7 @@ export default function CoordTasks() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number|null>(null)
   const [myOnly, setMyOnly] = useState(true)
-  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", details:"", event_id:"", contact_id:"" })
+  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"" })
   const [saving, setSaving] = useState(false)
   const today = new Date().toISOString().slice(0,10)
 
@@ -56,12 +56,12 @@ export default function CoordTasks() {
 
   function startAdd() {
     setEditId(null)
-    setForm({ title:"", type:"call", assignees:[user?.name||""], due_date:"", status:"todo", details:"", event_id:"", contact_id:"" })
+    setForm({ title:"", type:"call", assignees:[user?.name||""], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"" })
     setShowForm(true)
   }
   function startEdit(t:any) {
     setEditId(t.id)
-    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, details:t.details||"", event_id:t.event_id||"", contact_id:t.contact_id||"" })
+    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, details:t.details||"", event_id:t.event_id||"", contact_id:t.contact_id||"", recurrence:t.recurrence||"" })
     setShowForm(true)
   }
 
@@ -116,6 +116,12 @@ export default function CoordTasks() {
             {COLS.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
           <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          <select value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+            <option value="">חד-פעמית</option>
+            <option value="daily">🔁 כל יום</option>
+            <option value="weekly">🔁 כל שבוע</option>
+            <option value="monthly">🔁 כל חודש</option>
+          </select>
           <select value={form.event_id} onChange={e=>setForm(f=>({...f,event_id:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             <option value="">— אירוע —</option>
             {events.map((e:any)=><option key={e.id} value={e.id}>{e.name}</option>)}
@@ -159,7 +165,7 @@ export default function CoordTasks() {
             {colTasks.map(t=>{
               const late=t.due_date&&t.due_date.slice(0,10)<today&&t.status!=="done"
               return <div key={t.id} style={{borderRight:`3px solid ${late?"#960010":col.dot}`}} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-2.5">
-                <div className="text-xs font-semibold leading-snug mb-1.5">{t.title}</div>
+                <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{t.title}</div>
                 <div className="text-[10px] text-[#64748B] mb-2">{TYPE_LABEL[t.type]||t.type}{t.due_date&&` · ${fd(t.due_date.slice(0,10))}`}</div>
                 {t.assignees?.length>0&&<div className="text-[10px] text-[#00488D] mb-2">{t.assignees.join(", ")}</div>}
                 <div className="flex gap-1">

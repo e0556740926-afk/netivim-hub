@@ -139,3 +139,15 @@ CREATE INDEX IF NOT EXISTS idx_push_email ON push_subscriptions(email);
 -- coordinators had one via the coordinators table
 -- ============================================================
 ALTER TABLE users ADD COLUMN IF NOT EXISTS slug text UNIQUE;
+
+-- ============================================================
+-- Recurring tasks — a task can repeat daily/weekly/monthly.
+-- Each occurrence is its own row so an unfinished one stays open
+-- exactly where it was, and the same recurring task can be open
+-- more than once at a time.
+-- ============================================================
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence text;         -- 'daily' | 'weekly' | 'monthly' | NULL
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS next_run date;           -- when the next occurrence should be created
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_series_id bigint; -- links generated occurrences back to their template, for display grouping
+CREATE INDEX IF NOT EXISTS idx_tasks_recurrence ON tasks(recurrence) WHERE recurrence IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run) WHERE next_run IS NOT NULL;
