@@ -62,6 +62,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── Public newsletter signup: allow POST /api/newsletter/subscribe only ──
+  if (pathname === "/api/newsletter/subscribe" && req.method === "POST") {
+    return NextResponse.next();
+  }
+
   // ── API routes ──────────────────────────────────────────────
   if (pathname.startsWith("/api")) {
     if (isPublicApi(pathname)) return NextResponse.next();

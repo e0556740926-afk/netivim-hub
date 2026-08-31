@@ -158,3 +158,41 @@ CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run) WHERE next_run 
 -- ============================================================
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority text DEFAULT 'normal';
 CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
+
+-- ============================================================
+-- Newsletter — parent subscribers + a tiny generic settings
+-- table (reused for lazily-created external IDs like the
+-- Resend audience, so no manual setup step is required)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+  id               bigserial PRIMARY KEY,
+  name             text NOT NULL,
+  email            text NOT NULL UNIQUE,
+  coordinator_id   bigint REFERENCES coordinators(id) ON DELETE SET NULL,
+  source           text DEFAULT 'general',   -- 'general' | 'coordinator'
+  status           text DEFAULT 'active',    -- 'active' | 'unsubscribed'
+  resend_contact_id text,
+  created_at       timestamptz DEFAULT now(),
+  unsubscribed_at  timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_newsletter_coordinator ON newsletter_subscribers(coordinator_id);
+CREATE INDEX IF NOT EXISTS idx_newsletter_status ON newsletter_subscribers(status);
+CREATE INDEX IF NOT EXISTS idx_newsletter_created ON newsletter_subscribers(created_at);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key   text PRIMARY KEY,
+  value text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS newsletter_issues (
+  id           bigserial PRIMARY KEY,
+  subject      text NOT NULL,
+  intro        text DEFAULT '',
+  blocks       jsonb DEFAULT '[]',   -- [{title, text}]
+  closing      text DEFAULT '',
+  sent_at      timestamptz,
+  recipients   integer DEFAULT 0,
+  resend_broadcast_id text,
+  created_by   text DEFAULT '',
+  created_at   timestamptz DEFAULT now()
+);
