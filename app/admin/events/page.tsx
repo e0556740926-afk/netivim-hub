@@ -38,6 +38,9 @@ export default function EventsPage() {
   const [form, setForm] = useState({...EMPTY_FORM})
   const [saving, setSaving] = useState(false)
   const [bulkApproving, setBulkApproving] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [bulkStatus, setBulkStatus] = useState("")
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Results state
   const [resultsId, setResultsId] = useState<number|null>(null)
@@ -307,6 +310,38 @@ export default function EventsPage() {
         )}
       </div>
 
+      {/* Bulk actions toolbar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 flex-wrap bg-[#0D2744] text-white rounded-[10px] px-3.5 py-2.5 mb-3">
+          <span className="text-sm font-semibold">{selected.size} נבחרו</span>
+          <select value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)}
+            className="text-xs px-2 py-1.5 rounded-[7px] bg-white/15 text-white border-none outline-none">
+            <option value="" className="text-black">שנה סטטוס ל...</option>
+            {STATUS_OPTIONS.map(s=><option key={s.v} value={s.v} className="text-black">{s.l}</option>)}
+          </select>
+          <button disabled={!bulkStatus||bulkBusy} onClick={async ()=>{
+              setBulkBusy(true)
+              await fetch("/api/events/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"status", status:bulkStatus })})
+              setBulkBusy(false); setSelected(new Set()); setBulkStatus(""); success("הסטטוס עודכן"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white text-[#0D2744] disabled:opacity-40">
+            {bulkBusy?"מעדכן...":"החל"}
+          </button>
+          <button disabled={bulkBusy} onClick={async ()=>{
+              if (!confirm(`למחוק ${selected.size} אירועים?`)) return
+              setBulkBusy(true)
+              await fetch("/api/events/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({ ids:[...selected], action:"delete" })})
+              setBulkBusy(false); setSelected(new Set()); success("נמחקו"); load()
+            }}
+            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white/15 hover:bg-white/25">
+            מחק
+          </button>
+          <button onClick={()=>setSelected(new Set())} className="mr-auto text-xs text-white/60 hover:text-white">נקה בחירה</button>
+        </div>
+      )}
+
       {/* Events list */}
       {loading
         ? <div className="space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
@@ -322,10 +357,17 @@ export default function EventsPage() {
               const isPast=e.date&&e.date<today&&e.status!=="done"&&e.status!=="cancelled"
 
               return (
-                <div key={e.id} className={`bg-white border rounded-[14px] transition-all ${isEditing?"border-[#00488D] shadow-md":isResults?"border-[#166534] shadow-md":isPast?"border-[#FDE68A]":"border-[#E2E8F0] hover:border-[#CBD5E1]"}`}>
+                <div key={e.id} className={`bg-white border rounded-[14px] transition-all ${isEditing?"border-[#00488D] shadow-md":isResults?"border-[#166534] shadow-md":selected.has(e.id)?"border-[#00488D] bg-[#F0F7FF]":isPast?"border-[#FDE68A]":"border-[#E2E8F0] hover:border-[#CBD5E1]"}`}>
                   <div className="p-4">
                     {/* Top row */}
                     <div className="flex items-start gap-3 mb-3">
+                      <input type="checkbox" checked={selected.has(e.id)} onClick={ev=>ev.stopPropagation()}
+                        onChange={()=>{
+                          const next = new Set(selected)
+                          next.has(e.id) ? next.delete(e.id) : next.add(e.id)
+                          setSelected(next)
+                        }}
+                        className="accent-[#00488D] w-4 h-4 mt-1 flex-shrink-0"/>
                       {/* Date box */}
                       {e.date && <div className="text-center flex-shrink-0 w-12 bg-[#F0F7FF] rounded-[10px] py-2">
                         <div className="text-base font-extrabold leading-none text-[#0D2744]">{new Date(e.date).getDate()}</div>
