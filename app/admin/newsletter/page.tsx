@@ -18,6 +18,25 @@ function fd(d: string | null) {
 
 const EMPTY_ISSUE = { subject: "", intro: "", blocks: [{ title: "", text: "" }], closing: "בברכה,\nצוות נתיבים" }
 
+/**
+ * Email clients can't resolve a relative image path like
+ * "images/photo.jpg" — there's no page it's relative TO. Every image
+ * needs a full https:// URL. Design tools that export "download as
+ * HTML" (rather than an email-specific export) typically produce
+ * exactly this, silently — worth catching before a send goes out
+ * with broken images for every recipient.
+ */
+function findRelativeImages(html: string): string[] {
+  const found: string[] = []
+  const re = /<img[^>]+src=["']([^"']+)["']/gi
+  let m
+  while ((m = re.exec(html)) !== null) {
+    const src = m[1]
+    if (!/^(https?:|data:|cid:)/i.test(src)) found.push(src)
+  }
+  return found
+}
+
 export default function AdminNewsletterPage() {
   const { success, error: toastError } = useToast()
   const [subscribers, setSubscribers] = useState<any[]>([])
@@ -82,6 +101,10 @@ export default function AdminNewsletterPage() {
   async function sendIssue() {
     if (!issue.subject.trim()) { toastError("כותרת היא שדה חובה"); return }
     if (composeMode === "html" && !customHtml.trim()) { toastError("יש להדביק תוכן HTML"); return }
+    if (composeMode === "html") {
+      const relImgs = findRelativeImages(customHtml)
+      if (relImgs.length > 0 && !confirm(`נמצאו ${relImgs.length} תמונות עם כתובת יחסית שלא יוצגו במייל. לשלוח בכל זאת?`)) return
+    }
     if (!confirm(`לשלוח גיליון ל-${stats?.total || 0} נרשמים פעילים? לא ניתן לבטל אחרי השליחה.`)) return
     setSending(true)
     const res = await fetch("/api/newsletter/issues", {
@@ -343,6 +366,12 @@ export default function AdminNewsletterPage() {
                 placeholder="הדבק כאן HTML שיוצא מ-Canva או כל כלי עיצוב אחר..."
                 dir="ltr"
                 className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#00488D]"/>
+              {customHtml.trim() && findRelativeImages(customHtml).length > 0 && (
+                <div className="text-xs text-[#991B1B] bg-[#FEE2E2] rounded-[8px] px-3 py-2.5 mt-2">
+                  ⚠️ נמצאו {findRelativeImages(customHtml).length} תמונות עם כתובת יחסית (למשל <code dir="ltr">{findRelativeImages(customHtml)[0]}</code>) — הן <b>לא יוצגו</b> במייל בפועל.
+                  <div className="mt-1 font-normal">בקנווה: יש לבחור <b>Share ← Email</b> ולא <b>Download</b>, כדי לקבל קישורי תמונה מלאים.</div>
+                </div>
+              )}
               <div className="text-xs text-[#94A3B8] bg-[#F0F7FF] rounded-[8px] px-3 py-2 mt-2">
                 קישור הסרה מתווסף אוטומטית בסוף המייל, גם אם לא כלול בתוכן שהדבקת.
               </div>
