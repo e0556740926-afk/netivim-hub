@@ -127,16 +127,39 @@ function renderIssueHtml(c: IssueContent): string {
 }
 
 /**
+ * Wraps custom HTML (e.g. exported from Canva or any other design
+ * tool) with an unsubscribe footer, unless the pasted content already
+ * contains one. The unsubscribe link is a hard requirement regardless
+ * of who designed the email — this makes it impossible to accidentally
+ * skip by pasting content that doesn't already have the placeholder.
+ */
+function ensureUnsubscribeFooter(html: string): string {
+  if (html.includes("RESEND_UNSUBSCRIBE_URL")) return html;
+  const footer = `
+    <div style="padding:16px 24px;background:#F8FAFC;text-align:center;font-family:'Segoe UI',Arial,sans-serif;">
+      <div style="font-size:11px;color:#94A3B8;">{{{RESEND_UNSUBSCRIBE_URL}}}</div>
+    </div>`;
+  return /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${footer}</body>`) : html + footer;
+}
+
+/**
  * Sends the monthly issue as a Resend Broadcast to the full active
  * audience. Using Broadcasts (not the transactional send API) is
  * what makes Resend inject the one-click unsubscribe link
  * automatically via the {{{RESEND_UNSUBSCRIBE_URL}}} placeholder —
  * required, not optional, per the newsletter's own requirements.
  */
-export async function sendMonthlyIssue(content: IssueContent): Promise<{ ok: boolean; broadcastId?: string; recipients?: number; reason?: string }> {
+export async function sendMonthlyIssue(
+  content: IssueContent,
+  customHtml?: string | null
+): Promise<{ ok: boolean; broadcastId?: string; recipients?: number; reason?: string }> {
   if (!RESEND_KEY) return { ok: false, reason: "no_key" };
   const audienceId = await getOrCreateAudienceId();
   if (!audienceId) return { ok: false, reason: "no_audience" };
+
+  const html = customHtml?.trim()
+    ? ensureUnsubscribeFooter(customHtml.trim())
+    : renderIssueHtml(content);
 
   try {
     const createRes = await fetch("https://api.resend.com/broadcasts", {
@@ -146,7 +169,7 @@ export async function sendMonthlyIssue(content: IssueContent): Promise<{ ok: boo
         audience_id: audienceId,
         from: FROM,
         subject: content.subject,
-        html: renderIssueHtml(content),
+        html,
       }),
     });
     if (!createRes.ok) {

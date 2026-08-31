@@ -29,7 +29,18 @@ export default function AdminNewsletterPage() {
   const [q, setQ] = useState("")
 
   const [showCompose, setShowCompose] = useState(false)
+  const [composeMode, setComposeMode] = useState<"template"|"html">("template")
+  const [customHtml, setCustomHtml] = useState("")
   const [issue, setIssue] = useState({ ...EMPTY_ISSUE })
+
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState({ name: "", email: "" })
+  const [addSaving, setAddSaving] = useState(false)
+
+  const [showImport, setShowImport] = useState(false)
+  const [csvText, setCsvText] = useState("")
+  const [csvPreview, setCsvPreview] = useState<{name:string,email:string}[]>([])
+  const [importSaving, setImportSaving] = useState(false)
   const [sending, setSending] = useState(false)
 
   const [showHistory, setShowHistory] = useState(false)
@@ -66,12 +77,13 @@ export default function AdminNewsletterPage() {
 
   async function sendIssue() {
     if (!issue.subject.trim()) { toastError("כותרת היא שדה חובה"); return }
+    if (composeMode === "html" && !customHtml.trim()) { toastError("יש להדביק תוכן HTML"); return }
     if (!confirm(`לשלוח גיליון ל-${stats?.total || 0} נרשמים פעילים? לא ניתן לבטל אחרי השליחה.`)) return
     setSending(true)
     const res = await fetch("/api/newsletter/issues", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(issue),
+      body: JSON.stringify({ ...issue, customHtml: composeMode === "html" ? customHtml : null }),
     })
     setSending(false)
     if (!res.ok) {
@@ -80,8 +92,81 @@ export default function AdminNewsletterPage() {
       return
     }
     setShowCompose(false)
-    setIssue({ ...EMPTY_ISSUE })
+    setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template")
     success("הגיליון נשלח בהצלחה")
+    load()
+  }
+
+  async function addParent() {
+    if (!addForm.name.trim() || !addForm.email.trim()) { toastError("שם ומייל הם שדות חובה"); return }
+    setAddSaving(true)
+    const res = await fetch("/api/newsletter/import", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: addForm.name.trim(), email: addForm.email.trim() }),
+    })
+    setAddSaving(false)
+    if (!res.ok) { toastError("ההוספה נכשלה"); return }
+    const d = await res.json()
+    if (d.added === 0) { toastError("המייל הזה כבר ברשימה"); return }
+    setShowAdd(false); setAddForm({ name: "", email: "" })
+    success("ההורה נוסף")
+    load()
+  }
+
+  // Minimal, dependency-free CSV parser — deliberately not using the
+  // xlsx (SheetJS) npm package: it carries two unpatched high-severity
+  // vulnerabilities (prototype pollution + ReDoS), which is a real risk
+  // for a file an admin uploads and the server parses. CSV is safe to
+  // hand-parse for a simple two-column name/email file, and Excel
+  // exports to CSV in two clicks — the practical need is covered
+  // without pulling in a vulnerable dependency.
+  function parseCsv(text: string): {name:string,email:string}[] {
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    if (!lines.length) return []
+    const splitLine = (l: string) => l.split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+    let start = 0
+    const first = splitLine(lines[0]).map(c => c.toLowerCase())
+    const looksLikeHeader = first.some(c => c.includes("שם") || c.includes("name") || c.includes("מייל") || c.includes("email") || c.includes("אימייל"))
+    let nameIdx = 0, emailIdx = 1
+    if (looksLikeHeader) {
+      start = 1
+      const ni = first.findIndex(c => c.includes("שם") || c.includes("name"))
+      const ei = first.findIndex(c => c.includes("מייל") || c.includes("email") || c.includes("אימייל"))
+      if (ni >= 0) nameIdx = ni
+      if (ei >= 0) emailIdx = ei
+    }
+    const out: {name:string,email:string}[] = []
+    for (let i = start; i < lines.length; i++) {
+      const cols = splitLine(lines[i])
+      const name = cols[nameIdx] || ""
+      const email = cols[emailIdx] || ""
+      if (name && email.includes("@")) out.push({ name, email })
+    }
+    return out
+  }
+
+  function onCsvChange(text: string) {
+    setCsvText(text)
+    setCsvPreview(parseCsv(text))
+  }
+
+  async function onFileSelected(file: File) {
+    const text = await file.text()
+    onCsvChange(text)
+  }
+
+  async function confirmImport() {
+    if (!csvPreview.length) return
+    setImportSaving(true)
+    const res = await fetch("/api/newsletter/import", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rows: csvPreview }),
+    })
+    setImportSaving(false)
+    if (!res.ok) { toastError("הייבוא נכשל"); return }
+    const d = await res.json()
+    setShowImport(false); setCsvText(""); setCsvPreview([])
+    success(`יובאו ${d.added} הורים${d.skipped ? ` · ${d.skipped} דולגו (כבר קיימים)` : ""}`)
     load()
   }
 
@@ -107,7 +192,15 @@ export default function AdminNewsletterPage() {
           <h1 className="text-2xl font-extrabold text-[#0D2744]">ניוזלטר להורים</h1>
           <div className="text-sm text-[#64748B] mt-0.5">רשימת תפוצה, כתיבה ושליחת גיליונות</div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setShowAdd(true)}
+            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
+            + הוסף הורה
+          </button>
+          <button onClick={() => setShowImport(true)}
+            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
+            📥 ייבוא מאקסל
+          </button>
           <button onClick={() => setShowHistory(true)}
             className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
             היסטוריית גיליונות
@@ -203,12 +296,38 @@ export default function AdminNewsletterPage() {
         </>}
       >
         <div className="space-y-3">
+          {/* Mode toggle */}
+          <div className="flex gap-2 p-1 bg-[#F0F4F8] rounded-[10px]">
+            <button onClick={() => setComposeMode("template")}
+              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="template"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>
+              תבנית פשוטה
+            </button>
+            <button onClick={() => setComposeMode("html")}
+              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="html"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>
+              HTML מוכן (Canva ועוד)
+            </button>
+          </div>
+
           <div>
             <label className="text-xs font-semibold block mb-1">כותרת הגיליון *</label>
             <input value={issue.subject} onChange={e => setIssue(i => ({ ...i, subject: e.target.value }))}
               placeholder="לדוגמה: עדכון חודשי — ספטמבר 2026"
               className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
           </div>
+
+          {composeMode === "html" ? (
+            <div>
+              <label className="text-xs font-semibold block mb-1">תוכן HTML</label>
+              <textarea value={customHtml} onChange={e => setCustomHtml(e.target.value)} rows={8}
+                placeholder="הדבק כאן HTML שיוצא מ-Canva או כל כלי עיצוב אחר..."
+                dir="ltr"
+                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#00488D]"/>
+              <div className="text-xs text-[#94A3B8] bg-[#F0F7FF] rounded-[8px] px-3 py-2 mt-2">
+                קישור הסרה מתווסף אוטומטית בסוף המייל, גם אם לא כלול בתוכן שהדבקת.
+              </div>
+            </div>
+          ) : (
+          <>
           <div>
             <label className="text-xs font-semibold block mb-1">פתיחה</label>
             <textarea value={issue.intro} onChange={e => setIssue(i => ({ ...i, intro: e.target.value }))} rows={3}
@@ -248,6 +367,8 @@ export default function AdminNewsletterPage() {
           <div className="text-xs text-[#94A3B8] bg-[#F0F7FF] rounded-[8px] px-3 py-2">
             עיצוב הגיליון קבוע — לוגו, כותרת וקישור הסרה מתווספים אוטומטית. אתה ממלא רק את התוכן.
           </div>
+          </>
+          )}
         </div>
       </Modal>
 
@@ -272,6 +393,79 @@ export default function AdminNewsletterPage() {
             ))}
           </div>
         )}
+      </Modal>
+
+      {/* Manual add modal */}
+      <Modal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title="+ הוסף הורה"
+        footer={<>
+          <button onClick={addParent} disabled={addSaving}
+            className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+            {addSaving ? "מוסיף..." : "הוסף"}
+          </button>
+          <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">ביטול</button>
+        </>}
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold block mb-1">שם מלא *</label>
+            <input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
+              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">מייל *</label>
+            <input value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} type="email"
+              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          </div>
+        </div>
+      </Modal>
+
+      {/* CSV import modal */}
+      <Modal
+        open={showImport}
+        onClose={() => { setShowImport(false); setCsvText(""); setCsvPreview([]) }}
+        title="📥 ייבוא מאקסל"
+        subtitle="שמור את הקובץ כ-CSV באקסל (שמירה בשם → CSV) והעלה כאן"
+        width="520px"
+        footer={csvPreview.length > 0 ? <>
+          <button onClick={confirmImport} disabled={importSaving}
+            className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+            {importSaving ? "מייבא..." : `ייבא ${csvPreview.length} שורות`}
+          </button>
+          <button onClick={() => { setCsvText(""); setCsvPreview([]) }} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">נקה</button>
+        </> : undefined}
+      >
+        <div className="space-y-3">
+          <div>
+            <input type="file" accept=".csv,text/csv"
+              onChange={e => e.target.files?.[0] && onFileSelected(e.target.files[0])}
+              className="w-full text-sm"/>
+          </div>
+          <div className="text-xs text-[#94A3B8] text-center">— או —</div>
+          <textarea value={csvText} onChange={e => onCsvChange(e.target.value)} rows={5}
+            placeholder={"שם,מייל\nישראל ישראלי,israel@example.com"}
+            dir="ltr"
+            className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#00488D]"/>
+
+          {csvPreview.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold mb-1.5">תצוגה מקדימה ({csvPreview.length} שורות)</div>
+              <div className="max-h-40 overflow-y-auto border border-[#E2E8F0] rounded-[9px]">
+                {csvPreview.slice(0, 20).map((r, i) => (
+                  <div key={i} className="flex justify-between px-3 py-1.5 text-xs border-b border-[#F1F5F9] last:border-0">
+                    <span className="font-medium">{r.name}</span>
+                    <span className="text-[#64748B]">{r.email}</span>
+                  </div>
+                ))}
+                {csvPreview.length > 20 && (
+                  <div className="text-xs text-[#94A3B8] text-center py-1.5">ועוד {csvPreview.length - 20}...</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   )

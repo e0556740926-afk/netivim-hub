@@ -28,12 +28,13 @@ export async function POST(req: NextRequest) {
     blocks: Array.isArray(d.blocks) ? d.blocks.filter((b: any) => b.title?.trim() || b.text?.trim()) : [],
     closing: d.closing || "",
   };
+  const customHtml: string | null = d.customHtml?.trim() || null;
 
-  const result = await sendMonthlyIssue(content);
+  const result = await sendMonthlyIssue(content, customHtml);
 
   const rows = await sql`
     INSERT INTO newsletter_issues (subject, intro, blocks, closing, sent_at, recipients, resend_broadcast_id, created_by)
-    VALUES (${content.subject}, ${content.intro}, ${JSON.stringify(content.blocks)}, ${content.closing},
+    VALUES (${content.subject}, ${customHtml ? "[HTML מותאם אישית]" : content.intro}, ${JSON.stringify(content.blocks)}, ${content.closing},
             ${result.ok ? new Date().toISOString() : null}, ${result.recipients || 0},
             ${result.broadcastId || null}, ${me?.name || ""})
     RETURNING *`;
