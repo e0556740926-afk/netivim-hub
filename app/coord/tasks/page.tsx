@@ -12,6 +12,12 @@ const COLS = [
   { key:"done", label:"בוצע", border:"#BBF7D0", dot:"#166534" },
 ]
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
+const PRIORITY_LABEL: Record<string,string> = { urgent:"דחוף", normal:"רגיל", low:"נמוך" }
+const PRIORITY_COLOR: Record<string,{bg:string,fg:string}> = {
+  urgent: { bg:"#FEE2E2", fg:"#991B1B" },
+  normal: { bg:"#F3F4F6", fg:"#374151" },
+  low:    { bg:"#F0F4F8", fg:"#64748B" },
+}
 
 export default function CoordTasks() {
   const [loading, setLoading] = useState(true)
@@ -24,7 +30,8 @@ export default function CoordTasks() {
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number|null>(null)
   const [myOnly, setMyOnly] = useState(true)
-  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"" })
+  const [filterPriority, setFilterPriority] = useState("")
+  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"", priority:"normal" })
   const [saving, setSaving] = useState(false)
   const today = new Date().toISOString().slice(0,10)
 
@@ -50,18 +57,19 @@ export default function CoordTasks() {
   }
   useEffect(() => { load() }, [])
 
-  const shown = myOnly
+  const shown = (myOnly
     ? tasks.filter(t=>t.assignees?.includes(user?.name||""))
     : tasks
+  ).filter(t => !filterPriority || (t.priority||"normal") === filterPriority)
 
   function startAdd() {
     setEditId(null)
-    setForm({ title:"", type:"call", assignees:[user?.name||""], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"" })
+    setForm({ title:"", type:"call", assignees:[user?.name||""], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"", priority:"normal" })
     setShowForm(true)
   }
   function startEdit(t:any) {
     setEditId(t.id)
-    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, details:t.details||"", event_id:t.event_id||"", contact_id:t.contact_id||"", recurrence:t.recurrence||"" })
+    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, details:t.details||"", event_id:t.event_id||"", contact_id:t.contact_id||"", recurrence:t.recurrence||"", priority:t.priority||"normal" })
     setShowForm(true)
   }
 
@@ -103,6 +111,16 @@ export default function CoordTasks() {
       </div>
     </div>
 
+    {/* Priority filter chips */}
+    <div className="flex gap-1.5 mb-3 overflow-x-auto">
+      {["",...Object.keys(PRIORITY_LABEL)].map(p=>(
+        <button key={p||"all"} onClick={()=>setFilterPriority(p)}
+          className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap border transition-colors ${filterPriority===p?"bg-[#0D2744] text-white border-[#0D2744]":"border-[#E2E8F0] text-[#64748B]"}`}>
+          {p===""?"הכל":PRIORITY_LABEL[p]}
+        </button>
+      ))}
+    </div>
+
     {/* Form */}
     {showForm&&<div className="bg-white border-2 border-[#00488D] rounded-[14px] p-4 mb-4 fade-up">
       <div className="text-sm font-bold text-[#00488D] mb-3">{editId?"עריכת משימה":"משימה חדשה"}</div>
@@ -116,6 +134,9 @@ export default function CoordTasks() {
             {COLS.map(c=><option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
           <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          <select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+            {Object.entries(PRIORITY_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
           <select value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))} className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             <option value="">חד-פעמית</option>
             <option value="daily">🔁 כל יום</option>
@@ -164,9 +185,17 @@ export default function CoordTasks() {
           <div className="space-y-2">
             {colTasks.map(t=>{
               const late=t.due_date&&t.due_date.slice(0,10)<today&&t.status!=="done"
-              return <div key={t.id} style={{borderRight:`3px solid ${late?"#960010":col.dot}`}} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-2.5">
-                <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{t.title}</div>
-                <div className="text-[10px] text-[#64748B] mb-2">{TYPE_LABEL[t.type]||t.type}{t.due_date&&` · ${fd(t.due_date.slice(0,10))}`}</div>
+              const isUrgent=(t.priority||"normal")==="urgent"
+              return <div key={t.id} style={{borderRight:`3px solid ${isUrgent?"#960010":late?"#960010":col.dot}`}} className={`bg-[#F8FAFC] border rounded-[10px] p-2.5 ${isUrgent?"border-[#FECACA]":"border-[#E2E8F0]"}`}>
+                <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{isUrgent && "🔴 "}{t.title}</div>
+                <div className="text-[10px] text-[#64748B] mb-2 flex items-center gap-1 flex-wrap">
+                  <span>{TYPE_LABEL[t.type]||t.type}{t.due_date&&` · ${fd(t.due_date.slice(0,10))}`}</span>
+                  {(t.priority && t.priority!=="normal") && (
+                    <span style={{background:PRIORITY_COLOR[t.priority]?.bg,color:PRIORITY_COLOR[t.priority]?.fg}} className="px-1.5 py-0.5 rounded-full font-bold">
+                      {PRIORITY_LABEL[t.priority]}
+                    </span>
+                  )}
+                </div>
                 {t.assignees?.length>0&&<div className="text-[10px] text-[#00488D] mb-2">{t.assignees.join(", ")}</div>}
                 <div className="flex gap-1">
                   {col.key!=="done"&&<button onClick={()=>move(t.id,"done")} className="flex-1 text-center py-1 rounded-[6px] text-[10px] font-bold bg-[#DCFCE7] text-[#166534]">✓</button>}

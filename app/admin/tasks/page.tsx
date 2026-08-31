@@ -19,6 +19,12 @@ const COLS = [
   { key:"done", label:"בוצע", bg:"#F0FFF4", border:"#BBF7D0", fg:"#166534" },
 ]
 const TYPE_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
+const PRIORITY_LABEL: Record<string,string> = { urgent:"דחוף", normal:"רגיל", low:"נמוך" }
+const PRIORITY_COLOR: Record<string,{bg:string,fg:string}> = {
+  urgent: { bg:"#FEE2E2", fg:"#991B1B" },
+  normal: { bg:"#F3F4F6", fg:"#374151" },
+  low:    { bg:"#F0F4F8", fg:"#64748B" },
+}
 
 export default function TasksPage() {
   const [error, setError] = useState(false)
@@ -32,7 +38,8 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false)
   const [editTask, setEditTask] = useState<any>(null)
   const [filterAssignee, setFilterAssignee] = useState("")
-  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"" })
+  const [filterPriority, setFilterPriority] = useState("")
+  const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"", priority:"normal" })
   const [saving, setSaving] = useState(false)
   const today = new Date().toISOString().slice(0,10)
 
@@ -60,13 +67,13 @@ export default function TasksPage() {
 
   function startEdit(t: any) {
     setEditTask(t)
-    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, event_id:t.event_id||"", contact_id:t.contact_id||"", details:t.details||"", recurrence:t.recurrence||"" })
+    setForm({ title:t.title, type:t.type, assignees:t.assignees||[], due_date:t.due_date?.slice(0,10)||"", status:t.status, event_id:t.event_id||"", contact_id:t.contact_id||"", details:t.details||"", recurrence:t.recurrence||"", priority:t.priority||"normal" })
     setShowForm(true)
   }
 
   function startAdd() {
     setEditTask(null)
-    setForm({ title:"", type:"call", assignees:[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"" })
+    setForm({ title:"", type:"call", assignees:[], due_date:"", status:"todo", event_id:"", contact_id:"", details:"", recurrence:"", priority:"normal" })
     setShowForm(true)
   }
 
@@ -111,7 +118,9 @@ export default function TasksPage() {
     setForm(f => ({ ...f, assignees: f.assignees.includes(name) ? f.assignees.filter(x=>x!==name) : [...f.assignees,name] }))
   }
 
-  const filtered = filterAssignee ? tasks.filter(t => t.assignees?.includes(filterAssignee)) : tasks
+  const filtered = tasks
+    .filter(t => !filterAssignee || t.assignees?.includes(filterAssignee))
+    .filter(t => !filterPriority || (t.priority||"normal") === filterPriority)
 
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
   if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
@@ -122,6 +131,10 @@ export default function TasksPage() {
         <div className="text-sm text-[#64748B] mt-0.5">{tasks.filter(t=>t.status!=="done").length} פתוחות · {tasks.filter(t=>t.status==="done").length} הושלמו</div>
       </div>
       <div className="flex gap-2">
+        <select value={filterPriority} onChange={e=>setFilterPriority(e.target.value)} className="px-3 py-2 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
+          <option value="">כל רמות הדחיפות</option>
+          {Object.entries(PRIORITY_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+        </select>
         <select value={filterAssignee} onChange={e=>setFilterAssignee(e.target.value)} className="px-3 py-2 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
           <option value="">כל המשתמשים</option>
           <optgroup label="רכזים">{coords.filter((c:any)=>!c._isManager).map((c:any)=><option key={c.id} value={c.name}>{c.name}</option>)}</optgroup>
@@ -147,6 +160,10 @@ export default function TasksPage() {
           </select></div>
         <div><label className="text-xs font-semibold block mb-1">תאריך יעד</label>
           <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">דחיפות</label>
+          <select value={form.priority} onChange={e=>setForm(f=>({...f,priority:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+            {Object.entries(PRIORITY_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select></div>
         <div><label className="text-xs font-semibold block mb-1">חזרה 🔁</label>
           <select value={form.recurrence} onChange={e=>setForm(f=>({...f,recurrence:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             <option value="">חד-פעמית</option>
@@ -190,11 +207,17 @@ export default function TasksPage() {
               {colTasks.map(t => {
                 const late = t.due_date && t.due_date.slice(0,10) < today && t.status!=="done"
                 const accent = late?"#960010":col.key==="waiting"?"#B45309":col.key==="done"?"#166534":"#00488D"
+                const isUrgent = (t.priority||"normal") === "urgent"
                 return <DraggableCard key={t.id} id={t.id}>
-                  <div style={{borderRight:`3px solid ${accent}`}} className="bg-white border border-[#E2E8F0] rounded-[11px] p-3 cursor-grab active:cursor-grabbing">
-                    <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{t.title}</div>
+                  <div style={{borderRight:`3px solid ${isUrgent?"#960010":accent}`}} className={`bg-white border rounded-[11px] p-3 cursor-grab active:cursor-grabbing ${isUrgent?"border-[#FECACA]":"border-[#E2E8F0]"}`}>
+                    <div className="text-xs font-semibold leading-snug mb-1.5">{t.recurrence && "🔁 "}{isUrgent && "🔴 "}{t.title}</div>
                     <div className="flex gap-1 mb-2 flex-wrap">
                       <Badge text={TYPE_LABEL[t.type]||t.type}/>
+                      {(t.priority && t.priority !== "normal") && (
+                        <span style={{background:PRIORITY_COLOR[t.priority]?.bg,color:PRIORITY_COLOR[t.priority]?.fg}} className="text-xs font-bold px-1.5 py-0.5 rounded-full">
+                          {PRIORITY_LABEL[t.priority]}
+                        </span>
+                      )}
                       {t.assignees?.slice(0,1).map((a:string)=><span key={a} className="text-xs px-1.5 py-0.5 bg-[#F0F7FF] text-[#00488D] rounded-full">{a.split(" ")[0]}</span>)}
                     </div>
                     {t.due_date && <div style={{color:accent}} className="text-xs font-semibold mb-2">{late?"⚠ ":""}{fd(t.due_date.slice(0,10))}</div>}

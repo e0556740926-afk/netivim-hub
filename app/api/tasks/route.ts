@@ -82,21 +82,33 @@ async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: s
 export async function POST(req: NextRequest) {
   const d = await req.json();
   const hasRecurrence = await hasColumn("tasks", "recurrence");
+  const hasPriority = await hasColumn("tasks", "priority");
+  const priority = hasPriority ? (d.priority || "normal") : undefined;
 
   let rows;
   if (hasRecurrence && d.recurrence) {
     // A recurring task's due_date is its first occurrence; next_run
     // starts at the same date so the scheduled generator spawns the
     // SECOND occurrence exactly when the first one's date arrives.
-    rows = await sql`
-      INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status,recurrence,next_run)
-      VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'},${d.recurrence},${d.due_date||null})
-      RETURNING *`;
+    rows = hasPriority
+      ? await sql`
+          INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status,recurrence,next_run,priority)
+          VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'},${d.recurrence},${d.due_date||null},${priority})
+          RETURNING *`
+      : await sql`
+          INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status,recurrence,next_run)
+          VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'},${d.recurrence},${d.due_date||null})
+          RETURNING *`;
   } else {
-    rows = await sql`
-      INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status)
-      VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'})
-      RETURNING *`;
+    rows = hasPriority
+      ? await sql`
+          INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status,priority)
+          VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'},${priority})
+          RETURNING *`
+      : await sql`
+          INSERT INTO tasks (coordinator_id,event_id,contact_id,title,details,type,assignees,due_date,status)
+          VALUES (${d.coordinator_id||null},${d.event_id||null},${d.contact_id||null},${d.title},${d.details||''},${d.type||'call'},${d.assignees||[]},${d.due_date||null},${d.status||'todo'})
+          RETURNING *`;
   }
 
   const task = rows[0];
@@ -127,15 +139,28 @@ export async function PATCH(req: NextRequest) {
   const added = next.filter(n => !prev.includes(n));
 
   const hasRecurrence = await hasColumn("tasks", "recurrence");
+  const hasPriority = await hasColumn("tasks", "priority");
+  const priority = d.priority || "normal";
+
   if (hasRecurrence) {
     // Editing a task keeps its existing next_run schedule untouched
     // unless the recurrence rule itself changed; turning recurrence
     // off clears next_run so the generator skips it going forward.
     if (d.recurrence) {
-      await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=${d.recurrence} WHERE id=${d.id}`;
+      if (hasPriority) {
+        await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=${d.recurrence},priority=${priority} WHERE id=${d.id}`;
+      } else {
+        await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=${d.recurrence} WHERE id=${d.id}`;
+      }
     } else {
-      await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=NULL,next_run=NULL WHERE id=${d.id}`;
+      if (hasPriority) {
+        await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=NULL,next_run=NULL,priority=${priority} WHERE id=${d.id}`;
+      } else {
+        await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},recurrence=NULL,next_run=NULL WHERE id=${d.id}`;
+      }
     }
+  } else if (hasPriority) {
+    await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null},priority=${priority} WHERE id=${d.id}`;
   } else {
     await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
   }

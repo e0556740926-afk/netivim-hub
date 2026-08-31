@@ -152,3 +152,9 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS recurrence_series_id bigint; -- links
 CREATE INDEX IF NOT EXISTS idx_tasks_recurrence ON tasks(recurrence) WHERE recurrence IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_next_run ON tasks(next_run) WHERE next_run IS NOT NULL;
 
+
+-- ============================================================
+-- Task priority/urgency
+-- ============================================================
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority text DEFAULT 'normal';
+CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
