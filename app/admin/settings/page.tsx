@@ -7,6 +7,7 @@ import { fd } from "@/lib/utils"
 import Badge from "@/components/ui/Badge"
 import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
+import Modal from "@/components/ui/Modal"
 
 const ROLE_LABEL: Record<string,string> = { admin:"מנהל מערכת", coordinator:"רכז", viewer:"צופה" }
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }
@@ -26,6 +27,10 @@ export default function SettingsPage() {
   const [actTab, setActTab] = useState<"tasks"|"leads"|"interactions"|"reports">("tasks")
   const [saving, setSaving] = useState(false)
   const [calTokens, setCalTokens] = useState<Record<number,string>>({})
+  const [onboarding, setOnboarding] = useState<{ name: string; slug: string; coordinatorId: number } | null>(null)
+  const [targetInput, setTargetInput] = useState("")
+  const [targetSaving, setTargetSaving] = useState(false)
+  const [targetSaved, setTargetSaved] = useState(false)
 
   async function loadCalTokens(userList: any[]) {
     const tokens: Record<number,string> = {}
@@ -82,7 +87,23 @@ export default function SettingsPage() {
     })
     const d = await res.json()
     if (d.error) { setErr(d.error); setSaving(false); return }
-    setSaving(false); setShowForm(false); load()
+    setSaving(false); setShowForm(false)
+    if (!editUser && form.role === "coordinator" && d.coordinatorSlug && d.coordinatorId) {
+      setOnboarding({ name: form.name, slug: d.coordinatorSlug, coordinatorId: d.coordinatorId })
+      setTargetInput(""); setTargetSaved(false)
+    }
+    load()
+  }
+
+  async function saveOnboardingTarget() {
+    if (!onboarding || !targetInput) return
+    setTargetSaving(true)
+    const now = new Date()
+    await fetch("/api/targets", {
+      method: "POST", headers: { "Content-Type":"application/json" },
+      body: JSON.stringify({ coordinator_id: onboarding.coordinatorId, month: now.getMonth()+1, year: now.getFullYear(), target_leads: +targetInput })
+    })
+    setTargetSaving(false); setTargetSaved(true)
   }
 
   async function del(id: number) {
@@ -244,5 +265,59 @@ export default function SettingsPage() {
         </div>)}
       </div></Card>
     </>}
+
+    {/* New-coordinator onboarding checklist */}
+    <Modal
+      open={!!onboarding}
+      onClose={()=>setOnboarding(null)}
+      title={`✓ ${onboarding?.name} נוסף בהצלחה`}
+      accent="#166534"
+      footer={<button onClick={()=>setOnboarding(null)} className="w-full py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold">סיימתי</button>}
+    >
+      {onboarding && (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 bg-[#F0FFF4] border border-[#BBF7D0] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#166534] text-sm">✓</span>
+            <div className="text-sm">
+              <div className="font-semibold text-[#166534]">חשבון נוצר</div>
+              <div className="text-xs text-[#64748B]">שם משתמש וסיסמה פעילים</div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 bg-[#F0FFF4] border border-[#BBF7D0] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#166534] text-sm">✓</span>
+            <div className="text-sm flex-1 min-w-0">
+              <div className="font-semibold text-[#166534]">לינק אישי נוצר</div>
+              <div className="text-xs font-mono text-[#64748B] break-all mt-0.5">/j/{onboarding.slug}</div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2.5 bg-[#F0F7FF] border border-[#BFDBFE] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#00488D] text-sm">ℹ</span>
+            <div className="text-sm">
+              <div className="font-semibold text-[#00488D]">לינק ליומן Google</div>
+              <div className="text-xs text-[#64748B]">ייווצר אוטומטית בכניסה הראשונה שלו לפרופיל</div>
+            </div>
+          </div>
+
+          <div className={`border rounded-[10px] px-3 py-2.5 ${targetSaved ? "bg-[#F0FFF4] border-[#BBF7D0]" : "bg-white border-[#E2E8F0]"}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={targetSaved ? "text-[#166534] text-sm" : "text-[#94A3B8] text-sm"}>{targetSaved ? "✓" : "○"}</span>
+              <div className="text-sm font-semibold">{targetSaved ? "יעד חודשי הוגדר" : "הגדר יעד חודשי (מומלץ)"}</div>
+            </div>
+            {!targetSaved && (
+              <div className="flex gap-2 mt-2">
+                <input type="number" value={targetInput} onChange={e=>setTargetInput(e.target.value)}
+                  placeholder="לדוגמה: 15" className="flex-1 px-3 py-1.5 border border-[#CBD5E1] rounded-[8px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                <button onClick={saveOnboardingTarget} disabled={!targetInput||targetSaving}
+                  className="px-4 py-1.5 bg-[#0D2744] text-white rounded-[8px] text-xs font-bold disabled:opacity-40">
+                  {targetSaving?"שומר...":"שמור"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
   </div>
 }
