@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import KPICard from "@/components/ui/KPICard"
 import Card from "@/components/ui/Card"
 import Modal from "@/components/ui/Modal"
@@ -41,6 +41,8 @@ export default function AdminNewsletterPage() {
   const [csvText, setCsvText] = useState("")
   const [csvPreview, setCsvPreview] = useState<{name:string,email:string}[]>([])
   const [importSaving, setImportSaving] = useState(false)
+  const [csvFileName, setCsvFileName] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [sending, setSending] = useState(false)
 
   const [showHistory, setShowHistory] = useState(false)
@@ -151,6 +153,7 @@ export default function AdminNewsletterPage() {
   }
 
   async function onFileSelected(file: File) {
+    setCsvFileName(file.name)
     const text = await file.text()
     onCsvChange(text)
   }
@@ -165,7 +168,7 @@ export default function AdminNewsletterPage() {
     setImportSaving(false)
     if (!res.ok) { toastError("הייבוא נכשל"); return }
     const d = await res.json()
-    setShowImport(false); setCsvText(""); setCsvPreview([])
+    setShowImport(false); setCsvText(""); setCsvPreview([]); setCsvFileName("")
     success(`יובאו ${d.added} הורים${d.skipped ? ` · ${d.skipped} דולגו (כבר קיימים)` : ""}`)
     load()
   }
@@ -425,7 +428,7 @@ export default function AdminNewsletterPage() {
       {/* CSV import modal */}
       <Modal
         open={showImport}
-        onClose={() => { setShowImport(false); setCsvText(""); setCsvPreview([]) }}
+        onClose={() => { setShowImport(false); setCsvText(""); setCsvPreview([]); setCsvFileName("") }}
         title="📥 ייבוא מאקסל"
         subtitle="שמור את הקובץ כ-CSV באקסל (שמירה בשם → CSV) והעלה כאן"
         width="520px"
@@ -434,14 +437,20 @@ export default function AdminNewsletterPage() {
             className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
             {importSaving ? "מייבא..." : `ייבא ${csvPreview.length} שורות`}
           </button>
-          <button onClick={() => { setCsvText(""); setCsvPreview([]) }} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">נקה</button>
+          <button onClick={() => { setCsvText(""); setCsvPreview([]); setCsvFileName("") }} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">נקה</button>
         </> : undefined}
       >
         <div className="space-y-3">
           <div>
-            <input type="file" accept=".csv,text/csv"
-              onChange={e => e.target.files?.[0] && onFileSelected(e.target.files[0])}
-              className="w-full text-sm"/>
+            <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden"
+              onChange={e => e.target.files?.[0] && onFileSelected(e.target.files[0])}/>
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="w-full py-3 border-2 border-dashed border-[#CBD5E1] rounded-[10px] text-sm font-semibold text-[#374151] hover:border-[#00488D] hover:bg-[#F0F7FF] transition-colors flex items-center justify-center gap-2">
+              📁 {csvFileName || "בחר קובץ CSV"}
+            </button>
+            {csvFileName && (
+              <div className="text-xs text-[#166534] mt-1.5 text-center">✓ הקובץ נטען — {csvPreview.length} שורות זוהו</div>
+            )}
           </div>
           <div className="text-xs text-[#94A3B8] text-center">— או —</div>
           <textarea value={csvText} onChange={e => onCsvChange(e.target.value)} rows={5}

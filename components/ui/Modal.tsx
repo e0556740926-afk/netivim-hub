@@ -20,20 +20,31 @@ export default function Modal({
 }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null)
 
-  // Close on Escape, and lock background scroll while open
+  // Always call the latest onClose without making it a dependency of
+  // the effect below — onClose is typically passed as an inline arrow
+  // function, so its reference changes on every render of the parent
+  // (including one caused by typing in a field inside this modal).
+  // Depending on it directly re-ran the effect on every keystroke,
+  // which called panel.current?.focus() and yanked focus out of
+  // whatever input the user was typing in.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  // Close on Escape, and lock background scroll — runs once per
+  // open/close transition, not on every parent re-render.
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseRef.current() }
     document.addEventListener("keydown", onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    // move focus into the dialog
+    // move focus into the dialog, once, when it opens
     panel.current?.focus()
     return () => {
       document.removeEventListener("keydown", onKey)
       document.body.style.overflow = prev
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
 
