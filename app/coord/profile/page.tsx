@@ -3,12 +3,14 @@ import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { useRouter } from "next/navigation"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 
 export default function CoordProfile() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const { user, logout } = useAuth()
+  const router = useRouter()
   const [stats, setStats] = useState({ month:0, year:0 })
   const [coord, setCoord] = useState<any>(null)
   const [report, setReport] = useState({ achievements:"", challenges:"", leads_count:0, next_week_plan:"" })
@@ -98,6 +100,22 @@ export default function CoordProfile() {
         </div>
         <PushNotificationToggle/>
         <button onClick={logout} className="text-xs text-[#64748B] border border-[#E2E8F0] px-3 py-1.5 rounded-lg hover:bg-[#F8FAFC]">יציאה</button>
+      </div>
+
+      {/* Quick links */}
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
+        <button onClick={() => router.push("/coord/link")}
+          className="bg-white border border-[#E2E8F0] rounded-[14px] p-3.5 text-right hover:border-[#BFDBFE] hover:bg-[#F0F7FF] transition-colors">
+          <div className="text-lg mb-1">🔗</div>
+          <div className="text-sm font-bold">הלינק שלי ללידים</div>
+          <div className="text-xs text-[#64748B] mt-0.5">שיתוף וסטטיסטיקה</div>
+        </button>
+        <button onClick={() => router.push("/coord/newsletter")}
+          className="bg-white border border-[#E2E8F0] rounded-[14px] p-3.5 text-right hover:border-[#BFDBFE] hover:bg-[#F0F7FF] transition-colors">
+          <div className="text-lg mb-1">📬</div>
+          <div className="text-sm font-bold">ניוזלטר להורים</div>
+          <div className="text-xs text-[#64748B] mt-0.5">הלינק שלי ומי נרשם</div>
+        </button>
       </div>
 
       {/* Stats */}
