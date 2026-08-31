@@ -43,6 +43,8 @@ export default function AdminNewsletterPage() {
   const [importSaving, setImportSaving] = useState(false)
   const [csvFileName, setCsvFileName] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [htmlFileName, setHtmlFileName] = useState("")
+  const htmlFileInputRef = useRef<HTMLInputElement>(null)
   const [sending, setSending] = useState(false)
 
   const [showHistory, setShowHistory] = useState(false)
@@ -94,7 +96,7 @@ export default function AdminNewsletterPage() {
       return
     }
     setShowCompose(false)
-    setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template")
+    setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template"); setHtmlFileName("")
     success("הגיליון נשלח בהצלחה")
     load()
   }
@@ -156,6 +158,12 @@ export default function AdminNewsletterPage() {
     setCsvFileName(file.name)
     const text = await file.text()
     onCsvChange(text)
+  }
+
+  async function onHtmlFileSelected(file: File) {
+    setHtmlFileName(file.name)
+    const text = await file.text()
+    setCustomHtml(text)
   }
 
   async function confirmImport() {
@@ -321,6 +329,16 @@ export default function AdminNewsletterPage() {
           {composeMode === "html" ? (
             <div>
               <label className="text-xs font-semibold block mb-1">תוכן HTML</label>
+              <input ref={htmlFileInputRef} type="file" accept=".html,text/html" className="hidden"
+                onChange={e => e.target.files?.[0] && onHtmlFileSelected(e.target.files[0])}/>
+              <button type="button" onClick={() => htmlFileInputRef.current?.click()}
+                className="w-full py-3 border-2 border-dashed border-[#CBD5E1] rounded-[10px] text-sm font-semibold text-[#374151] hover:border-[#00488D] hover:bg-[#F0F7FF] transition-colors flex items-center justify-center gap-2 mb-2">
+                📁 {htmlFileName || "בחר קובץ HTML (מיוצא מ-Canva)"}
+              </button>
+              {htmlFileName && (
+                <div className="text-xs text-[#166534] mb-2 text-center">✓ הקובץ נטען — אפשר לערוך למטה במידת הצורך</div>
+              )}
+              <div className="text-xs text-[#94A3B8] text-center mb-2">— או הדבק ישירות —</div>
               <textarea value={customHtml} onChange={e => setCustomHtml(e.target.value)} rows={8}
                 placeholder="הדבק כאן HTML שיוצא מ-Canva או כל כלי עיצוב אחר..."
                 dir="ltr"
