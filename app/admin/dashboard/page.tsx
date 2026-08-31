@@ -10,12 +10,14 @@ import PageLoader from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 
 interface Board { name:string; area:string; actual:number; target:number }
+interface ManagerBoard { name:string; actual:number }
 const MEDAL = ["🥇","🥈","🥉"]
 const ST_LABEL: Record<string,string> = { marketing:"בפרסום", pending_approval:"ממתין לאישור", approved:"מאושר", planning:"תכנון", done:"בוצע" }
 
 export default function Dashboard() {
   const { user } = useAuth()
   const [board, setBoard] = useState<Board[]>([])
+  const [managerBoard, setManagerBoard] = useState<ManagerBoard[]>([])
   const [pending, setPending] = useState<any[]>([])
   const [radar, setRadar] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
@@ -33,7 +35,7 @@ export default function Dashboard() {
       const res = await fetch("/api/dashboard")
       if (!res.ok) throw new Error()
       const d = await res.json()
-      const { coordinators, targets, events, leadCounts, expenseByEvent, reports, totals } = d
+      const { coordinators, targets, events, leadCounts, managerLeadCounts, expenseByEvent, reports, totals } = d
 
       // Counting now happens in SQL; these are small lookup maps.
       const leadsByCoord = new Map<number,number>(
@@ -49,6 +51,13 @@ export default function Dashboard() {
         target: (targets||[]).find((x:any)=>x.coordinator_id===c.id)?.target_leads || 0,
       })).sort((a:Board,b:Board)=>b.actual-a.actual)
       setBoard(b)
+
+      // Leads a manager brought in directly (their own personal link).
+      // Deliberately not compared against a target — general count only.
+      const mb: ManagerBoard[] = (managerLeadCounts||[])
+        .map((r:any)=>({ name: r.owner_name, actual: r.count }))
+        .sort((a:ManagerBoard,b:ManagerBoard)=>b.actual-a.actual)
+      setManagerBoard(mb)
 
       const totTarget = (targets||[]).reduce((s:number,t:any)=>s+(+t.target_leads||0),0)
       setOrgLeads(totals?.leads||0); setOrgTarget(totTarget)
@@ -149,6 +158,24 @@ export default function Dashboard() {
             })}
             {board.length===0&&<div className="text-sm text-[#94A3B8] text-center py-4">אין רכזים</div>}
           </div>
+
+          {managerBoard.length > 0 && <>
+            <div className="text-xs font-bold text-[#94A3B8] uppercase tracking-wide mt-5 mb-3 pt-4 border-t border-[#F1F5F9]">
+              לידים ממנהלים · כללי (ללא יעד)
+            </div>
+            <div className="space-y-2.5">
+              {managerBoard.map((m) => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <div className="w-6 text-center flex-shrink-0">👑</div>
+                  <div className="w-8 h-8 rounded-full bg-[#EDE9FE] text-[#5B21B6] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {m.name.split(" ").map(w=>w[0]).join("")}
+                  </div>
+                  <div className="flex-1 text-sm font-semibold truncate">{m.name}</div>
+                  <div className="text-sm font-bold text-[#5B21B6]">{m.actual} לידים</div>
+                </div>
+              ))}
+            </div>
+          </>}
         </Card>
       </div>
 

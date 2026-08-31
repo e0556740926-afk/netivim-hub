@@ -30,7 +30,7 @@ export async function GET() {
 
   const [
     coordinators, targets, events,
-    leadCounts, expenseByEvent, totals, reports,
+    leadCounts, expenseByEvent, totals, reports, managerLeadCounts,
   ] = await Promise.all([
     sql`SELECT id, name, area, role FROM coordinators ORDER BY id`,
 
@@ -47,6 +47,7 @@ export async function GET() {
     sql`SELECT coordinator_id, COUNT(*)::int AS count
         FROM leads
         WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+          AND coordinator_id IS NOT NULL
         GROUP BY coordinator_id`,
 
     sql`SELECT event_id, SUM(amount)::float AS total
@@ -67,6 +68,19 @@ export async function GET() {
 
     sql`SELECT coordinator_id FROM weekly_reports
         WHERE submitted_at > NOW() - INTERVAL '7 days'`,
+
+    // Leads a manager brought in directly through their own personal
+    // link carry owner_name instead of coordinator_id, so they were
+    // invisible to the leaderboard entirely until now. General count,
+    // deliberately not compared against a target — managers don't
+    // have monthly_targets rows and this isn't meant to be one more
+    // thing they're measured against, just visibility into what they
+    // personally brought in.
+    sql`SELECT owner_name, COUNT(*)::int AS count
+        FROM leads
+        WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())
+          AND coordinator_id IS NULL AND owner_name IS NOT NULL AND owner_name <> ''
+        GROUP BY owner_name`,
   ]);
 
   const t: any = totals[0] || {};
@@ -80,6 +94,7 @@ export async function GET() {
     targets,
     events,
     leadCounts,
+    managerLeadCounts,
     expenseByEvent,
     reports,
     totals: {
