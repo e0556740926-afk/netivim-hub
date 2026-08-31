@@ -20,6 +20,7 @@ const nav = [
   null,
   { label:"ניהול רכזים",path:"/admin/reports",    dot:"#34D399", badgeKey:"missingReports" },
   { label:"פיננסים",    path:"/admin/finance",    dot:"#FBBF24" },
+  { label:"ניוזלטר",    path:"/admin/newsletter",  dot:"#C9A84C" },
   { label:"הגדרות",     path:"/admin/settings",   dot:"#94A3B8" },
 ] as const
 
