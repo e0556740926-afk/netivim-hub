@@ -2,16 +2,32 @@ import { NextResponse } from "next/server";
 import sql from "@/lib/db";
 
 /**
- * The dashboard only ever counted these rows client-side, so the counting
- * happens in SQL now. Previously this shipped every task, every expense
- * and every lead in the org just to produce four numbers.
+ * The admin sidebar polls this endpoint every 60s (per logged-in
+ * admin) purely for badge counts — pending approvals, late tasks,
+ * missing reports. With more than one admin active, that's several
+ * full re-runs of 7 parallel queries a minute for numbers that
+ * usually haven't changed since the last poll.
  *
+ * Short in-memory cache, same TTL pattern already proven in
+ * lib/schema.ts: correct within one warm serverless instance, and
+ * short enough (20s) that a real change — an admin approving
+ * something — shows up well within the sidebar's own 60s poll
+ * interval regardless of which instance serves the next request.
+ */
+let cached: { body: any; at: number } | null = null;
+const TTL_MS = 20_000;
+
+/**
  * Shapes kept deliberately small and stable:
  *   leadCounts  [{ coordinator_id, count }]
  *   expenseByEvent [{ event_id, total }]
  *   totals      { leads, spent, budget, lateTasks }
  */
 export async function GET() {
+  if (cached && Date.now() - cached.at < TTL_MS) {
+    return NextResponse.json(cached.body);
+  }
+
   const [
     coordinators, targets, events,
     leadCounts, expenseByEvent, totals, reports,
@@ -59,7 +75,7 @@ export async function GET() {
     ? Math.round(((t.leads - prevLeads) / prevLeads) * 100)
     : (t.leads > 0 ? 100 : 0);
 
-  return NextResponse.json({
+  const body = {
     coordinators,
     targets,
     events,
@@ -74,5 +90,7 @@ export async function GET() {
       budget: t.budget ?? 0,
       lateTasks: t.late_tasks ?? 0,
     },
-  });
+  };
+  cached = { body, at: Date.now() };
+  return NextResponse.json(body);
 }
