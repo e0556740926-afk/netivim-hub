@@ -196,3 +196,85 @@ CREATE TABLE IF NOT EXISTS newsletter_issues (
   created_by   text DEFAULT '',
   created_at   timestamptz DEFAULT now()
 );
+
+-- ============================================================
+-- Task upgrades (coordinator/manager split) — 01.09.2026
+-- All additive, idempotent, applied via Neon MCP per project
+-- convention. hasColumn()/information_schema gates cover the
+-- code side, this file is the durable record.
+-- ============================================================
+
+-- SLA aging: when did the status last change (not just created_at).
+-- A trigger keeps this correct regardless of which code path updates
+-- the row (API route, recurring-tasks function, direct SQL) instead
+-- of relying on every call site remembering to set it.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status_changed_at timestamptz DEFAULT now();
+
+CREATE OR REPLACE FUNCTION set_task_status_changed_at() RETURNS trigger AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    NEW.status_changed_at = now();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_tasks_status_changed ON tasks;
+CREATE TRIGGER trg_tasks_status_changed
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW EXECUTE FUNCTION set_task_status_changed_at();
+
+CREATE INDEX IF NOT EXISTS idx_tasks_status_changed ON tasks(status_changed_at);
+
+-- Per-channel notification delivery visibility (email/whatsapp/push
+-- known-sent vs known-failed), surfaced to managers given the known
+-- unverified-Resend-domain issue.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notify_log jsonb DEFAULT '[]';
+
+-- Comments thread on a task (coordinator <-> manager, in-app instead
+-- of falling back to whatsapp/email for every back-and-forth).
+CREATE TABLE IF NOT EXISTS task_comments (
+  id bigserial PRIMARY KEY,
+  task_id bigint NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  author_name text NOT NULL,
+  body text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id);
+
+-- Sub-tasks / checklist for multi-step tasks.
+CREATE TABLE IF NOT EXISTS task_checklist_items (
+  id bigserial PRIMARY KEY,
+  task_id bigint NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  text text NOT NULL,
+  done boolean DEFAULT false,
+  sort_order integer DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_task_checklist_task ON task_checklist_items(task_id);
+
+-- Manual task templates for managers (e.g. "onboarding sequence").
+-- Applied only by explicit manager action from the admin tasks
+-- screen — never auto-triggered by a lead/contact/event event.
+CREATE TABLE IF NOT EXISTS task_templates (
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  created_by text DEFAULT '',
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS task_template_items (
+  id bigserial PRIMARY KEY,
+  template_id bigint NOT NULL REFERENCES task_templates(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  type text DEFAULT 'call',
+  priority text DEFAULT 'normal',
+  offset_days integer DEFAULT 0,
+  sort_order integer DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_task_template_items_template ON task_template_items(template_id);
+
+-- Note (no schema action taken): tasks.meeting_id has no FK and no
+-- code in the app currently reads or writes it (grep confirmed zero
+-- references outside this column's own definition) — left untouched
+-- rather than guessing at a constraint for a dead column.

@@ -23,6 +23,13 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/meetings" },
   { path: "/api/targets", methods: ["POST", "PATCH", "DELETE"] },
   { path: "/api/export" },
+  // Manager-only task tooling: bulk actions across other people's
+  // tasks, manual templates, and the recurring-series manager. A
+  // coordinator keeps full access to /api/tasks itself (their own
+  // tasks) plus comments/checklist on any task they can see.
+  { path: "/api/tasks/bulk" },
+  { path: "/api/tasks/series" },
+  { path: "/api/task-templates" },
 ];
 
 function isPublicApi(pathname: string) {

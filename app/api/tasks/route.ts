@@ -45,8 +45,15 @@ async function getEmailsFor(names: string[]) {
   return Array.from(map.entries()).map(([name, v]) => ({ name, ...v }));
 }
 
-// Fire-and-forget notifications
-async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: string) {
+/**
+ * Fire-and-forget notifications. Also returns a small per-channel
+ * delivery log ({channel, to, ok, reason, at}[]) so the caller can
+ * persist it to tasks.notify_log — surfaced to managers because the
+ * email channel is known-unreliable (no verified Resend domain) and
+ * silently-failed mail was invisible before this.
+ */
+async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: string): Promise<any[]> {
+  const log: any[] = [];
   try {
     const recipients = await getEmailsFor(newAssignees);
     const payload = (r: any) => ({
@@ -62,7 +69,9 @@ async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: s
       const jobs: Promise<any>[] = [];
       if (r.email) {
         const { subject, html } = taskAssignedEmail(payload(r));
-        jobs.push(sendEmail({ to: r.email, subject, html }));
+        jobs.push(sendEmail({ to: r.email, subject, html }).then((res: any) => {
+          log.push({ channel: "email", to: r.name, ok: !!res?.ok, reason: res?.ok ? undefined : res?.reason, at: new Date().toISOString() });
+        }));
         jobs.push(sendPush(r.email, {
           title: "✅ משימה חדשה",
           body: task.title,
@@ -70,12 +79,33 @@ async function notifyAssignees(task: any, newAssignees: string[], assignedBy?: s
         }));
       }
       if (r.phone) {
-        jobs.push(sendWhatsApp(r.phone, taskAssignedMsg(payload(r))));
+        jobs.push(sendWhatsApp(r.phone, taskAssignedMsg(payload(r))).then((res: any) => {
+          log.push({ channel: "whatsapp", to: r.name, ok: !!res?.ok, reason: res?.ok ? undefined : res?.reason, at: new Date().toISOString() });
+        }));
       }
       return jobs;
     }));
   } catch (e) {
     console.error("[notify] failed:", e);
+  }
+  return log;
+}
+
+/** Appends entries to tasks.notify_log, keeping the most recent 20. Never throws. */
+async function persistNotifyLog(taskId: number, entries: any[]) {
+  if (!entries.length) return;
+  try {
+    if (!(await hasColumn("tasks", "notify_log"))) return;
+    await sql`
+      UPDATE tasks SET notify_log = (
+        SELECT COALESCE(jsonb_agg(x), '[]'::jsonb) FROM (
+          SELECT x FROM jsonb_array_elements(COALESCE(notify_log,'[]'::jsonb) || ${JSON.stringify(entries)}::jsonb) x
+          ORDER BY (x->>'at') DESC LIMIT 20
+        ) s
+      )
+      WHERE id=${taskId}`;
+  } catch (e) {
+    console.error("[notify_log] failed:", e);
   }
 }
 
@@ -113,7 +143,8 @@ export async function POST(req: NextRequest) {
 
   const task = rows[0];
   if (d.notify !== false && d.assignees?.length) {
-    await notifyAssignees(task, d.assignees, d.assigned_by);
+    const log = await notifyAssignees(task, d.assignees, d.assigned_by);
+    await persistNotifyLog(task.id, log);
   }
   const me = await currentUser(req);
   logAudit({ entityType:"task", entityId:task.id, action:"create", actorName:me?.name||d.assigned_by, summary:`נוצרה: ${d.title}` });
@@ -122,13 +153,24 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
-  // Guard: a payload without a title is a status-only update, never a full one.
-  // Without this, a partial PATCH wipes title/assignees/due_date.
-  if (d.status_only || d.title === undefined) {
+
+  // Status-only update (kanban drag/quick buttons) — never touches
+  // other fields, so a partial payload can't wipe title/assignees.
+  if (d.status_only || (d.title === undefined && d.due_date === undefined)) {
     if (d.status === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
     await sql`UPDATE tasks SET status=${d.status} WHERE id=${d.id}`;
     const me0 = await currentUser(req);
     logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me0?.name, actorEmail:me0?.email, summary:`סטטוס → ${d.status}` });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Due-date-only update ("דחה למחר" / snooze) — same guard as above,
+  // for the one-click reschedule action.
+  if (d.due_date_only) {
+    if (d.due_date === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+    await sql`UPDATE tasks SET due_date=${d.due_date} WHERE id=${d.id}`;
+    const me0b = await currentUser(req);
+    logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me0b?.name, actorEmail:me0b?.email, summary:`נדחה ל-${d.due_date}` });
     return NextResponse.json({ ok: true });
   }
 
@@ -166,11 +208,12 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (d.notify !== false && added.length) {
-    await notifyAssignees(
+    const log = await notifyAssignees(
       { title: d.title, type: d.type, due_date: d.due_date, details: d.details },
       added,
       d.assigned_by
     );
+    await persistNotifyLog(d.id, log);
   }
   const me1 = await currentUser(req);
   logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me1?.name||d.assigned_by, summary:`עודכן: ${d.title}` });
