@@ -11,11 +11,11 @@ const FROM = process.env.EMAIL_FROM || "נתיבים שטח <onboarding@resend.d
  * same "no human setup step" philosophy as the auto-generated
  * coordinator/manager slugs elsewhere in this app.
  */
-async function getOrCreateAudienceId(): Promise<string | null> {
-  if (!RESEND_KEY) return null;
+async function getOrCreateAudienceId(): Promise<{ id: string | null; reason?: string }> {
+  if (!RESEND_KEY) return { id: null, reason: "RESEND_API_KEY לא מוגדר" };
 
   const rows = await sql`SELECT value FROM app_settings WHERE key='resend_audience_id' LIMIT 1`;
-  if (rows.length) return (rows[0] as any).value;
+  if (rows.length) return { id: (rows[0] as any).value };
 
   try {
     const res = await fetch("https://api.resend.com/audiences", {
@@ -24,17 +24,18 @@ async function getOrCreateAudienceId(): Promise<string | null> {
       body: JSON.stringify({ name: "הורים — ניוזלטר נתיבים" }),
     });
     if (!res.ok) {
-      console.error("[newsletter] audience create failed:", await res.text());
-      return null;
+      const errText = await res.text();
+      console.error("[newsletter] audience create failed:", errText);
+      return { id: null, reason: `Resend: ${errText}` };
     }
     const data = await res.json();
     const id = data.id as string;
     await sql`INSERT INTO app_settings (key, value) VALUES ('resend_audience_id', ${id})
                ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
-    return id;
+    return { id };
   } catch (e) {
     console.error("[newsletter] audience create error:", e);
-    return null;
+    return { id: null, reason: String(e) };
   }
 }
 
@@ -46,7 +47,7 @@ async function getOrCreateAudienceId(): Promise<string | null> {
  * broadcast reaches them. A failure here never blocks signup.
  */
 export async function upsertResendContact(email: string, name: string): Promise<string | null> {
-  const audienceId = await getOrCreateAudienceId();
+  const { id: audienceId } = await getOrCreateAudienceId();
   if (!audienceId) return null;
 
   try {
@@ -71,7 +72,7 @@ export async function upsertResendContact(email: string, name: string): Promise<
 /** Marks a contact unsubscribed on Resend's side too, best-effort. */
 export async function unsubscribeResendContact(resendContactId: string | null): Promise<void> {
   if (!resendContactId || !RESEND_KEY) return;
-  const audienceId = await getOrCreateAudienceId();
+  const { id: audienceId } = await getOrCreateAudienceId();
   if (!audienceId) return;
   try {
     await fetch(`https://api.resend.com/audiences/${audienceId}/contacts/${resendContactId}`, {
@@ -154,8 +155,8 @@ export async function sendMonthlyIssue(
   customHtml?: string | null
 ): Promise<{ ok: boolean; broadcastId?: string; recipients?: number; reason?: string }> {
   if (!RESEND_KEY) return { ok: false, reason: "no_key" };
-  const audienceId = await getOrCreateAudienceId();
-  if (!audienceId) return { ok: false, reason: "no_audience" };
+  const { id: audienceId, reason: audienceFailReason } = await getOrCreateAudienceId();
+  if (!audienceId) return { ok: false, reason: audienceFailReason || "no_audience" };
 
   const html = customHtml?.trim()
     ? ensureUnsubscribeFooter(customHtml.trim())
