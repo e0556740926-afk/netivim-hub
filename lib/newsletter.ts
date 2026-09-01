@@ -1,6 +1,13 @@
 import sql from "@/lib/db";
 
-const RESEND_KEY = process.env.RESEND_API_KEY;
+// Audience/Broadcast management needs a Resend API key with full
+// access — the existing RESEND_API_KEY (used for every transactional
+// email elsewhere in the app) is deliberately scoped to "Sending
+// access only" and confirmed via a live diagnostic to reject audience
+// management calls with 401 restricted_api_key. Rather than widen
+// that key's permissions everywhere, the newsletter uses its own key
+// so the rest of the app keeps the narrower, safer scope.
+const RESEND_KEY = process.env.RESEND_NEWSLETTER_API_KEY || process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || "נתיבים שטח <onboarding@resend.dev>";
 
 /**
