@@ -1,7 +1,8 @@
-export function fd(d?: string | null): string {
+export function fd(d?: string | Date | null): string {
   if (!d) return '—'
-  const p = d.split('-')
-  if (p.length !== 3) return d
+  const s = d instanceof Date ? d.toISOString() : String(d)
+  const p = s.slice(0, 10).split('-')
+  if (p.length !== 3) return s
   return `${p[2]}.${p[1]}.${p[0]}`
 }
 

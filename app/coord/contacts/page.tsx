@@ -226,7 +226,8 @@ export default function CoordContacts() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold">{c.name}</div>
-            <div className="text-xs text-[#64748B] truncate">{c.org} {c.owner&&`· ${c.owner}`}</div>
+            <div className="text-xs text-[#64748B] truncate">{c.org} {c.org&&"· "}{TYPE_LABEL[c.type]||c.type} {c.owner&&`· ${c.owner}`}</div>
+            <div className="text-[#f59e0b] text-xs mt-0.5">{"★".repeat(c.potential||1)}{"☆".repeat(3-(c.potential||1))}</div>
           </div>
           <div className="text-right flex-shrink-0">
             <span style={sc} className="px-2 py-0.5 rounded-full text-xs font-semibold">{STATUS_LABEL[c.status]||c.status}</span>
