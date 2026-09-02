@@ -1,13 +1,71 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 
+const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" };
+const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" };
+const INT_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", whatsapp:"וואטסאפ", email:"דואל", other:"אחר" };
+
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") || "contacts";
 
   let rows: any[] = [];
   let headers: string[] = [];
+  let filenamePrefix = type;
 
-  if (type === "contacts") {
+  if (type === "coord-activity") {
+    const cidParam = req.nextUrl.searchParams.get("coordinator_id");
+    const cid = cidParam ? parseInt(cidParam) : null;
+    if (!cid) {
+      return new NextResponse("coordinator_id is required", { status: 400 });
+    }
+
+    const coordRows = await sql`SELECT name FROM coordinators WHERE id = ${cid} LIMIT 1`;
+    const coordName = coordRows[0]?.name || "";
+    filenamePrefix = `activity-${coordName || cid}`;
+
+    const [tasks, leads, interactions, reports] = await Promise.all([
+      sql`SELECT t.*, e.name as event_name FROM tasks t LEFT JOIN events e ON e.id=t.event_id WHERE ${coordName}=ANY(t.assignees) OR t.coordinator_id=${cid} ORDER BY t.created_at DESC`,
+      sql`SELECT * FROM leads WHERE coordinator_id=${cid} ORDER BY created_at DESC`,
+      sql`SELECT i.*, c.name as contact_name FROM interactions i LEFT JOIN contacts c ON c.id=i.contact_id WHERE i.coordinator_id=${cid} ORDER BY i.date DESC`,
+      sql`SELECT * FROM weekly_reports WHERE coordinator_id=${cid} ORDER BY submitted_at DESC`,
+    ]);
+
+    headers = ["תאריך","סוג פעולה","פרטים","סטטוס"];
+
+    const unified = [
+      ...leads.map((l: any) => ({
+        date: l.created_at,
+        kind: "ליד חדש",
+        details: [l.name, l.phone, l.source==="link"?"לינק":l.source==="event"?"אירוע":"ידני", l.notes].filter(Boolean).join(" · "),
+        status: LEAD_STATUS[l.status] || l.status,
+      })),
+      ...tasks.map((t: any) => ({
+        date: t.created_at,
+        kind: "משימה",
+        details: [t.title, t.event_name, t.details].filter(Boolean).join(" · "),
+        status: TASK_STATUS[t.status] || t.status,
+      })),
+      ...interactions.map((i: any) => ({
+        date: i.date,
+        kind: `אינטראקציה — ${INT_LABEL[i.type] || i.type}`,
+        details: [i.contact_name, i.summary, i.next_step].filter(Boolean).join(" · "),
+        status: "",
+      })),
+      ...reports.map((r: any) => ({
+        date: r.submitted_at,
+        kind: "דיווח שבועי",
+        details: [r.achievements, r.challenges].filter(Boolean).join(" · "),
+        status: `${r.leads_count ?? 0} לידים דווחו`,
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    rows = unified.map(u => ({
+      date: u.date ? new Date(u.date).toLocaleDateString("he-IL") : "",
+      kind: u.kind,
+      details: u.details,
+      status: u.status,
+    }));
+  } else if (type === "contacts") {
     rows = await sql`SELECT name,org,role,phone,email,type,status,potential,last_contact,owner,notes FROM contacts ORDER BY name`;
     headers = ["שם","ארגון","תפקיד","טלפון","דואל","סוג","סטטוס","פוטנציאל","קשר אחרון","רכז","הערות"];
   } else if (type === "leads") {
@@ -41,7 +99,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${type}-${new Date().toISOString().slice(0,10)}.csv"`,
+      "Content-Disposition": `attachment; filename="${filenamePrefix}-${new Date().toISOString().slice(0,10)}.csv"`,
     }
   });
 }

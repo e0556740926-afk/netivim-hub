@@ -332,6 +332,9 @@ export default function CoordManagementPage() {
 
                 {activeCoord?.id===coord.id && activity && (
                   <div className="border border-t-0 border-[#00488D] rounded-b-[12px] bg-white overflow-hidden">
+                    <div className="flex justify-end px-4 pt-3">
+                      <ExportButton type="coord-activity" label="ייצוא דוח פעילות" params={{coordinator_id:coord.id}}/>
+                    </div>
                     {/* Stats */}
                     <div className="grid grid-cols-4 border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
                       {([

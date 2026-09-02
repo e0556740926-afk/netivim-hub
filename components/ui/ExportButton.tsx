@@ -1,7 +1,8 @@
-interface ExportButtonProps { type: string; label?: string }
-export default function ExportButton({ type, label }: ExportButtonProps) {
+interface ExportButtonProps { type: string; label?: string; params?: Record<string,string|number> }
+export default function ExportButton({ type, label, params }: ExportButtonProps) {
   function doExport() {
-    window.open(`/api/export?type=${type}`, "_blank")
+    const qs = new URLSearchParams({ type, ...(params||{} as any) }).toString()
+    window.open(`/api/export?${qs}`, "_blank")
   }
   return (
     <button onClick={doExport}
