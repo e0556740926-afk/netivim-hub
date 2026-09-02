@@ -22,12 +22,13 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
   advanced:{bg:"#EDE9FE",color:"#5B21B6"},
   irrelevant:{bg:"#FEE2E2",color:"#991B1B"}
 }
-const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"" }
+const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"" }
 
 export default function AdminLeads() {
   const { success, undoable } = useToast()
   const [leads, setLeads] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkTarget, setBulkTarget] = useState("")
@@ -46,13 +47,15 @@ export default function AdminLeads() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [lr, ua] = await Promise.all([
-        fetch("/api/leads"), fetch("/api/users/all")
+      const [lr, ua, er] = await Promise.all([
+        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events")
       ])
       const { leads } = await lr.json()
       const { coordinators, admins } = await ua.json()
+      const { events } = await er.json()
       setLeads(leads||[])
       setCoords(coordinators||[])
+      setEvents((events||[]).filter((e:any)=>["approved","marketing","done"].includes(e.status)))
       setAdminUsers(admins||[])
     } catch { setError(true) }
     finally { setLoading(false) }
@@ -76,7 +79,8 @@ export default function AdminLeads() {
         age: form.age ? +form.age : null,
         id_number: form.idNumber,
         notes: form.notes,
-        source: "manual"
+        event_id: form.eventId || null,
+        source: form.eventId ? "event" : "manual"
       })
     })
     const d = await res.json()
@@ -179,6 +183,13 @@ export default function AdminLeads() {
                 <label className="text-xs font-semibold block mb-1">ת.ז</label>
                 <input value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))}
                   placeholder="000000000" maxLength={9} className={InputClass}/>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-semibold block mb-1">נאסף באירוע (לא חובה)</label>
+                <select value={form.eventId} onChange={e=>setForm(f=>({...f,eventId:e.target.value}))} className={InputClass+" bg-white"}>
+                  <option value="">— לא באירוע —</option>
+                  {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-semibold block mb-1">הערות</label>

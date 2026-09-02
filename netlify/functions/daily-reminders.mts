@@ -76,7 +76,7 @@ function wrap(title: string, bodyHtml: string) {
 }
 
 export default async () => {
-  const results = { missingReports: 0, dueTodayTasks: 0, overdueTasks: 0, undebriefed: 0, errors: [] as string[] };
+  const results = { missingReports: 0, dueTodayTasks: 0, overdueTasks: 0, undebriefed: 0, upcomingEvents: 0, errors: [] as string[] };
   // Collected in parallel with the per-person reminders below, so managers
   // get one end-of-run digest instead of a separate flood of per-item mail.
   const digest = {
@@ -240,6 +240,33 @@ export default async () => {
     }
   } catch (e: any) {
     results.errors.push(`undebriefed: ${e.message}`);
+  }
+
+  // ── 3.5. Events happening in exactly 3 days — a "getting ready?"
+  //        nudge, the mirror image of the undebriefed check above
+  //        (which only fires AFTER an event has passed). ──
+  try {
+    const upcoming = await sql`
+      SELECT e.id, e.name, e.date, e.location, c.name as coord_name, u.email, COALESCE(c.phone,u.phone) as phone
+      FROM events e
+      LEFT JOIN coordinators c ON c.id = e.coordinator_id
+      LEFT JOIN users u ON u.id = c.user_id
+      WHERE e.status IN ('approved','marketing')
+        AND e.date = CURRENT_DATE + INTERVAL '3 days'
+    `;
+    for (const e of upcoming as any[]) {
+      if (!e.coord_name) continue;
+      const html = wrap(
+        "🗓️ עוד 3 ימים לאירוע",
+        `<div style="font-size:14px;color:#374151;">שלום ${e.coord_name}, האירוע <b>${e.name}</b>${e.location?` ב${e.location}`:""} מתקיים בעוד 3 ימים. הכל מוכן?</div>
+         <a href="${APP_URL}/coord/events" style="display:inline-block;margin-top:16px;background:#0D2744;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">צפה במשימות האירוע</a>`
+      );
+      if (e.email) await sendEmail(e.email, `עוד 3 ימים ל${e.name}`, html);
+      if (e.phone) await sendWhatsApp(e.phone, `🗓️ *עוד 3 ימים לאירוע*\n\n${e.name}${e.location?` — ${e.location}`:""}\nהכל מוכן?\n👈 ${APP_URL}/coord/events`);
+      results.upcomingEvents++;
+    }
+  } catch (e: any) {
+    results.errors.push(`upcomingEvents: ${e.message}`);
   }
 
   // ── 4. Manager digest — one email/WhatsApp summarising everything

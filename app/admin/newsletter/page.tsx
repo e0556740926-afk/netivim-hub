@@ -90,21 +90,26 @@ export default function AdminNewsletterPage() {
   const [sending, setSending] = useState(false)
 
   const [showHistory, setShowHistory] = useState(false)
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [sr, ir] = await Promise.all([
+      const [sr, ir, er] = await Promise.all([
         fetch("/api/newsletter/subscribers"),
         fetch("/api/newsletter/issues"),
+        fetch("/api/events"),
       ])
       if (!sr.ok) throw new Error()
       const sd = await sr.json()
       const id = await ir.json()
+      const ed = await er.json().catch(()=>({events:[]}))
       setSubscribers(sd.subscribers || [])
       setStats(sd.stats)
       setAvailable(sd.available !== false)
       setIssues(id.issues || [])
+      const today = new Date().toISOString().slice(0,10)
+      setUpcomingEvents((ed.events||[]).filter((e:any)=>["approved","marketing"].includes(e.status) && e.date >= today).slice(0,10))
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
   }
@@ -113,6 +118,17 @@ export default function AdminNewsletterPage() {
   function addBlock() {
     if (issue.blocks.length >= 4) return
     setIssue(i => ({ ...i, blocks: [...i.blocks, { title: "", text: "" }] }))
+  }
+  function addEventBlock() {
+    if (issue.blocks.length >= 4 || !upcomingEvents.length) return
+    const ev = upcomingEvents[0]
+    const dt = ev.date ? new Date(ev.date) : null
+    const dateStr = dt ? `${dt.getDate()} ב${MONTHS[dt.getMonth()]}` : ""
+    const block = {
+      title: `📅 בקרוב: ${ev.name}`,
+      text: [dateStr, ev.time, ev.location].filter(Boolean).join(" · ") + "\nנשמח לראותכם!",
+    }
+    setIssue(i => ({ ...i, blocks: [...i.blocks.filter(b=>b.title.trim()||b.text.trim()), block] }))
   }
   function removeBlock(idx: number) {
     setIssue(i => ({ ...i, blocks: i.blocks.filter((_, x) => x !== idx) }))
@@ -582,9 +598,14 @@ export default function AdminNewsletterPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold">קטעים ({issue.blocks.length}/4)</label>
-              {issue.blocks.length < 4 && (
-                <button onClick={addBlock} className="text-xs font-bold text-[#00488D]">+ הוסף קטע</button>
-              )}
+              <div className="flex gap-3">
+                {upcomingEvents.length > 0 && issue.blocks.length < 4 && (
+                  <button onClick={addEventBlock} className="text-xs font-bold text-[#5B21B6]">🎪 הוסף אירוע קרוב</button>
+                )}
+                {issue.blocks.length < 4 && (
+                  <button onClick={addBlock} className="text-xs font-bold text-[#00488D]">+ הוסף קטע</button>
+                )}
+              </div>
             </div>
             {issue.blocks.map((b, idx) => (
               <div key={idx} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-3 space-y-2">

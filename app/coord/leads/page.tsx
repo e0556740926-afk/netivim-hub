@@ -19,13 +19,14 @@ const STATUS_COLORS: Record<string,{bg:string,fg:string}> = {
   irrelevant:{bg:"#FEE2E2",fg:"#991B1B"}
 }
 const EMPTY_FORM = {
-  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:""
+  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:""
 }
 
 export default function CoordLeads() {
   const [error, setError] = useState(false)
   const { user } = useAuth()
   const [leads, setLeads] = useState<any[]>([])
+  const [events, setEvents] = useState<any[]>([])
   const [myLeads, setMyLeads] = useState(0)
   const [target, setTarget] = useState(0)
   const [coordId, setCoordId] = useState<number|null>(null)
@@ -47,12 +48,15 @@ export default function CoordLeads() {
       const { coord } = await cRes.json()
       if (!coord) { setLoading(false); return }
       setCoordId(coord.id)
-      const [lRes, tRes] = await Promise.all([
+      const [lRes, tRes, eRes] = await Promise.all([
         fetch(`/api/leads?coordinator_id=${coord.id}`),
-        fetch("/api/targets")
+        fetch("/api/targets"),
+        fetch("/api/events"),
       ])
       const { leads } = await lRes.json()
       const { targets } = await tRes.json()
+      const { events } = await eRes.json()
+      setEvents((events||[]).filter((e:any)=>["approved","marketing","done"].includes(e.status)))
       setLeads(leads||[])
       const monthStr = String(m).padStart(2,"0")
       setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
@@ -78,7 +82,8 @@ export default function CoordLeads() {
         age: form.age ? +form.age : null,
         id_number: form.idNumber,
         notes: form.notes,
-        source: "manual"
+        event_id: form.eventId || null,
+        source: form.eventId ? "event" : "manual"
       })
     })
     const d = await res.json()
@@ -179,6 +184,18 @@ export default function CoordLeads() {
                 className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm resize-none focus:outline-none focus:border-[#166534]"
                 style={{fontSize:"16px"}}/>
             </div>
+
+            {/* Event attribution */}
+            {events.length > 0 && (
+              <div>
+                <label className="text-xs font-semibold block mb-1 text-[#374151]">נאסף באירוע (לא חובה)</label>
+                <select value={form.eventId} onChange={e=>setForm(f=>({...f,eventId:e.target.value}))}
+                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]">
+                  <option value="">— לא באירוע —</option>
+                  {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Duplicate warning */}
             {dupWarning && (

@@ -7,7 +7,7 @@ export async function GET() {
   const [coordinators, targets, leads] = await Promise.all([
     sql`SELECT id, name, area FROM coordinators ORDER BY id`,
     sql`SELECT coordinator_id, target_leads FROM monthly_targets WHERE month = ${month} AND year = ${year}`,
-    sql`SELECT coordinator_id FROM leads WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())`,
+    sql`SELECT coordinator_id, event_id FROM leads WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', NOW())`,
   ]);
   return NextResponse.json({ coordinators, targets, leads });
 }

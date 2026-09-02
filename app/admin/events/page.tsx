@@ -22,13 +22,17 @@ const STATUS_OPTIONS = [
 ]
 const ST: Record<string,string> = Object.fromEntries(STATUS_OPTIONS.map(s=>[s.v,s.l]))
 
-const EMPTY_FORM = { name:"", date:"", time:"", location:"", budget_planned:"", target_attendees:"", status:"planning", approved:false }
+const EMPTY_FORM = { name:"", date:"", time:"", location:"", budget_planned:"", target_attendees:"", capacity:"", partner_contact_id:"", status:"planning", approved:false }
 const EMPTY_RESULTS = { actual_attendees:"", leads_collected:"", summary:"", follow_up:"" }
+const EMPTY_ATTENDEE = { name:"", phone:"", email:"" }
+const EMPTY_VENDOR = { name:"", category:"other", contact:"", amount:"", deposit_paid:false, notes:"" }
+const VENDOR_CATEGORIES: Record<string,string> = { venue:"אולם/מיקום", catering:"קייטרינג", marketing:"שיווק/פרסום", materials:"חומרים", other:"אחר" }
 
 export default function EventsPage() {
   const { success } = useToast()
   const [events, setEvents] = useState<any[]>([])
   const [expenses, setExpenses] = useState<Record<number,number>>({})
+  const [contacts, setContacts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [filter, setFilter] = useUrlState("status")
@@ -46,17 +50,32 @@ export default function EventsPage() {
   const [resultsId, setResultsId] = useState<number|null>(null)
   const [results, setResults] = useState({...EMPTY_RESULTS})
 
+  // Attendees/vendors management state
+  const [manageId, setManageId] = useState<number|null>(null)
+  const [manageTab, setManageTab] = useState<"attendees"|"vendors">("attendees")
+  const [attendees, setAttendees] = useState<any[]>([])
+  const [vendors, setVendors] = useState<any[]>([])
+  const [newAttendee, setNewAttendee] = useState({...EMPTY_ATTENDEE})
+  const [newVendor, setNewVendor] = useState({...EMPTY_VENDOR})
+  const [manageBusy, setManageBusy] = useState(false)
+
+  // Insights
+  const [showInsights, setShowInsights] = useState(false)
+  const [insights, setInsights] = useState<any>(null)
+
   // New event
   const [showNew, setShowNew] = useState(false)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [er, ex] = await Promise.all([fetch("/api/events"), fetch("/api/expenses")])
+      const [er, ex, cr] = await Promise.all([fetch("/api/events"), fetch("/api/expenses"), fetch("/api/contacts")])
       if (!er.ok) throw new Error()
       const { events } = await er.json()
       const { expenses: exp } = await ex.json()
+      const { contacts } = await cr.json().catch(()=>({contacts:[]}))
       setEvents(events||[])
+      setContacts(contacts||[])
       const m: Record<number,number> = {}
       ;(exp||[]).forEach((e:any)=>{ if(e.event_id) m[e.event_id]=(m[e.event_id]||0)+(+e.amount||0) })
       setExpenses(m)
@@ -66,16 +85,86 @@ export default function EventsPage() {
 
   useEffect(()=>{ load() },[])
 
+  async function loadInsights() {
+    setShowInsights(true)
+    if (insights) return
+    const res = await fetch("/api/events/insights")
+    if (res.ok) setInsights(await res.json())
+  }
+
   // Open edit for existing event
   function openEdit(e: any) {
     setEditId(e.id)
     setForm({
       name: e.name||"", date: e.date?.slice(0,10)||"", time: e.time||"",
       location: e.location||"", budget_planned: e.budget_planned||"",
-      target_attendees: e.target_attendees||"", status: e.status||"planning",
+      target_attendees: e.target_attendees||"", capacity: e.capacity||"",
+      partner_contact_id: e.partner_contact_id||"", status: e.status||"planning",
       approved: e.approved||false
     })
     setShowNew(false); setResultsId(null)
+  }
+
+  // Duplicate an event into a fresh "new event" form, pre-filled.
+  function duplicateEvent(e: any) {
+    setEditId(null)
+    setForm({
+      name: `${e.name} (עותק)`, date: "", time: e.time||"",
+      location: e.location||"", budget_planned: e.budget_planned||"",
+      target_attendees: e.target_attendees||"", capacity: e.capacity||"",
+      partner_contact_id: e.partner_contact_id||"", status: "planning",
+      approved: false
+    })
+    setShowNew(true); setResultsId(null)
+  }
+
+  // Open attendees/vendors management modal
+  async function openManage(e: any, tab: "attendees"|"vendors" = "attendees") {
+    setManageId(e.id); setManageTab(tab)
+    setNewAttendee({...EMPTY_ATTENDEE}); setNewVendor({...EMPTY_VENDOR})
+    const [ar, vr] = await Promise.all([fetch(`/api/events/${e.id}/attendees`), fetch(`/api/events/${e.id}/vendors`)])
+    setAttendees((await ar.json()).attendees||[])
+    setVendors((await vr.json()).vendors||[])
+  }
+
+  async function addAttendee() {
+    if (!manageId || !newAttendee.name.trim()) return
+    setManageBusy(true)
+    const res = await fetch(`/api/events/${manageId}/attendees`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newAttendee)})
+    const d = await res.json()
+    setManageBusy(false); setNewAttendee({...EMPTY_ATTENDEE})
+    if (d.waitlisted) success("נוסף לרשימת המתנה — הקיבולת מלאה")
+    openManage({id:manageId})
+    load()
+  }
+  async function toggleCheckin(a: any) {
+    await fetch(`/api/events/${manageId}/attendees`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:a.id, checked_in: !a.checked_in})})
+    setAttendees(list=>list.map(x=>x.id===a.id?{...x,checked_in:!x.checked_in}:x))
+    load()
+  }
+  async function promoteAttendee(a: any) {
+    await fetch(`/api/events/${manageId}/attendees`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:a.id, promote:true})})
+    openManage({id:manageId}); load()
+  }
+  async function removeAttendee(id: number) {
+    await fetch(`/api/events/${manageId}/attendees`, {method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})
+    setAttendees(list=>list.filter(x=>x.id!==id)); load()
+  }
+
+  async function addVendor() {
+    if (!manageId || !newVendor.name.trim()) return
+    setManageBusy(true)
+    await fetch(`/api/events/${manageId}/vendors`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...newVendor, amount:+newVendor.amount||0})})
+    setManageBusy(false); setNewVendor({...EMPTY_VENDOR})
+    openManage({id:manageId})
+  }
+  async function toggleDeposit(v: any) {
+    await fetch(`/api/events/${manageId}/vendors`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...v, deposit_paid:!v.deposit_paid})})
+    setVendors(list=>list.map(x=>x.id===v.id?{...x,deposit_paid:!x.deposit_paid}:x))
+  }
+  async function removeVendor(id: number) {
+    await fetch(`/api/events/${manageId}/vendors`, {method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})})
+    setVendors(list=>list.filter(x=>x.id!==id))
   }
 
   // Open results panel
@@ -93,16 +182,12 @@ export default function EventsPage() {
   async function saveEdit() {
     if (!form.name.trim()) return
     setSaving(true)
+    const body = { ...form, budget_planned:+form.budget_planned||0, target_attendees:+form.target_attendees||0,
+      capacity: form.capacity?+form.capacity:null, partner_contact_id: form.partner_contact_id?+form.partner_contact_id:null }
     if (editId) {
-      await fetch(`/api/events/${editId}`, {
-        method:"PATCH", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ ...form, budget_planned:+form.budget_planned||0, target_attendees:+form.target_attendees||0 })
-      })
+      await fetch(`/api/events/${editId}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) })
     } else {
-      await fetch("/api/events", {
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ ...form, budget_planned:+form.budget_planned||0, target_attendees:+form.target_attendees||0 })
-      })
+      await fetch("/api/events", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) })
     }
     setSaving(false); setEditId(null); setShowNew(false); load()
     success(editId ? "האירוע עודכן" : "האירוע נוצר")
@@ -186,10 +271,101 @@ export default function EventsPage() {
           <div className="text-sm text-[#64748B] mt-0.5">{events.length} אירועים סה"כ</div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="secondary" onClick={loadInsights}>📊 ביצועים מצטברים</Button>
           <ExportButton type="events"/>
           <Button onClick={()=>{setShowNew(true);setEditId(null);setResultsId(null);setForm({...EMPTY_FORM})}}>+ אירוע חדש</Button>
         </div>
       </div>
+
+      {/* Insights modal */}
+      <Modal open={showInsights} onClose={()=>setShowInsights(false)} title="📊 ביצועי אירועים — מצטבר" width="640px">
+        {!insights ? <div className="text-sm text-[#94A3B8] text-center py-6">טוען...</div> : <>
+          <div className="grid grid-cols-4 gap-2 mb-4">
+            <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold">{insights.totals.events}</div><div className="text-[10px] text-[#64748B]">אירועים שבוצעו</div></div>
+            <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold text-[#00488D]">{insights.totals.leads}</div><div className="text-[10px] text-[#64748B]">לידים סה"כ</div></div>
+            <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold">₪{insights.totals.spent.toLocaleString()}</div><div className="text-[10px] text-[#64748B]">הוצאה כוללת</div></div>
+            <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold text-[#166534]">{insights.totals.costPerLead?`₪${insights.totals.costPerLead}`:"—"}</div><div className="text-[10px] text-[#64748B]">עלות/ליד ממוצעת</div></div>
+          </div>
+          <div className="text-xs font-bold mb-2">מגמה חודשית (אירועים שבוצעו)</div>
+          <div className="space-y-1.5 mb-4">
+            {insights.byMonth.length===0 && <div className="text-xs text-[#94A3B8]">אין עדיין אירועים שבוצעו</div>}
+            {insights.byMonth.map((m:any)=>(
+              <div key={m.month} className="flex items-center gap-2 text-xs">
+                <div className="w-16 text-[#64748B]">{m.month}</div>
+                <div className="flex-1 h-2 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${Math.min(100,m.leads*5)}%`}} className="h-full bg-[#5B21B6] rounded-full"/></div>
+                <div className="w-20 text-left font-semibold">{m.leads} לידים · {m.events} אירועים</div>
+              </div>
+            ))}
+          </div>
+          <div className="text-xs font-bold mb-2">לפי רכז (אירועים שבוצעו)</div>
+          <div className="space-y-1">
+            {insights.byCoordinator.filter((c:any)=>c.coordinator_name).map((c:any)=>(
+              <div key={c.coordinator_name} className="flex items-center justify-between text-xs py-1 border-b border-[#F1F5F9] last:border-0">
+                <span className="font-medium">{c.coordinator_name}</span>
+                <span className="text-[#64748B]">{c.events} אירועים · <b className="text-[#00488D]">{c.leads}</b> לידים</span>
+              </div>
+            ))}
+          </div>
+        </>}
+      </Modal>
+
+      {/* Attendees / vendors management modal */}
+      <Modal open={manageId!==null} onClose={()=>setManageId(null)}
+        title={`👥 ניהול — ${events.find(e=>e.id===manageId)?.name||""}`} width="560px">
+        <div className="flex gap-2 p-1 bg-[#F0F4F8] rounded-[10px] mb-3">
+          <button onClick={()=>setManageTab("attendees")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${manageTab==="attendees"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>נרשמים ({attendees.length})</button>
+          <button onClick={()=>setManageTab("vendors")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${manageTab==="vendors"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>ספקים ({vendors.length})</button>
+        </div>
+
+        {manageTab === "attendees" ? <>
+          <div className="flex gap-2 mb-3">
+            <input value={newAttendee.name} onChange={e=>setNewAttendee(a=>({...a,name:e.target.value}))} placeholder="שם *" className={InputClass}/>
+            <input value={newAttendee.phone} onChange={e=>setNewAttendee(a=>({...a,phone:e.target.value}))} placeholder="טלפון" className={InputClass}/>
+            <button onClick={addAttendee} disabled={manageBusy||!newAttendee.name.trim()} className="px-3 py-2 bg-[#0D2744] text-white rounded-[9px] text-sm font-bold disabled:opacity-50 whitespace-nowrap">+ הוסף</button>
+          </div>
+          {attendees.length===0 ? <div className="text-xs text-[#94A3B8] text-center py-4">אין עדיין נרשמים</div> : (
+            <div className="max-h-72 overflow-y-auto space-y-1.5">
+              {attendees.map((a:any)=>(
+                <div key={a.id} className={`flex items-center gap-2 px-3 py-2 rounded-[9px] border ${a.waitlisted?"border-[#FDE68A] bg-[#FFFBEB]":"border-[#E2E8F0]"}`}>
+                  <input type="checkbox" checked={a.checked_in} disabled={a.waitlisted} onChange={()=>toggleCheckin(a)} className="accent-[#166534] w-4 h-4"/>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{a.name}</div>
+                    <div className="text-xs text-[#94A3B8]">{a.phone}{a.waitlisted?" · ברשימת המתנה":a.checked_in?" · הגיע/ה ✓":""}</div>
+                  </div>
+                  {a.waitlisted && <button onClick={()=>promoteAttendee(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#00488D] text-[#00488D]">קדם</button>}
+                  <button onClick={()=>removeAttendee(a.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] text-[#94A3B8] hover:text-[#960010]">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </> : <>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <input value={newVendor.name} onChange={e=>setNewVendor(v=>({...v,name:e.target.value}))} placeholder="שם ספק *" className={InputClass}/>
+            <select value={newVendor.category} onChange={e=>setNewVendor(v=>({...v,category:e.target.value}))} className={InputClass+" bg-white"}>
+              {Object.entries(VENDOR_CATEGORIES).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+            </select>
+            <input value={newVendor.contact} onChange={e=>setNewVendor(v=>({...v,contact:e.target.value}))} placeholder="איש קשר / טלפון" className={InputClass}/>
+            <input type="number" value={newVendor.amount} onChange={e=>setNewVendor(v=>({...v,amount:e.target.value}))} placeholder="סכום (₪)" className={InputClass}/>
+          </div>
+          <button onClick={addVendor} disabled={manageBusy||!newVendor.name.trim()} className="w-full py-2 bg-[#0D2744] text-white rounded-[9px] text-sm font-bold disabled:opacity-50 mb-3">+ הוסף ספק</button>
+          {vendors.length===0 ? <div className="text-xs text-[#94A3B8] text-center py-4">אין עדיין ספקים</div> : (
+            <div className="space-y-1.5">
+              {vendors.map((v:any)=>(
+                <div key={v.id} className="flex items-center gap-2 px-3 py-2 rounded-[9px] border border-[#E2E8F0]">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{v.name} <span className="text-xs text-[#94A3B8]">· {VENDOR_CATEGORIES[v.category]||v.category}</span></div>
+                    <div className="text-xs text-[#94A3B8]">{v.contact}{v.amount>0?` · ₪${(+v.amount).toLocaleString()}`:""}</div>
+                  </div>
+                  <label className="flex items-center gap-1 text-xs text-[#64748B]">
+                    <input type="checkbox" checked={v.deposit_paid} onChange={()=>toggleDeposit(v)} className="accent-[#166534] w-3.5 h-3.5"/> מקדמה שולמה
+                  </label>
+                  <button onClick={()=>removeVendor(v.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] text-[#94A3B8] hover:text-[#960010]">✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>}
+      </Modal>
 
       {/* NEW / EDIT FORM */}
       <Modal
@@ -227,6 +403,17 @@ export default function EventsPage() {
             <input type="number" value={form.target_attendees} onChange={e=>setForm(f=>({...f,target_attendees:e.target.value}))} className={InputClass} placeholder="0"/>
           </div>
           <div>
+            <label className="text-xs font-semibold block mb-1">קיבולת מקסימלית (לא חובה)</label>
+            <input type="number" value={form.capacity} onChange={e=>setForm(f=>({...f,capacity:e.target.value}))} className={InputClass} placeholder="ללא הגבלה"/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">שותף מארח (לא חובה)</label>
+            <select value={form.partner_contact_id} onChange={e=>setForm(f=>({...f,partner_contact_id:e.target.value}))} className={InputClass+" bg-white"}>
+              <option value="">— ללא —</option>
+              {contacts.map((c:any)=><option key={c.id} value={c.id}>{c.name}{c.org?` · ${c.org}`:""}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="text-xs font-semibold block mb-1">סטטוס</label>
             <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className={InputClass+" bg-white"}>
               {STATUS_OPTIONS.map(s=><option key={s.v} value={s.v}>{s.l}</option>)}
@@ -237,6 +424,16 @@ export default function EventsPage() {
             <label className="text-sm font-medium text-[#374151]">מאושר על ידי הנהלה</label>
           </div>
         </div>
+        {editId && editEvent?.slug && (
+          <div className="mt-4 pt-4 border-t border-[#E2E8F0] flex items-center gap-3">
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=6&data=${encodeURIComponent(`${typeof window!=="undefined"?window.location.origin:""}/j/event/${editEvent.slug}`)}`}
+              alt="QR לקליטת לידים" width={64} height={64} className="rounded-[8px] flex-shrink-0"/>
+            <div className="text-xs text-[#64748B] leading-relaxed">
+              קישור לקליטת לידים באירוע — לידים שנכנסים דרכו מתויגים אוטומטית לאירוע הזה.
+              <div className="font-mono text-[#00488D] mt-1 break-all">/j/event/{editEvent.slug}</div>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* RESULTS PANEL */}
@@ -269,9 +466,14 @@ export default function EventsPage() {
                     className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold" placeholder="0"/>
                 </div>
                 <div className="flex justify-between text-sm items-center">
-                  <span className="text-[#64748B]">לידים</span>
+                  <span className="text-[#64748B]">לידים (תיקון ידני)</span>
                   <input type="number" value={results.leads_collected} onChange={e=>setResults(r=>({...r,leads_collected:e.target.value}))}
                     className="w-20 px-2 py-0.5 border border-[#BBF7D0] rounded-[7px] text-sm text-center focus:outline-none focus:border-[#166534] font-bold text-[#00488D]" placeholder="0"/>
+                </div>
+                <div className="text-[10px] text-[#64748B] text-left pt-1">
+                  {resultsEvent.leads_from_event > 0
+                    ? <>המערכת סופרת <b className="text-[#00488D]">{resultsEvent.leads_from_event}</b> לידים אמיתיים המשויכים לאירוע — זה מה שיוצג ברשימה, אין צורך למלא ידנית.</>
+                    : "אין עדיין לידים משויכים לאירוע זה (event_id) — השדה כאן משמש רק כגיבוי ידני."}
                 </div>
               </div>
             </div>
@@ -350,7 +552,8 @@ export default function EventsPage() {
             {filtered.map(e=>{
               const spent=expenses[e.id]||0
               const bp=e.budget_planned>0?Math.round(spent/e.budget_planned*100):0
-              const roi=e.leads_collected>0&&spent>0?Math.round(spent/e.leads_collected):null
+              const realLeads = e.leads_from_event>0 ? e.leads_from_event : (e.leads_collected||0)
+              const roi=realLeads>0&&spent>0?Math.round(spent/realLeads):null
               const isEditing=editId===e.id
               const isResults=resultsId===e.id
               const today=new Date().toISOString().slice(0,10)
@@ -382,6 +585,8 @@ export default function EventsPage() {
                         <div className="text-xs text-[#64748B] mt-0.5 flex gap-2 flex-wrap">
                           {e.time && <span>🕐 {e.time}</span>}
                           {e.location && <span>📍 {e.location}</span>}
+                          {e.partner_name && <span>🤝 {e.partner_name}</span>}
+                          {e.waitlist_count>0 && <span className="text-[#B45309]">⏳ {e.waitlist_count} בהמתנה</span>}
                         </div>
                       </div>
                       <Badge text={ST[e.status]||e.status}/>
@@ -395,13 +600,13 @@ export default function EventsPage() {
                       </div>
                       <div className="bg-[#F8FAFC] rounded-[9px] p-2 text-center">
                         <div className="text-sm font-bold">{e.target_attendees||0}
-                          {e.actual_attendees>0 && <span className="text-[#166534]">/{e.actual_attendees}</span>}
+                          {(e.attendee_count>0||e.actual_attendees>0) && <span className="text-[#166534]">/{e.attendee_count||e.actual_attendees}</span>}
                         </div>
                         <div className="text-[10px] text-[#64748B]">יעד/בפועל</div>
                       </div>
                       <div className="bg-[#F8FAFC] rounded-[9px] p-2 text-center">
-                        <div className="text-sm font-bold text-[#00488D]">{e.leads_collected||0}</div>
-                        <div className="text-[10px] text-[#64748B]">לידים</div>
+                        <div className="text-sm font-bold text-[#00488D]">{realLeads}</div>
+                        <div className="text-[10px] text-[#64748B]">{e.leads_from_event>0?"לידים ✓":"לידים"}</div>
                       </div>
                       <div className="bg-[#F8FAFC] rounded-[9px] p-2 text-center">
                         <div className="text-sm font-bold">{roi?`₪${roi}`:"—"}</div>
@@ -438,6 +643,14 @@ export default function EventsPage() {
                           ✓ אשר אירוע
                         </button>
                       )}
+                      <button onClick={()=>openManage(e)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] hover:bg-[#F0F7FF] hover:border-[#BFDBFE] transition-colors">
+                        👥 ניהול{e.checked_in_count>0?` (${e.checked_in_count} הגיעו)`:""}
+                      </button>
+                      <button onClick={()=>duplicateEvent(e)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] hover:bg-[#F0F7FF] hover:border-[#BFDBFE] transition-colors">
+                        ⧉ שכפל
+                      </button>
                       <button onClick={()=>deleteEvent(e.id)} className="mr-auto flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] text-[#94A3B8] hover:bg-[#FFF0F0] hover:text-[#960010] hover:border-[#FECACA] transition-colors">
                         ✕ מחק
                       </button>
