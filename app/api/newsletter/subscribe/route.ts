@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { hasColumn } from "@/lib/schema";
-import { upsertResendContact } from "@/lib/newsletter";
+import { upsertResendContact, sendWelcomeEmail } from "@/lib/newsletter";
 
 /**
  * Public signup — no auth, matches /api/leads POST's public-form
@@ -39,9 +39,12 @@ export async function POST(req: NextRequest) {
     if (cr.length) { coordinatorId = (cr[0] as any).id; source = "coordinator"; }
   }
 
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+  const consentSource = d.slug ? `לינק אישי רכז (${d.slug})` : "טופס ציבורי";
+
   const rows = await sql`
-    INSERT INTO newsletter_subscribers (name, email, coordinator_id, source)
-    VALUES (${d.name.trim()}, ${d.email.trim()}, ${coordinatorId}, ${source})
+    INSERT INTO newsletter_subscribers (name, email, coordinator_id, source, area, consent_source, consent_ip)
+    VALUES (${d.name.trim()}, ${d.email.trim()}, ${coordinatorId}, ${source}, ${d.area?.trim() || null}, ${consentSource}, ${ip})
     RETURNING id`;
 
   // Best-effort — never blocks the signup itself.
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
   if (resendId) {
     await sql`UPDATE newsletter_subscribers SET resend_contact_id=${resendId} WHERE id=${rows[0].id}`;
   }
+  sendWelcomeEmail(d.name.trim(), d.email.trim()).catch(e => console.error("[newsletter] welcome email error:", e));
 
   return NextResponse.json({ ok: true });
 }

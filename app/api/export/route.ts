@@ -80,6 +80,10 @@ export async function GET(req: NextRequest) {
   } else if (type === "reports") {
     rows = await sql`SELECT c.name,r.week_start,r.leads_count,r.achievements,r.challenges,r.next_week_plan,r.submitted_at FROM weekly_reports r JOIN coordinators c ON c.id=r.coordinator_id ORDER BY r.submitted_at DESC`;
     headers = ["רכז","שבוע","לידים","הישגים","אתגרים","תכנון","הוגש"];
+  } else if (type === "newsletter") {
+    rows = await sql`SELECT s.name, s.email, s.area, COALESCE(c.name,'כללי') as coordinator, s.source, s.status, s.frequency, s.created_at
+      FROM newsletter_subscribers s LEFT JOIN coordinators c ON c.id = s.coordinator_id ORDER BY s.created_at DESC`;
+    headers = ["שם","מייל","אזור","רכז מקור","מקור הרשמה","סטטוס","תדירות","תאריך הרשמה"];
   } else if (type === "expenses") {
     rows = await sql`SELECT e.description,ev.name as event_name,e.vendor,e.amount,e.date,e.status,e.category FROM expenses e LEFT JOIN events ev ON ev.id=e.event_id ORDER BY e.date DESC`;
     headers = ["תיאור","אירוע","ספק","סכום","תאריך","סטטוס","קטגוריה"];

@@ -57,6 +57,18 @@ export default function CoordNewsletterPage() {
           </button>
           <button onClick={whatsapp} className="py-2.5 bg-[#166534] text-white text-sm font-bold rounded-[10px] hover:bg-[#15803d] transition-colors">שתף בוואטסאפ</button>
         </div>
+        {shareUrl && (
+          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/10">
+            {/* Public, no-signup QR image service — just an <img>, no API key or account needed. */}
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&margin=8&data=${encodeURIComponent(shareUrl)}`}
+              alt="קוד QR ללינק האישי" width={72} height={72}
+              className="rounded-[10px] bg-white p-1 flex-shrink-0"/>
+            <div className="text-white/60 text-xs leading-relaxed">
+              קוד QR להדפסה על פליירים או שילוט באירוע — מי שסורק נכנס ישר לטופס ההרשמה שלך.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}

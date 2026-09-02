@@ -4,7 +4,7 @@ import Image from "next/image"
 
 export default function NewsletterForm({ slug }: { slug?: string }) {
   const [coordName, setCoordName] = useState("")
-  const [form, setForm] = useState({ name: "", email: "" })
+  const [form, setForm] = useState({ name: "", email: "", area: "" })
   const [sent, setSent] = useState(false)
   const [err, setErr] = useState("")
   const [loading, setLoading] = useState(false)
@@ -22,7 +22,7 @@ export default function NewsletterForm({ slug }: { slug?: string }) {
     const res = await fetch("/api/newsletter/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name.trim(), email: form.email.trim(), slug }),
+      body: JSON.stringify({ name: form.name.trim(), email: form.email.trim(), area: form.area.trim(), slug }),
     })
     setLoading(false)
     if (!res.ok) { const d = await res.json().catch(() => ({})); setErr(d.error || "שגיאה בשליחה"); return }
@@ -36,6 +36,7 @@ export default function NewsletterForm({ slug }: { slug?: string }) {
         <div className="w-20 h-20 rounded-full bg-[#C9A84C] flex items-center justify-center text-4xl mx-auto mb-6 shadow-lg">✓</div>
         <div className="text-3xl font-extrabold text-white mb-3">נרשמת בהצלחה!</div>
         <div className="text-white/70 text-sm leading-relaxed">עדכונים מנתיבים יגיעו למייל שלך מדי חודש</div>
+        <a href="/newsletter/archive" className="inline-block mt-6 text-white/40 text-xs hover:text-white/70">לצפייה בגיליונות קודמים ←</a>
       </div>
     </div>
   )
@@ -69,6 +70,13 @@ export default function NewsletterForm({ slug }: { slug?: string }) {
             onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
             type="email"
             placeholder="כתובת מייל"
+            className="w-full px-4 py-3.5 bg-white/10 border border-white/30 rounded-[12px] text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#C9A84C] focus:bg-white/15 transition-all backdrop-blur-sm"
+            style={{ fontSize: "16px" }}
+          />
+          <input
+            value={form.area}
+            onChange={e => setForm(f => ({ ...f, area: e.target.value }))}
+            placeholder="עיר / אזור מגורים (לא חובה)"
             className="w-full px-4 py-3.5 bg-white/10 border border-white/30 rounded-[12px] text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#C9A84C] focus:bg-white/15 transition-all backdrop-blur-sm"
             style={{ fontSize: "16px" }}
           />

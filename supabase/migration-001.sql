@@ -278,3 +278,63 @@ CREATE INDEX IF NOT EXISTS idx_task_template_items_template ON task_template_ite
 -- code in the app currently reads or writes it (grep confirmed zero
 -- references outside this column's own definition) — left untouched
 -- rather than guessing at a constraint for a dead column.
+
+-- ============================================================
+-- Newsletter upgrade — deliverability, scheduling, segments,
+-- analytics, self-hosted unsubscribe/preferences — 02.09.2026
+-- Applied directly via Neon MCP per project convention; this
+-- file is the durable record. hasColumn() gates cover rollback
+-- safety on the code side.
+-- ============================================================
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS status text DEFAULT 'draft';        -- draft | scheduled | sent | failed
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS scheduled_at timestamptz;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS from_name text;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS reply_to text;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS segment_area text;                  -- null = whole audience
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS html text;                          -- fully-rendered snapshot, reused for archive/preview
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS opens integer DEFAULT 0;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS clicks integer DEFAULT 0;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS unique_opens integer DEFAULT 0;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS unique_clicks integer DEFAULT 0;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS bounced integer DEFAULT 0;
+ALTER TABLE newsletter_issues ADD COLUMN IF NOT EXISTS complained integer DEFAULT 0;
+UPDATE newsletter_issues SET status='sent' WHERE sent_at IS NOT NULL AND status='draft';
+
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS area text;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}';
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS frequency text DEFAULT 'monthly';
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS consent_source text;           -- proof of consent per anti-spam law
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS consent_ip text;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS manage_token uuid DEFAULT gen_random_uuid(); -- self-hosted one-click unsubscribe, independent of Resend Broadcasts
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS last_opened_at timestamptz;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS opens_count integer DEFAULT 0;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS clicks_count integer DEFAULT 0;
+ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS welcome_sent_at timestamptz;
+-- 'status' also gains an informal 'bounced' value (list hygiene — a
+-- hard bounce stops mail without being counted as a voluntary
+-- unsubscribe), set by the webhook handler, not a new column.
+
+CREATE TABLE IF NOT EXISTS newsletter_events (
+  id               bigserial PRIMARY KEY,
+  issue_id         bigint REFERENCES newsletter_issues(id) ON DELETE CASCADE,
+  subscriber_email text,
+  event_type       text NOT NULL,   -- opened | clicked | bounced | complained | delivered
+  link_url         text,            -- set for 'clicked' events
+  created_at       timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_newsletter_events_issue ON newsletter_events(issue_id);
+CREATE INDEX IF NOT EXISTS idx_newsletter_events_type ON newsletter_events(event_type);
+
+-- Manual, one-time setup this migration does NOT and cannot cover
+-- (all require access to third-party dashboards, not just SQL):
+--   1. Verify a real sending domain's SPF/DKIM/DMARC in the Resend
+--      dashboard, then set EMAIL_FROM to an address on it — the app
+--      still defaults to onboarding@resend.dev, a Resend test address
+--      that will not reliably reach Gmail/Yahoo inboxes for bulk mail.
+--   2. Register a webhook in the Resend dashboard pointing at
+--      /api/newsletter/webhook, and set RESEND_WEBHOOK_SECRET to the
+--      whsec_... value it shows once — required for open/click/bounce
+--      analytics to populate at all.
+--   3. Optionally set NEWSLETTER_ORG_ADDRESS (a physical mailing
+--      address) — required by anti-spam law in every bulk email
+--      footer; falls back to a visible placeholder string until set.

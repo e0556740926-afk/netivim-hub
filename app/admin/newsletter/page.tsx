@@ -16,7 +16,24 @@ function fd(d: string | null) {
   return `${dt.getDate()} ${MONTHS[dt.getMonth()]} ${dt.getFullYear()}`
 }
 
-const EMPTY_ISSUE = { subject: "", intro: "", blocks: [{ title: "", text: "" }], closing: "בברכה,\nצוות נתיבים" }
+const EMPTY_ISSUE = { subject: "", intro: "", blocks: [{ title: "", text: "" }], closing: "בברכה,\nצוות נתיבים", fromName: "", replyTo: "", segmentArea: "" }
+
+const STATUS_LABEL: Record<string,string> = { draft: "טיוטה", scheduled: "מתוזמן", sent: "נשלח", failed: "נכשל" }
+const STATUS_COLOR: Record<string,{bg:string,color:string}> = {
+  draft: { bg:"#F3F4F6", color:"#374151" },
+  scheduled: { bg:"#FEF3C7", color:"#B45309" },
+  sent: { bg:"#DCFCE7", color:"#166534" },
+  failed: { bg:"#FEE2E2", color:"#991B1B" },
+}
+function fdt(d: string | null) {
+  if (!d) return "—"
+  const dt = new Date(d)
+  return `${dt.getDate()} ${MONTHS[dt.getMonth()]} · ${String(dt.getHours()).padStart(2,"0")}:${String(dt.getMinutes()).padStart(2,"0")}`
+}
+function pct(n: number, total: number) {
+  if (!total) return "0%"
+  return `${Math.round((n / total) * 100)}%`
+}
 
 /**
  * Email clients can't resolve a relative image path like
@@ -51,6 +68,12 @@ export default function AdminNewsletterPage() {
   const [composeMode, setComposeMode] = useState<"template"|"html">("template")
   const [customHtml, setCustomHtml] = useState("")
   const [issue, setIssue] = useState({ ...EMPTY_ISSUE })
+  const [editingId, setEditingId] = useState<number|null>(null)
+  const [scheduling, setScheduling] = useState(false)
+  const [scheduledAt, setScheduledAt] = useState("")
+  const [testTo, setTestTo] = useState("")
+  const [testSending, setTestSending] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
 
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState({ name: "", email: "" })
@@ -98,29 +121,119 @@ export default function AdminNewsletterPage() {
     setIssue(i => ({ ...i, blocks: i.blocks.map((b, x) => x === idx ? { ...b, [field]: value } : b) }))
   }
 
-  async function sendIssue() {
-    if (!issue.subject.trim()) { toastError("כותרת היא שדה חובה"); return }
-    if (composeMode === "html" && !customHtml.trim()) { toastError("יש להדביק תוכן HTML"); return }
+  function resetCompose() {
+    setShowCompose(false); setEditingId(null); setScheduling(false); setScheduledAt("")
+    setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template"); setHtmlFileName("")
+  }
+
+  function openNew() {
+    setEditingId(null); setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template")
+    setScheduling(false); setScheduledAt(""); setShowCompose(true)
+  }
+
+  /** Opens an existing draft/scheduled issue for editing, or (asNew) pre-fills a new draft from it — used for both "edit" and "duplicate". */
+  function openFromIssue(i: any, asNew: boolean) {
+    const isHtml = i.intro === "[HTML מותאם אישית]"
+    setComposeMode(isHtml ? "html" : "template")
+    setCustomHtml(isHtml ? (i.html || "") : "")
+    setIssue({
+      subject: asNew ? `${i.subject} (עותק)` : i.subject,
+      intro: isHtml ? "" : (i.intro || ""),
+      blocks: i.blocks?.length ? i.blocks : [{ title:"", text:"" }],
+      closing: i.closing || "בברכה,\nצוות נתיבים",
+      fromName: i.from_name || "", replyTo: i.reply_to || "", segmentArea: i.segment_area || "",
+    })
+    setEditingId(asNew ? null : i.id)
+    setScheduling(!!i.scheduled_at)
+    setScheduledAt(i.scheduled_at ? new Date(i.scheduled_at).toISOString().slice(0,16) : "")
+    setShowHistory(false); setShowCompose(true)
+  }
+
+  function validateCompose(): boolean {
+    if (!issue.subject.trim()) { toastError("כותרת היא שדה חובה"); return false }
+    if (composeMode === "html" && !customHtml.trim()) { toastError("יש להדביק תוכן HTML"); return false }
     if (composeMode === "html") {
       const relImgs = findRelativeImages(customHtml)
-      if (relImgs.length > 0 && !confirm(`נמצאו ${relImgs.length} תמונות עם כתובת יחסית שלא יוצגו במייל. לשלוח בכל זאת?`)) return
+      if (relImgs.length > 0 && !confirm(`נמצאו ${relImgs.length} תמונות עם כתובת יחסית שלא יוצגו במייל. לשלוח בכל זאת?`)) return false
     }
-    if (!confirm(`לשלוח גיליון ל-${stats?.total || 0} נרשמים פעילים? לא ניתן לבטל אחרי השליחה.`)) return
-    setSending(true)
-    const res = await fetch("/api/newsletter/issues", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...issue, customHtml: composeMode === "html" ? customHtml : null }),
+    return true
+  }
+
+  function payload(mode: "draft"|"schedule"|"send") {
+    return {
+      mode, ...issue,
+      customHtml: composeMode === "html" ? customHtml : null,
+      scheduledAt: mode === "schedule" ? scheduledAt : null,
+    }
+  }
+
+  async function saveDraft() {
+    if (!validateCompose()) return
+    if (scheduling && !scheduledAt) { toastError("יש לבחור תאריך ושעה לתזמון"); return }
+    setSavingDraft(true)
+    const url = editingId ? `/api/newsletter/issues/${editingId}` : "/api/newsletter/issues"
+    const method = editingId ? "PATCH" : "POST"
+    const res = await fetch(url, {
+      method, headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editingId ? { ...payload(scheduling ? "schedule" : "draft") } : payload(scheduling ? "schedule" : "draft")),
     })
-    setSending(false)
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}))
-      toastError(d.error || "השליחה נכשלה")
-      return
+    setSavingDraft(false)
+    if (!res.ok) { const d = await res.json().catch(()=>({})); toastError(d.error || "השמירה נכשלה"); return }
+    resetCompose()
+    success(scheduling ? "הגיליון תוזמן" : "הטיוטה נשמרה")
+    load()
+  }
+
+  async function sendIssue() {
+    if (!validateCompose()) return
+    const recipCount = issue.segmentArea ? "בפילוח שנבחר" : `${stats?.total || 0} נרשמים פעילים`
+    if (!confirm(`לשלוח גיליון ל-${recipCount}? לא ניתן לבטל אחרי השליחה.`)) return
+    setSending(true)
+    const url = editingId ? `/api/newsletter/issues/${editingId}/send` : "/api/newsletter/issues"
+    // Editing an existing draft: save first, then trigger send-now on it.
+    let res: Response
+    if (editingId) {
+      const saveRes = await fetch(`/api/newsletter/issues/${editingId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload("draft")),
+      })
+      if (!saveRes.ok) { setSending(false); toastError("השמירה נכשלה"); return }
+      res = await fetch(url, { method: "POST" })
+    } else {
+      res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload("send")) })
     }
-    setShowCompose(false)
-    setIssue({ ...EMPTY_ISSUE }); setCustomHtml(""); setComposeMode("template"); setHtmlFileName("")
+    setSending(false)
+    if (!res.ok) { const d = await res.json().catch(() => ({})); toastError(d.error || "השליחה נכשלה"); return }
+    resetCompose()
     success("הגיליון נשלח בהצלחה")
+    load()
+  }
+
+  async function sendTest() {
+    if (!validateCompose()) return
+    setTestSending(true)
+    const res = await fetch("/api/newsletter/issues/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...issue, customHtml: composeMode === "html" ? customHtml : null, email: testTo.trim() || undefined }),
+    })
+    setTestSending(false)
+    if (!res.ok) { const d = await res.json().catch(()=>({})); toastError(d.error || "שליחת הבדיקה נכשלה"); return }
+    const d = await res.json()
+    success(`נשלחה בדיקה ל-${d.to}`)
+  }
+
+  async function sendNow(id: number) {
+    if (!confirm("לשלוח את הגיליון הזה עכשיו?")) return
+    const res = await fetch(`/api/newsletter/issues/${id}/send`, { method: "POST" })
+    if (!res.ok) { const d = await res.json().catch(()=>({})); toastError(d.error || "השליחה נכשלה"); return }
+    success("נשלח בהצלחה")
+    load()
+  }
+
+  async function deleteIssue(id: number) {
+    if (!confirm("למחוק את הטיוטה הזו?")) return
+    const res = await fetch(`/api/newsletter/issues/${id}`, { method: "DELETE" })
+    if (!res.ok) { toastError("המחיקה נכשלה"); return }
+    success("נמחק")
     load()
   }
 
@@ -216,6 +329,7 @@ export default function AdminNewsletterPage() {
   const filtered = subscribers.filter((s: any) =>
     s.status === "active" && (!q || s.name?.includes(q) || s.email?.includes(q))
   )
+  const areas = Array.from(new Set(subscribers.map((s:any) => s.area).filter(Boolean))).sort()
 
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
 
@@ -227,6 +341,14 @@ export default function AdminNewsletterPage() {
           <div className="text-sm text-[#64748B] mt-0.5">רשימת תפוצה, כתיבה ושליחת גיליונות</div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <a href="/newsletter/archive" target="_blank" rel="noreferrer"
+            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC] flex items-center">
+            📰 ארכיון ציבורי
+          </a>
+          <a href="/api/export?type=newsletter" target="_blank" rel="noreferrer"
+            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC] flex items-center">
+            ⬇ ייצוא CSV
+          </a>
           <button onClick={() => setShowAdd(true)}
             className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
             + הוסף הורה
@@ -237,9 +359,9 @@ export default function AdminNewsletterPage() {
           </button>
           <button onClick={() => setShowHistory(true)}
             className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
-            היסטוריית גיליונות
+            📜 גיליונות {issues.length > 0 && `(${issues.length})`}
           </button>
-          <button onClick={() => setShowCompose(true)}
+          <button onClick={openNew}
             className="px-4 py-2 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold hover:bg-[#00488D] transition-colors">
             ✉ כתוב גיליון חדש
           </button>
@@ -251,6 +373,23 @@ export default function AdminNewsletterPage() {
           הפיצ'ר ממתין לעדכון מסד נתונים שטרם הופעל.
         </div>
       )}
+
+      {(() => {
+        const scheduledCount = issues.filter((i:any)=>i.status==="scheduled").length
+        const draftCount = issues.filter((i:any)=>i.status==="draft").length
+        if (!scheduledCount && !draftCount) return null
+        return (
+          <div className="bg-[#EFF6FF] text-[#00488D] rounded-[10px] px-4 py-3 text-sm mb-4 flex items-center gap-2">
+            <span>🗓️</span>
+            <span>
+              {scheduledCount > 0 && <>{scheduledCount} גיליונות מתוזמנים</>}
+              {scheduledCount > 0 && draftCount > 0 && " · "}
+              {draftCount > 0 && <>{draftCount} טיוטות ממתינות</>}
+            </span>
+            <button onClick={() => setShowHistory(true)} className="underline font-semibold mr-auto">צפה</button>
+          </div>
+        )
+      })()}
 
       {loading ? (
         <div className="space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
@@ -302,7 +441,7 @@ export default function AdminNewsletterPage() {
                     <div className="text-sm font-semibold">{s.name}</div>
                     <div className="text-xs text-[#64748B]">{s.email}</div>
                   </div>
-                  <div className="text-xs text-[#94A3B8]">{s.coordinator_name || "כללי"}</div>
+                  <div className="text-xs text-[#94A3B8]">{s.coordinator_name || "כללי"}{s.area ? ` · ${s.area}` : ""}</div>
                   <div className="text-xs text-[#94A3B8] w-24 text-left">{fd(s.created_at)}</div>
                   <button onClick={() => unsubscribe(s.id, s.name)}
                     className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
@@ -317,16 +456,32 @@ export default function AdminNewsletterPage() {
       {/* Compose modal */}
       <Modal
         open={showCompose}
-        onClose={() => setShowCompose(false)}
-        title="✉ גיליון חדש"
-        subtitle={`יישלח ל-${stats?.total || 0} נרשמים פעילים`}
+        onClose={resetCompose}
+        title={editingId ? "✎ עריכת טיוטה" : "✉ גיליון חדש"}
+        subtitle={issue.segmentArea ? `יישלח רק לנרשמים באזור: ${issue.segmentArea}` : `יישלח ל-${stats?.total || 0} נרשמים פעילים`}
         width="600px"
         footer={<>
-          <button onClick={sendIssue} disabled={sending}
-            className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
-            {sending ? "שולח..." : "שלח עכשיו"}
-          </button>
-          <button onClick={() => setShowCompose(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">ביטול</button>
+          <div className="w-full space-y-2">
+            <div className="flex gap-2">
+              <button onClick={sendIssue} disabled={sending || savingDraft || testSending}
+                className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+                {sending ? "שולח..." : "שלח עכשיו"}
+              </button>
+              <button onClick={saveDraft} disabled={sending || savingDraft || testSending}
+                className="flex-1 py-2.5 border border-[#00488D] text-[#00488D] rounded-[10px] text-sm font-bold disabled:opacity-50">
+                {savingDraft ? "שומר..." : scheduling ? "תזמן" : "שמור טיוטה"}
+              </button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <input value={testTo} onChange={e=>setTestTo(e.target.value)} placeholder="מייל לבדיקה (ריק = המייל שלי)"
+                className="flex-1 px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs focus:outline-none focus:border-[#00488D]"/>
+              <button onClick={sendTest} disabled={testSending}
+                className="px-3 py-2 border border-[#E2E8F0] rounded-[9px] text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 whitespace-nowrap">
+                {testSending ? "שולח..." : "📧 שלח בדיקה"}
+              </button>
+              <button onClick={resetCompose} className="px-3 py-2 text-xs text-[#94A3B8]">ביטול</button>
+            </div>
+          </div>
         </>}
       >
         <div className="space-y-3">
@@ -347,6 +502,42 @@ export default function AdminNewsletterPage() {
             <input value={issue.subject} onChange={e => setIssue(i => ({ ...i, subject: e.target.value }))}
               placeholder="לדוגמה: עדכון חודשי — ספטמבר 2026"
               className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-semibold block mb-1">שם השולח (לא חובה)</label>
+              <input value={issue.fromName} onChange={e => setIssue(i => ({ ...i, fromName: e.target.value }))}
+                placeholder="למשל: צוות נתיבים"
+                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1">Reply-To (לא חובה)</label>
+              <input value={issue.replyTo} onChange={e => setIssue(i => ({ ...i, replyTo: e.target.value }))} type="email" dir="ltr"
+                placeholder="office@netivim.org"
+                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-semibold block mb-1">קהל יעד</label>
+              <select value={issue.segmentArea} onChange={e => setIssue(i => ({ ...i, segmentArea: e.target.value }))}
+                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+                <option value="">כל הנרשמים הפעילים</option>
+                {areas.map((a:string) => <option key={a} value={a}>רק אזור: {a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold block mb-1 flex items-center gap-1.5">
+                <input type="checkbox" checked={scheduling} onChange={e=>setScheduling(e.target.checked)} className="w-3.5 h-3.5"/>
+                תזמון לשליחה עתידית
+              </label>
+              {scheduling && (
+                <input type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+              )}
+            </div>
           </div>
 
           {composeMode === "html" ? (
@@ -381,8 +572,11 @@ export default function AdminNewsletterPage() {
           <div>
             <label className="text-xs font-semibold block mb-1">פתיחה</label>
             <textarea value={issue.intro} onChange={e => setIssue(i => ({ ...i, intro: e.target.value }))} rows={3}
-              placeholder="כמה מילות פתיחה חמות..."
+              placeholder="כמה מילות פתיחה חמות... אפשר לכתוב שלום {{{first_name}}}, לפנייה אישית"
               className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#00488D]"/>
+            <div className="text-[11px] text-[#94A3B8] mt-1">
+              {"{{{first_name}}}"} יוחלף בשם הפרטי — מובטח בשליחה לאזור/בדיקה, ותלוי בתמיכת Resend בשליחה לכל הרשימה.
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -423,24 +617,58 @@ export default function AdminNewsletterPage() {
       </Modal>
 
       {/* History modal */}
-      <Modal open={showHistory} onClose={() => setShowHistory(false)} title="📜 היסטוריית גיליונות" width="500px">
+      <Modal open={showHistory} onClose={() => setShowHistory(false)} title="📜 גיליונות" width="560px">
         {issues.length === 0 ? (
-          <div className="text-sm text-[#94A3B8] text-center py-6">עדיין לא נשלח אף גיליון</div>
+          <div className="text-sm text-[#94A3B8] text-center py-6">עדיין לא נוצר אף גיליון</div>
         ) : (
           <div className="space-y-2">
-            {issues.map((i: any) => (
-              <div key={i.id} className="border border-[#E2E8F0] rounded-[10px] p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold">{i.subject}</div>
-                  {i.sent_at
-                    ? <span className="text-xs px-2 py-0.5 bg-[#DCFCE7] text-[#166534] rounded-full font-semibold">נשלח</span>
-                    : <span className="text-xs px-2 py-0.5 bg-[#FEE2E2] text-[#991B1B] rounded-full font-semibold">נכשל</span>}
+            {issues.map((i: any) => {
+              const st = STATUS_COLOR[i.status] || STATUS_COLOR.draft
+              const canEdit = i.status === "draft" || i.status === "scheduled"
+              return (
+                <div key={i.id} className="border border-[#E2E8F0] rounded-[10px] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-semibold truncate">{i.subject}</div>
+                    <span style={st} className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0">{STATUS_LABEL[i.status] || i.status}</span>
+                  </div>
+                  <div className="text-xs text-[#64748B] mt-1">
+                    {i.status === "scheduled" ? `מתוזמן ל-${fdt(i.scheduled_at)}` : i.status === "sent" ? fdt(i.sent_at) : `נוצר ${fdt(i.created_at)}`}
+                    {i.segment_area && ` · אזור: ${i.segment_area}`}
+                    {i.status === "sent" && ` · ${i.recipients || 0} נמענים`}
+                    {i.created_by && ` · ${i.created_by}`}
+                  </div>
+
+                  {i.status === "sent" && (i.recipients > 0) && (
+                    <div className="flex gap-3 mt-2 text-xs">
+                      <span className="text-[#00488D] font-semibold">👁 {i.unique_opens || 0} פתיחות ({pct(i.unique_opens||0, i.recipients)})</span>
+                      <span className="text-[#166534] font-semibold">🔗 {i.unique_clicks || 0} הקלקות ({pct(i.unique_clicks||0, i.recipients)})</span>
+                      {i.bounced > 0 && <span className="text-[#B45309] font-semibold">⚠ {i.bounced} החזרות</span>}
+                      {i.complained > 0 && <span className="text-[#991B1B] font-semibold">🚩 {i.complained} תלונות</span>}
+                    </div>
+                  )}
+
+                  <div className="flex gap-1.5 mt-2 flex-wrap">
+                    {i.status === "sent" && (
+                      <a href={`/newsletter/archive/${i.id}`} target="_blank" rel="noreferrer"
+                        className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">👁 צפה</a>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => openFromIssue(i, false)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">✎ ערוך</button>
+                    )}
+                    {canEdit && (
+                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#00488D] text-[#00488D] hover:bg-[#F0F7FF]">שלח עכשיו</button>
+                    )}
+                    <button onClick={() => openFromIssue(i, true)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">⧉ שכפל</button>
+                    {canEdit && (
+                      <button onClick={() => deleteIssue(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">🗑 מחק</button>
+                    )}
+                    {i.status === "failed" && (
+                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#B45309] text-[#B45309] hover:bg-[#FEF3C7]">נסה שוב</button>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-[#64748B] mt-1">
-                  {i.sent_at ? fd(i.sent_at) : fd(i.created_at)} · {i.recipients || 0} נמענים · {i.created_by}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Modal>
