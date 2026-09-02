@@ -255,7 +255,7 @@ function WeeklyReportContent() {
                   <td>{c.org||"—"}</td>
                   <td>{c.role||"—"}</td>
                   <td>{c.status}</td>
-                  <td>{fd(c.last_contact)}</td>
+                  <td>{fd(c.last_interaction_date)}</td>
                 </tr>
               ))}
             </tbody>

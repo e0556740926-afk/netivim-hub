@@ -75,10 +75,15 @@ export async function GET(req: NextRequest) {
         WHERE coordinator_id = ${cid} AND date BETWEEN ${ws} AND ${we}
         ORDER BY date`,
 
-    sql`SELECT * FROM contacts
-        WHERE (coordinator_id = ${cid} OR owner = ${coordName})
-          AND last_contact BETWEEN ${ws} AND ${we}
-        ORDER BY last_contact DESC`,
+    // Contacts actually touched this week — driven by real logged interactions,
+    // not the free-text last_contact field (which can be set on creation/import
+    // and doesn't necessarily reflect real activity that week).
+    sql`SELECT DISTINCT c.*, MAX(i.date) OVER (PARTITION BY c.id) AS last_interaction_date
+        FROM contacts c
+        JOIN interactions i ON i.contact_id = c.id
+        WHERE i.coordinator_id = ${cid}
+          AND i.date BETWEEN ${ws} AND ${we}
+        ORDER BY last_interaction_date DESC`,
   ]);
 
   const asDate = (v: any) =>
