@@ -34,7 +34,6 @@ export default function CoordTasks() {
   const [events, setEvents] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState<number|null>(null)
-  const [myOnly, setMyOnly] = useState(true)
   const [filterPriority, setFilterPriority] = useState("")
   const [view, setView] = useState<"kanban"|"agenda">("kanban")
   const [form, setForm] = useState({ title:"", type:"call", assignees:[] as string[], due_date:"", status:"todo", details:"", event_id:"", contact_id:"", recurrence:"", priority:"normal" })
@@ -52,10 +51,11 @@ export default function CoordTasks() {
   const [newComment, setNewComment] = useState("")
 
   async function load() {
+    if (!user) return
     setLoading(true); setError(false)
     try {
       const [tr, cr, cor, er, ur] = await Promise.all([
-        fetch("/api/tasks"), fetch("/api/contacts"), fetch("/api/targets"),
+        fetch(`/api/tasks?name=${encodeURIComponent(user.name)}&full=1`), fetch("/api/contacts"), fetch("/api/targets"),
         fetch("/api/events"), fetch("/api/users/assignees")
       ])
       const { tasks } = await tr.json()
@@ -71,7 +71,7 @@ export default function CoordTasks() {
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (user) load() }, [user])
 
   async function loadTaskExtras(id: number) {
     try {
@@ -84,10 +84,7 @@ export default function CoordTasks() {
     } catch (e) { console.error(e) }
   }
 
-  const shown = (myOnly
-    ? tasks.filter(t=>t.assignees?.includes(user?.name||""))
-    : tasks
-  ).filter(t => !filterPriority || (t.priority||"normal") === filterPriority)
+  const shown = tasks.filter(t => !filterPriority || (t.priority||"normal") === filterPriority)
 
   function startAdd() {
     setEditId(null)
@@ -199,11 +196,8 @@ export default function CoordTasks() {
 
   return <div className="p-4">
     <div className="flex items-center justify-between mb-3">
-      <div className="text-lg font-extrabold">משימות</div>
+      <div className="text-lg font-extrabold">המשימות שלי</div>
       <div className="flex gap-2">
-        <button onClick={()=>setMyOnly(v=>!v)} className={`px-3 py-1.5 rounded-[9px] text-xs font-semibold border transition-colors ${myOnly?"bg-[#0D2744] text-white border-[#0D2744]":"border-[#E2E8F0] text-[#475569]"}`}>
-          {myOnly?"שלי בלבד":"הכל"}
-        </button>
         <button onClick={startAdd} className="px-3 py-1.5 bg-[#0D2744] text-white rounded-[9px] text-sm font-semibold">+ משימה</button>
       </div>
     </div>

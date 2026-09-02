@@ -9,7 +9,16 @@ import { hasColumn } from "@/lib/schema";
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
+  const full = req.nextUrl.searchParams.get("full");
   const cid = req.nextUrl.searchParams.get("coordinator_id");
+  if (name && full) {
+    // A coordinator's own task list — every status, no limit.
+    // Distinct from the plain `name` mode below, which is the small
+    // home-page "what's next" widget and intentionally excludes done
+    // tasks and caps at 10.
+    const rows = await sql`SELECT * FROM tasks WHERE ${name}=ANY(assignees) ORDER BY due_date`;
+    return NextResponse.json({ tasks: rows });
+  }
   if (name) {
     const rows = await sql`SELECT * FROM tasks WHERE ${name}=ANY(assignees) AND status!='done' ORDER BY due_date LIMIT 10`;
     return NextResponse.json({ tasks: rows });
