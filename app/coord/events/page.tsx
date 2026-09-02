@@ -26,6 +26,7 @@ export default function CoordEvents() {
   const { user } = useAuth()
   const [events, setEvents] = useState<any[]>([])
   const [expenses, setExpenses] = useState<Record<number,number>>({})
+  const [coordId, setCoordId] = useState<number|null>(null)
   const [showForm, setShowForm] = useState(false)
   const [filter, setFilter] = useState("")
   const [form, setForm] = useState({ name:"", date:"", time:"", location:"", budget_planned:0, target_attendees:0 })
@@ -34,7 +35,12 @@ export default function CoordEvents() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [er, ex] = await Promise.all([fetch("/api/events"), fetch("/api/expenses")])
+      if (!user) return
+      const [cr, er, ex] = await Promise.all([
+        fetch(`/api/coord?user_id=${user.id}`), fetch("/api/events"), fetch("/api/expenses")
+      ])
+      const { coord } = await cr.json()
+      setCoordId(coord?.id || null)
       const { events } = await er.json()
       const { expenses } = await ex.json()
       setEvents(events||[])
@@ -44,12 +50,12 @@ export default function CoordEvents() {
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
   }
-  useEffect(()=>{ load() },[])
+  useEffect(()=>{ if(user) load() },[user])
 
   async function create() {
     if (!form.name.trim()) return
     setSaving(true)
-    await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,status:"pending_approval",approved:false})})
+    await fetch("/api/events",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,status:"pending_approval",approved:false,coordinator_id:coordId})})
     setSaving(false); setShowForm(false); setForm({name:"",date:"",time:"",location:"",budget_planned:0,target_attendees:0}); load()
   }
 
@@ -111,6 +117,7 @@ export default function CoordEvents() {
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold">{e.name}</div>
               <div className="text-xs text-[#64748B] mt-0.5">{e.time&&`${e.time} · `}{e.location}</div>
+              {e.coordinator_name && e.coordinator_name!==user?.name && <div className="text-[10px] text-[#94A3B8] mt-0.5">הוצע ע"י {e.coordinator_name}</div>}
             </div>
             <span style={sc} className="px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap">{STATUS_LABEL[e.status]||e.status}</span>
           </div>

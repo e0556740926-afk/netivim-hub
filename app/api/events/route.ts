@@ -5,7 +5,7 @@ import { currentUser } from "@/lib/auth-server";
 
 export async function GET() {
   const [events, expenses] = await Promise.all([
-    sql`SELECT * FROM events ORDER BY date`,
+    sql`SELECT e.*, c.name as coordinator_name FROM events e LEFT JOIN coordinators c ON c.id = e.coordinator_id ORDER BY e.date`,
     sql`SELECT event_id, amount FROM expenses`,
   ]);
   return NextResponse.json({ events, expenses });
@@ -14,8 +14,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const d = await req.json();
   const rows = await sql`
-    INSERT INTO events (name, date, time, location, status, budget_planned, target_attendees, approved)
-    VALUES (${d.name}, ${d.date||null}, ${d.time||''}, ${d.location||''}, 'pending_approval', ${d.budget_planned||0}, ${d.target_attendees||0}, false)
+    INSERT INTO events (name, date, time, location, status, budget_planned, target_attendees, approved, coordinator_id)
+    VALUES (${d.name}, ${d.date||null}, ${d.time||''}, ${d.location||''}, 'pending_approval', ${d.budget_planned||0}, ${d.target_attendees||0}, false, ${d.coordinator_id||null})
     RETURNING *
   `;
   const me = await currentUser(req);

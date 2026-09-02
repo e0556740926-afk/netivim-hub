@@ -8,6 +8,7 @@ const tabs = [
   { label:"לידים",  path:"/coord/leads",    icon:"⭐" },
   { label:"יומן",   path:"/coord/calendar", icon:"📅" },
   { label:"משימות", path:"/coord/tasks",    icon:"✅", badge:true },
+  { label:"אירועים", path:"/coord/events",  icon:"🎪" },
   { label:"קשרים",  path:"/coord/contacts", icon:"👥" },
 ]
 
