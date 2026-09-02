@@ -7,6 +7,10 @@ interface SilfrusLeadArgs {
   email?: string;
   /** The coordinator or manager this lead is assigned to. */
   ownerName: string;
+  /** Israeli ID number (ת.ז), if collected. */
+  idNumber?: string;
+  age?: string | number;
+  notes?: string;
 }
 
 /**
@@ -33,6 +37,9 @@ export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; 
         campaign: "",
         last_name: a.lastName,
         "First name": a.firstName,
+        id_number: a.idNumber || "",
+        age: a.age != null ? String(a.age) : "",
+        notes: a.notes || "",
       }]),
     });
     if (!res.ok) {

@@ -123,6 +123,9 @@ export async function POST(req: NextRequest) {
         phone: d.phone,
         email: d.email || "",
         ownerName,
+        idNumber: d.id_number || "",
+        age: d.age || "",
+        notes: d.notes || "",
       });
     } catch (e) { console.error("[silfrus sync]", e); }
   }

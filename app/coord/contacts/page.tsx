@@ -25,6 +25,8 @@ export default function CoordContacts() {
   const [contacts, setContacts] = useState<any[]>([])
   const [q, setQ] = useState("")
   const [fStatus, setFStatus] = useState("")
+  const [fType, setFType] = useState("")
+  const [fOwner, setFOwner] = useState("")
   const [openId, setOpenId] = useState<number|null>(null)
   const [detail, setDetail] = useState<any>(null)
   const [showForm, setShowForm] = useState(false)
@@ -90,11 +92,17 @@ export default function CoordContacts() {
     const res=await fetch("/api/contacts/"+openId); setDetail(await res.json()); load()
   }
 
+  const owners = Array.from(new Set(contacts.map(c=>c.owner).filter(Boolean))).sort()
+
   const filtered = contacts.filter(c=>{
     if(q&&!((c.name||"")+(c.org||"")).includes(q)) return false
     if(fStatus&&c.status!==fStatus) return false
+    if(fType&&c.type!==fType) return false
+    if(fOwner&&c.owner!==fOwner) return false
     return true
   })
+  const hasFilters = !!(q||fStatus||fType||fOwner)
+  function clearFilters() { setQ(""); setFStatus(""); setFType(""); setFOwner("") }
 
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
   if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
@@ -106,16 +114,27 @@ export default function CoordContacts() {
     </div>
 
     {/* Filters */}
-    <div className="flex gap-2 mb-3">
+    <div className="flex gap-2 mb-2">
       <div className="flex-1 flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[10px] px-3 py-2">
         <span className="text-[#94A3B8]">🔍</span>
         <input value={q} onChange={e=>setQ(e.target.value)} placeholder="חיפוש..." className="flex-1 text-sm bg-transparent outline-none"/>
         {q&&<button onClick={()=>setQ("")} className="text-[#94A3B8] text-xs">✕</button>}
       </div>
-      <select value={fStatus} onChange={e=>setFStatus(e.target.value)} className="px-2 py-2 border border-[#E2E8F0] rounded-[10px] text-xs bg-white">
-        <option value="">הכל</option>
+    </div>
+    <div className="flex gap-2 mb-3 overflow-x-auto">
+      <select value={fType} onChange={e=>setFType(e.target.value)} className="px-2 py-2 border border-[#E2E8F0] rounded-[10px] text-xs bg-white flex-shrink-0">
+        <option value="">כל הסוגים</option>
+        {Object.entries(TYPE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+      </select>
+      <select value={fStatus} onChange={e=>setFStatus(e.target.value)} className="px-2 py-2 border border-[#E2E8F0] rounded-[10px] text-xs bg-white flex-shrink-0">
+        <option value="">כל הסטטוסים</option>
         {Object.entries(STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
       </select>
+      {owners.length>1&&<select value={fOwner} onChange={e=>setFOwner(e.target.value)} className="px-2 py-2 border border-[#E2E8F0] rounded-[10px] text-xs bg-white flex-shrink-0">
+        <option value="">כל האחראים</option>
+        {owners.map(o=><option key={o} value={o}>{o}</option>)}
+      </select>}
+      {hasFilters&&<button onClick={clearFilters} className="px-2 py-2 text-xs text-[#00488D] font-semibold flex-shrink-0">נקה סינון</button>}
     </div>
 
     {/* Add/Edit form */}
@@ -196,7 +215,7 @@ export default function CoordContacts() {
 
     {/* List */}
     <div className="space-y-2">
-      {filtered.length===0&&<EmptyState icon="👥" title={q||fStatus?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={q||fStatus?"נסה חיפוש אחר":"כאן מופיעים כל אנשי הקשר של הארגון"} actionLabel={q||fStatus?undefined:"+ הוסף איש קשר"} onAction={startAdd} onClearFilters={q||fStatus?()=>{setQ("");setFStatus("")}:undefined}/>}
+      {filtered.length===0&&<EmptyState icon="👥" title={hasFilters?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={hasFilters?"נסה לשנות את הסינון או החיפוש":"כאן מופיעים כל אנשי הקשר של הארגון"} actionLabel={hasFilters?undefined:"+ הוסף איש קשר"} onAction={startAdd} onClearFilters={hasFilters?clearFilters:undefined}/>}
       {filtered.map(c=>{
         const d=ds(c.last_contact); const isOpen=openId===c.id
         const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
