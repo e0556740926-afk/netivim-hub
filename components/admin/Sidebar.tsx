@@ -42,6 +42,7 @@ const GROUPS: Group[] = [
       { label: "דשבורד מנכ״ל", path: "/admin/dashboards/ceo", dot: "#2E5C8A" },
       { label: "דשבורד מממן", path: "/admin/dashboards/funder", dot: "#2E5C8A" },
       { label: "סטטיסטיקות", path: "/admin/statistics", dot: "#6B4E9E", ceoOnly: true },
+      { label: "דוחות", path: "/admin/report-builder", dot: "#6B4E9E" },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
