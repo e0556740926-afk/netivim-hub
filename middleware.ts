@@ -30,6 +30,14 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/tasks/bulk" },
   { path: "/api/tasks/series" },
   { path: "/api/task-templates" },
+  // New Netivim CRM foundation layer (2026-09-05): case/referral/budget
+  // management is advisor & manager territory, not a coordinator screen.
+  // Organizations stays readable by coordinators (contacts screen needs
+  // it) but writes are admin-only.
+  { path: "/api/organizations", methods: ["POST", "PATCH"] },
+  { path: "/api/cases" },
+  { path: "/api/referrals" },
+  { path: "/api/budget" },
 ];
 
 function isPublicApi(pathname: string) {

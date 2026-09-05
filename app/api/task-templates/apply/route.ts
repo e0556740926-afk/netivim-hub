@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
+import { syncAssignedAndParticipants } from "@/lib/task-assignment";
 
 /**
  * Applies a saved template to a chosen set of assignees, starting
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
       VALUES (${it.title}, ${it.type}, ${it.priority}, ${assignees}, ${dueStr}, 'todo')
       RETURNING *`;
     created.push(rows[0]);
+    await syncAssignedAndParticipants(rows[0].id, assignees);
     logAudit({ entityType: "task", entityId: rows[0].id, action: "create", actorName: me?.name, actorEmail: me?.email, summary: `נוצרה מתבנית` });
   }
   return NextResponse.json({ ok: true, created: created.length, tasks: created });

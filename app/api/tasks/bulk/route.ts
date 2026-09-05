@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { syncAssignedAndParticipantsForIds } from "@/lib/task-assignment";
 
 /**
  * Bulk operations for a manager-selected set of tasks (admin-only,
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
   if (d.action === "reassign") {
     const assignees: string[] = Array.isArray(d.assignees) ? d.assignees : [];
     await sql`UPDATE tasks SET assignees=${assignees} WHERE id = ANY(${ids})`;
+    await syncAssignedAndParticipantsForIds(ids);
     for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `שיוך קבוצתי → ${assignees.join(", ")}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
   if (d.action === "add_assignee") {
     if (!d.name) return NextResponse.json({ error: "missing name" }, { status: 400 });
     await sql`UPDATE tasks SET assignees = array_append(assignees, ${d.name}) WHERE id = ANY(${ids}) AND NOT (${d.name} = ANY(assignees))`;
+    await syncAssignedAndParticipantsForIds(ids);
     for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `נוסף לשיוך: ${d.name}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }

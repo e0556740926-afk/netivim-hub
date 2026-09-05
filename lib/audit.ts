@@ -2,9 +2,9 @@ import sql from "@/lib/db";
 import { hasColumn } from "@/lib/schema";
 
 interface LogArgs {
-  entityType: "contact" | "lead" | "task" | "event";
+  entityType: "contact" | "lead" | "task" | "event" | "organization" | "case" | "case_protected" | "referral" | "funding_source" | "purchase_request";
   entityId: number;
-  action: "create" | "update" | "delete" | "restore";
+  action: "create" | "update" | "delete" | "restore" | "view";
   actorName?: string;
   actorEmail?: string;
   summary?: string;

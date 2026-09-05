@@ -414,6 +414,7 @@ export default function TasksPage() {
                           )}
                           {isStuck && <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#B45309]" title="לא זזה זמן רב">⏱ תקוע {stuckDays}י׳</span>}
                           {t.assignees?.slice(0,1).map((a:string)=><span key={a} className="text-xs px-1.5 py-0.5 bg-[#F0F7FF] text-[#00488D] rounded-full">{a.split(" ")[0]}</span>)}
+                          {t.participant_names?.length>0 && <span className="text-xs px-1.5 py-0.5 bg-[#F3F4F6] text-[#374151] rounded-full" title={t.participant_names.join(", ")}>+{t.participant_names.length}</span>}
                         </div>
                         {t.due_date && <div style={{color:accent}} className="text-xs font-semibold mb-2">{late?"⚠ ":""}{fd(t.due_date.slice(0,10))}</div>}
                         {lastNotify.length>0 && <div className="flex gap-1 mb-2" title="סטטוס שליחת התראות">

@@ -6,6 +6,30 @@ import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
 import { sendPush } from "@/lib/push";
 import { hasColumn } from "@/lib/schema";
+import { syncAssignedAndParticipants } from "@/lib/task-assignment";
+
+// Adds assigned_to_name + participant_names to whatever row set the
+// legacy queries below already produced. Read-only, additive — nothing
+// that already worked off `assignees` is affected.
+async function withAssignmentNames(rows: any[]) {
+  if (!rows.length) return rows;
+  const ids = rows.map(r => r.id);
+  const [owners, participants] = await Promise.all([
+    sql`SELECT t.id AS task_id, u.name FROM tasks t JOIN users u ON u.id = t.assigned_to WHERE t.id = ANY(${ids})`,
+    sql`SELECT tp.task_id, u.name FROM task_participants tp JOIN users u ON u.id = tp.user_id WHERE tp.task_id = ANY(${ids})`,
+  ]);
+  const ownerMap = new Map((owners as any[]).map(o => [o.task_id, o.name]));
+  const partMap = new Map<number, string[]>();
+  for (const p of participants as any[]) {
+    if (!partMap.has(p.task_id)) partMap.set(p.task_id, []);
+    partMap.get(p.task_id)!.push(p.name);
+  }
+  return rows.map(r => ({
+    ...r,
+    assigned_to_name: ownerMap.get(r.id) || null,
+    participant_names: partMap.get(r.id) || [],
+  }));
+}
 
 export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name");
@@ -17,18 +41,18 @@ export async function GET(req: NextRequest) {
     // home-page "what's next" widget and intentionally excludes done
     // tasks and caps at 10.
     const rows = await sql`SELECT * FROM tasks WHERE ${name}=ANY(assignees) ORDER BY due_date`;
-    return NextResponse.json({ tasks: rows });
+    return NextResponse.json({ tasks: await withAssignmentNames(rows) });
   }
   if (name) {
     const rows = await sql`SELECT * FROM tasks WHERE ${name}=ANY(assignees) AND status!='done' ORDER BY due_date LIMIT 10`;
-    return NextResponse.json({ tasks: rows });
+    return NextResponse.json({ tasks: await withAssignmentNames(rows) });
   }
   if (cid) {
     const rows = await sql`SELECT * FROM tasks WHERE coordinator_id=${parseInt(cid)} ORDER BY due_date`;
-    return NextResponse.json({ tasks: rows });
+    return NextResponse.json({ tasks: await withAssignmentNames(rows) });
   }
   const rows = await sql`SELECT * FROM tasks ORDER BY due_date`;
-  return NextResponse.json({ tasks: rows });
+  return NextResponse.json({ tasks: await withAssignmentNames(rows) });
 }
 
 // Look up emails for a list of assignee names
@@ -151,6 +175,7 @@ export async function POST(req: NextRequest) {
   }
 
   const task = rows[0];
+  await syncAssignedAndParticipants(task.id, d.assignees || []);
   if (d.notify !== false && d.assignees?.length) {
     const log = await notifyAssignees(task, d.assignees, d.assigned_by);
     await persistNotifyLog(task.id, log);
@@ -215,6 +240,8 @@ export async function PATCH(req: NextRequest) {
   } else {
     await sql`UPDATE tasks SET title=${d.title},details=${d.details||''},type=${d.type},assignees=${next},due_date=${d.due_date||null},status=${d.status},event_id=${d.event_id||null},contact_id=${d.contact_id||null} WHERE id=${d.id}`;
   }
+
+  await syncAssignedAndParticipants(d.id, next);
 
   if (d.notify !== false && added.length) {
     const log = await notifyAssignees(

@@ -72,6 +72,48 @@ handled separately.
 - **Salesforce migration (spec §14)** — blocked on a field-mapping session
   with Alexander Shiretzky and the 3 open CEO-level decisions in spec §16.1.
 
+## 2026-09-05 — Code layer: API + UI for Stages A-D
+
+- **New `leads.advisor_status`** (7-value enum, separate column from the
+  existing `leads.status`). Deliberately kept separate rather than reusing
+  `status`: code inspection showed `app/coord/leads/page.tsx` already runs
+  a live 4-value cycle (`new→contacted→advanced→irrelevant`) that
+  coordinators use today — overloading that field for the 7-stage advisor
+  pipeline would have broken a screen in active use. `status` is untouched.
+- **`lib/task-assignment.ts`** — shared helper (`syncAssignedAndParticipants`,
+  `syncAssignedAndParticipantsForIds`) wired into all 4 places that write
+  `tasks.assignees` (`tasks/route.ts`, `tasks/bulk`, `tasks/series`,
+  `task-templates/apply`), so `assigned_to`/`task_participants` stay derived
+  from `assignees[0]`/`assignees[1:]` going forward without touching any
+  existing notify/audit logic. `tasks` GET responses now also include
+  `assigned_to_name` and `participant_names`.
+- **New API routes**: `/api/organizations` (+`[id]` for programs/contacts),
+  `/api/cases` (advisor_status transitions with an explicit allowed-transition
+  table per spec §6.3, logs to `case_status_history`), `/api/cases/[id]`
+  (extended/protected tiers — opening protected info is a logged action per
+  spec §6.1 — plus triage-color with a simple red-flag task auto-created for
+  a `role='rav'` user if one exists), `/api/referrals` (enforces "≤3
+  concurrent" per spec §7.1, returns sibling referrals for the UI to offer
+  closing when one is accepted, auto-advances/reverts case status on
+  referral outcome), `/api/budget/funding-sources`, `/api/budget/vendors`,
+  `/api/budget/purchase-requests` (simple one-click approve → creates a
+  `purchase_orders` row).
+- `middleware.ts`: new routes gated admin-only except `GET /api/organizations`
+  (coordinators still need it for the contacts screen).
+- **New UI pages**: `/admin/organizations` (+ detail), `/admin/cases`
+  (+ detail: status buttons, triage dots, extended/protected/referrals/history
+  tabs), `/admin/budget` (sources/vendors/requests tabs). `/admin/tasks`
+  kanban got one additive badge (`+N` participants) — no existing behavior
+  changed.
+- **Honest scope note**: these are functional, data-correct screens, not a
+  pixel-accurate build of the 27-screen design package (no 4-column live
+  Advisor Desk board with SLA gauges, no 3-step Referral Wizard modal, no
+  Institution/Advisee self-service portals, no Executive/CEO/Funder
+  dashboards, no Field Builder live preview, no call-center QA). Those
+  remain separate, larger pieces of work.
+- Verified: `npm run build` — TypeScript clean, all 93 routes compiled,
+  static generation succeeded.
+
 ## Verification methodology
 
 Every stage: built and verified on a disposable Neon branch first

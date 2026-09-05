@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
+import { syncAssignedAndParticipants } from "@/lib/task-assignment";
 
 /**
  * Recurring-series management for managers (admin-only, gated in
@@ -48,7 +49,10 @@ export async function PATCH(req: NextRequest) {
     if (d.title !== undefined) await sql`UPDATE tasks SET title=${d.title} WHERE id=${d.id}`;
     if (d.type !== undefined) await sql`UPDATE tasks SET type=${d.type} WHERE id=${d.id}`;
     if (d.priority !== undefined) await sql`UPDATE tasks SET priority=${d.priority} WHERE id=${d.id}`;
-    if (d.assignees !== undefined) await sql`UPDATE tasks SET assignees=${d.assignees} WHERE id=${d.id}`;
+    if (d.assignees !== undefined) {
+      await sql`UPDATE tasks SET assignees=${d.assignees} WHERE id=${d.id}`;
+      await syncAssignedAndParticipants(d.id, d.assignees);
+    }
     logAudit({ entityType: "task", entityId: d.id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "עריכת סדרה חוזרת" });
     return NextResponse.json({ ok: true });
   }
