@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
 import { exportToCsv } from "@/lib/csv-export"
+import { FunnelSankey } from "@/components/dashboards/FunnelSankey"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
 const DIM_LABEL: Record<string, string> = { age_bucket: "גיל", city: "עיר", sector: "מגזר", source: "מקור", advisor_status: "סטטוס", category: "קטגוריית שיבוץ" }
@@ -50,6 +51,8 @@ export default function StatisticsPage() {
   const [nlError, setNlError] = useState("")
   const [nlEditing, setNlEditing] = useState<string | null>(null)
   const [nlRecent, setNlRecent] = useState<string[]>([])
+  const [sankey, setSankey] = useState<any>(null)
+  const [compareMode, setCompareMode] = useState(false)
 
   useEffect(() => {
     const i = setInterval(() => setNlPlaceholder(p => (p + 1) % EXAMPLE_QUESTIONS.length), 3500)
@@ -111,6 +114,10 @@ export default function StatisticsPage() {
     if (r.ok) setSavedViews((await r.json()).saved || [])
   }
   useEffect(() => { loadSavedViews() }, [])
+
+  useEffect(() => {
+    fetch("/api/statistics/funnel-sankey").then(r => r.ok ? r.json() : null).then(d => d && setSankey(d))
+  }, [])
 
   useEffect(() => {
     (async () => {
@@ -278,6 +285,14 @@ export default function StatisticsPage() {
         )}
       </div>
 
+      {sankey && (
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>משפך ההכוון — Sankey</div>
+          <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>{sankey.note}</div>
+          <FunnelSankey stages={sankey.stages} />
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -307,22 +322,40 @@ export default function StatisticsPage() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>מגמת לידים והוצאה — 12 חודשים אחרונים</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>מגמת לידים והוצאה</div>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: T.slate, cursor: "pointer" }}>
+            <input type="checkbox" checked={compareMode} onChange={e => setCompareMode(e.target.checked)} />
+            השווה לתקופה קודמת (שנה אחורה)
+          </label>
+        </div>
         <div style={{ display: "flex", gap: 14, fontSize: 11, color: T.slate, marginBottom: 12 }}>
           <span><span style={{ display: "inline-block", width: 10, height: 2, background: T.blue, marginLeft: 4 }} />לידים</span>
           <span><span style={{ display: "inline-block", width: 10, height: 2, background: T.warn, marginLeft: 4 }} />הוצאה (₪)</span>
+          {compareMode && <span><span style={{ display: "inline-block", width: 10, height: 10, background: T.blue, opacity: 0.5, marginLeft: 4 }} />לידים — לפני שנה</span>}
         </div>
         {trend.length ? (
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 100 }}>
-            {trend.map((m: any) => (
-              <div key={m.month} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", gap: 2 }} title={`${m.month}: ${m.leads} לידים, ₪${Math.round(Number(m.spend))}`}>
-                <div style={{ height: `${(m.leads / maxTrendLeads) * 60}%`, background: T.blue, borderRadius: "2px 2px 0 0" }} />
-                <div style={{ height: `${(Number(m.spend) / maxTrendSpend) * 30}%`, background: T.warn, borderRadius: "2px 2px 0 0" }} />
-                <div style={{ fontSize: 9, color: T.slate, textAlign: "center" }}>{m.month.slice(5)}</div>
-              </div>
-            ))}
+            {trend.map((m: any) => {
+              const [y, mo] = m.month.split("-")
+              const prevKey = `${Number(y) - 1}-${mo}`
+              const prev = compareMode ? trend.find((t: any) => t.month === prevKey) : null
+              return (
+                <div key={m.month} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 2, height: "100%" }} title={`${m.month}: ${m.leads} לידים, ₪${Math.round(Number(m.spend))}${prev ? ` · ${prevKey}: ${prev.leads} לידים` : ""}`}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", gap: 2 }}>
+                    <div style={{ height: `${(m.leads / maxTrendLeads) * 60}%`, background: T.blue, borderRadius: "2px 2px 0 0" }} />
+                    <div style={{ height: `${(Number(m.spend) / maxTrendSpend) * 30}%`, background: T.warn, borderRadius: "2px 2px 0 0" }} />
+                    <div style={{ fontSize: 9, color: T.slate, textAlign: "center" }}>{m.month.slice(5)}</div>
+                  </div>
+                  {compareMode && (
+                    <div style={{ flex: 1, height: `${prev ? (prev.leads / maxTrendLeads) * 60 : 0}%`, background: T.blue, opacity: 0.5, borderRadius: "2px 2px 0 0" }} />
+                  )}
+                </div>
+              )
+            })}
           </div>
         ) : <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין נתוני מגמה</div>}
+        {compareMode && <div style={{ fontSize: 11, color: T.slate, marginTop: 8 }}>עמודה שקופה = אין נתון לתקופה המקבילה אשתקד (עדיין אין מספיק היסטוריה במערכת).</div>}
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
