@@ -170,6 +170,56 @@ handled separately.
     its tabs); there's no separate "D3" mock to build against.
 - Verified: `npm run build` clean after both stages.
 
+## 2026-09-05 — Stage 4 (Budget F1-F2) + Stage 5 (Admin/Field Builder/Settings I2-I4)
+
+- Correction: the brief's task list said "E1-E3" for budget — the design
+  package actually ships this as **F1 (Budget Dashboard)** and **F2 (Funding
+  Sources)**; there's no separate procurement/vendor screen in the 27-screen
+  set. Read and built against the real files, not the brief's numbering.
+- `organizations` gains `rating`, `relationship_status`, `description`,
+  `total_students`; `custom_field_defs` gains `required`, `in_list`,
+  `visible_roles text[]`, `group_name` — all additive.
+- **F1 Budget Dashboard**: period-elapsed %, utilized %, monthly burn rate
+  (avg of last 3 months with paid expenses), forecast — all computed live
+  from `funding_sources` + `expenses`, not mock numbers. The mock's
+  category×month heatmap and "top 5 overages" need a **per-category budget
+  target that doesn't exist in the schema** — substituted with a plain
+  "spend by category" breakdown and said so on-screen, rather than
+  fabricating thresholds to make a heatmap look real.
+- **F2 Funding Sources**: real status logic — a source is flagged
+  "דורש טיפול דחוף" when its period ends within 30 days AND under 50% is
+  used; "מתקרב לסוף תקופה" within 60 days; otherwise "תקין". Matches the
+  mock's example case exactly in spirit, computed rather than hardcoded.
+- **Procurement (vendors/purchase requests)**: kept at `/admin/budget/procurement`
+  in the app's plain existing style — explicitly not "matched" to any mock
+  because none exists for it in the design package.
+- **I2 Field Builder**: full rebuild — field list (label/type/required/
+  in-list/visible-roles), create/edit panel with a real option-list editor,
+  a genuinely reactive live preview (updates on every keystroke, matching
+  the mock's specific requirement), and a value-lists overview at the
+  bottom. Backed by `/api/admin/custom-fields` (CRUD + reorder).
+- **I3 Automation Settings**: all 5 thresholds from the mock (follow-up
+  window, support check-in months, SLA hours, no-answer attempts, retention
+  frequency), stored in the existing `app_settings` key/value table, editable
+  live. **Important limitation**: these values are now real and persisted,
+  but nothing else in the app reads them yet — the SLA threshold used in
+  Advisor Desk/Case File is still the hardcoded `SLA_HOURS = 24` constant,
+  the referral follow-up automation described in spec §5 isn't running as a
+  scheduled job, etc. This screen is the control panel; wiring the rest of
+  the app to actually read these settings is separate follow-up work.
+- **I4 Audit Log**: real data from the existing `audit_log` table, with the
+  "all actions" / "protected-info views" tab split and user/entity filters
+  from the mock. The mock's "before"/"after" columns aren't buildable as-is:
+  `audit_log.summary` is free text (per the earlier integration-spec
+  finding), not structured before/after values — shown as a single
+  "פירוט" column instead, with an on-screen note explaining why.
+- **I1 Users & Permissions**: not rebuilt — `/admin/settings` already
+  covers this (users table, roles, status) in the app's existing style.
+  Linked to the three new screens above rather than duplicated.
+- Verified: `npm run build` clean, all new routes compiled
+  (`/admin/settings/fields`, `/automation`, `/audit-log`,
+  `/api/admin/custom-fields`, `/api/admin/automation-settings`).
+
 ## Verification methodology
 
 Every stage: built and verified on a disposable Neon branch first

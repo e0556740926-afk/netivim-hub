@@ -2,7 +2,7 @@ import sql from "@/lib/db";
 import { hasColumn } from "@/lib/schema";
 
 interface LogArgs {
-  entityType: "contact" | "lead" | "task" | "event" | "organization" | "case" | "case_protected" | "referral" | "funding_source" | "purchase_request";
+  entityType: "contact" | "lead" | "task" | "event" | "organization" | "case" | "case_protected" | "referral" | "funding_source" | "purchase_request" | "custom_field" | "setting";
   entityId: number;
   action: "create" | "update" | "delete" | "restore" | "view";
   actorName?: string;

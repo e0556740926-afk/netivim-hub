@@ -38,6 +38,7 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/cases" },
   { path: "/api/referrals" },
   { path: "/api/budget" },
+  { path: "/api/admin" },
 ];
 
 function isPublicApi(pathname: string) {

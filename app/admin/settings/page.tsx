@@ -124,7 +124,12 @@ export default function SettingsPage() {
       <div><h1 className="text-2xl font-extrabold text-[#0D2744]">הגדרות ומשתמשים</h1>
         <div className="text-sm text-[#64748B] mt-0.5">{users.length} משתמשים</div>
       </div>
-      <Button onClick={startAdd}>+ משתמש חדש</Button>
+      <div className="flex items-center gap-3">
+        <a href="/admin/settings/fields" className="text-sm font-semibold text-[#00488D]">בונה שדות מותאמים</a>
+        <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
+        <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
+        <Button onClick={startAdd}>+ משתמש חדש</Button>
+      </div>
     </div>
 
     {/* User form */}

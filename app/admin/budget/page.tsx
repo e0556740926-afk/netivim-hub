@@ -1,149 +1,154 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
-import Card from "@/components/ui/Card"
-import Button from "@/components/ui/Button"
-import Badge from "@/components/ui/Badge"
-import { fd } from "@/lib/utils"
 
-const TABS = ["sources", "vendors", "requests"] as const
-const TAB_LABEL: Record<string, string> = { sources: "מקורות מימון", vendors: "ספקים", requests: "דרישות רכש" }
+const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
+const CAT_LABEL: Record<string, string> = { equipment: "רכש ציוד", marketing: "פרסום", catering: "כיבוד", venue: "מקום/שכ\"ד", other: "אחר" }
+function money(n: number) { return `₪${Math.round(n).toLocaleString()}` }
 
-export default function BudgetPage() {
-  const [tab, setTab] = useState<typeof TABS[number]>("sources")
+export default function BudgetDashboard() {
   const [sources, setSources] = useState<any[]>([])
-  const [vendors, setVendors] = useState<any[]>([])
-  const [requests, setRequests] = useState<any[]>([])
+  const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [srcForm, setSrcForm] = useState({ funder: "", purpose: "", amount: "", period_start: "", period_end: "" })
-  const [vendorForm, setVendorForm] = useState({ name: "", contact: "", category: "" })
-  const [reqForm, setReqForm] = useState({ requested_by: "", item: "", reason: "" })
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [s, v, r] = await Promise.all([
-        fetch("/api/budget/funding-sources"), fetch("/api/budget/vendors"), fetch("/api/budget/purchase-requests"),
-      ])
-      setSources((await s.json()).funding_sources || [])
-      setVendors((await v.json()).vendors || [])
-      setRequests((await r.json()).purchase_requests || [])
+      const [sr, er] = await Promise.all([fetch("/api/budget/funding-sources"), fetch("/api/expenses")])
+      setSources((await sr.json()).funding_sources || [])
+      setExpenses((await er.json()).expenses || [])
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
-  async function addSource() {
-    if (!srcForm.funder || !srcForm.amount) return
-    await fetch("/api/budget/funding-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...srcForm, amount: Number(srcForm.amount) }) })
-    setSrcForm({ funder: "", purpose: "", amount: "", period_start: "", period_end: "" })
-    await load()
-  }
-  async function addVendor() {
-    if (!vendorForm.name) return
-    await fetch("/api/budget/vendors", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(vendorForm) })
-    setVendorForm({ name: "", contact: "", category: "" })
-    await load()
-  }
-  async function addRequest() {
-    if (!reqForm.requested_by || !reqForm.item) return
-    await fetch("/api/budget/purchase-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reqForm) })
-    setReqForm({ requested_by: "", item: "", reason: "" })
-    await load()
-  }
-  async function approve(id: number) {
-    await fetch("/api/budget/purchase-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve", id }) })
-    await load()
-  }
+  const metrics = useMemo(() => {
+    const totalBudget = sources.reduce((s, f) => s + Number(f.amount || 0), 0)
+    const paid = expenses.filter(e => e.status === "paid")
+    const totalUsed = paid.reduce((s, e) => s + Number(e.amount || 0), 0)
+
+    const starts = sources.map(f => f.period_start).filter(Boolean).map(d => new Date(d).getTime())
+    const ends = sources.map(f => f.period_end).filter(Boolean).map(d => new Date(d).getTime())
+    const periodStart = starts.length ? Math.min(...starts) : null
+    const periodEnd = ends.length ? Math.max(...ends) : null
+    const now = Date.now()
+    const periodPct = periodStart && periodEnd && periodEnd > periodStart
+      ? Math.min(100, Math.max(0, Math.round(((now - periodStart) / (periodEnd - periodStart)) * 100)))
+      : null
+    const usedPct = totalBudget > 0 ? Math.round((totalUsed / totalBudget) * 100) : null
+
+    // Burn rate: average monthly paid spend over the last 3 calendar months with data.
+    const byMonth = new Map<string, number>()
+    for (const e of paid) {
+      if (!e.date) continue
+      const k = String(e.date).slice(0, 7)
+      byMonth.set(k, (byMonth.get(k) || 0) + Number(e.amount))
+    }
+    const months = Array.from(byMonth.keys()).sort()
+    const recentMonths = months.slice(-3)
+    const burnRate = recentMonths.length ? recentMonths.reduce((s, k) => s + byMonth.get(k)!, 0) / recentMonths.length : 0
+
+    const monthsRemaining = periodEnd ? Math.max(0, (periodEnd - now) / (1000 * 60 * 60 * 24 * 30)) : 0
+    const forecast = totalUsed + burnRate * monthsRemaining
+    const forecastPct = totalBudget > 0 ? Math.round((forecast / totalBudget) * 100) : null
+
+    const byCategory = new Map<string, number>()
+    for (const e of paid) byCategory.set(e.category, (byCategory.get(e.category) || 0) + Number(e.amount))
+    const categoryBreakdown = Array.from(byCategory.entries()).map(([cat, amt]) => ({ cat, amt })).sort((a, b) => b.amt - a.amt)
+
+    return { totalBudget, totalUsed, periodPct, usedPct, burnRate, forecast, forecastPct, months, byMonth, categoryBreakdown }
+  }, [sources, expenses])
 
   if (error) return <ErrorState retry={load} />
+  if (loading) return <div className="p-6"><SkeletonCard /></div>
+
+  const chartMonths = metrics.months.slice(-6)
+  const maxMonthAmt = Math.max(1, ...chartMonths.map(m => metrics.byMonth.get(m) || 0))
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" dir="rtl">
-      <h1 className="text-xl font-bold mb-4">תקציב ורכש</h1>
-      <div className="flex gap-2 mb-4 border-b">
-        {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`px-3 py-2 text-sm font-semibold border-b-2 ${tab === t ? "border-[#00488D] text-[#00488D]" : "border-transparent text-gray-500"}`}>
-            {TAB_LABEL[t]}
-          </button>
-        ))}
+    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", color: T.navy, padding: "24px 32px 60px" }}>
+      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>בית › <span style={{ color: T.navy, fontWeight: 600 }}>תקציב</span></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 24, fontWeight: 700 }}>דשבורד תקציב <span style={{ fontSize: 14, color: T.slate, fontWeight: 400 }}>· תקציב מוגדר {money(metrics.totalBudget)}</span></div>
+        <Link href="/admin/budget/funding" style={{ fontSize: 13, fontWeight: 600, color: T.blue }}>מקורות מימון וכספים צבועים ←</Link>
+      </div>
+      <div style={{ marginBottom: 20 }}>
+        <Link href="/admin/budget/procurement" style={{ fontSize: 13, color: T.slate }}>רכש וספקים ←</Link>
       </div>
 
-      {loading ? <SkeletonCard /> : <>
-        {tab === "sources" && (
-          <div>
-            <Card className="p-3 mb-3 grid grid-cols-2 gap-2">
-              <input className="border rounded p-2" placeholder="מממן" value={srcForm.funder} onChange={e => setSrcForm(f => ({ ...f, funder: e.target.value }))} />
-              <input className="border rounded p-2" placeholder="ייעוד" value={srcForm.purpose} onChange={e => setSrcForm(f => ({ ...f, purpose: e.target.value }))} />
-              <input className="border rounded p-2" type="number" placeholder="סכום" value={srcForm.amount} onChange={e => setSrcForm(f => ({ ...f, amount: e.target.value }))} />
-              <input className="border rounded p-2" type="date" placeholder="תוקף עד" value={srcForm.period_end} onChange={e => setSrcForm(f => ({ ...f, period_end: e.target.value }))} />
-              <Button size="sm" onClick={addSource} className="col-span-2">+ הוסף מקור מימון</Button>
-            </Card>
-            <div className="grid gap-2">
-              {sources.map(s => {
-                const pct = s.amount ? Math.round((s.used_amount / s.amount) * 100) : 0
-                return (
-                  <Card key={s.id} className="p-3">
-                    <div className="flex justify-between items-center mb-1">
-                      <div className="font-medium">{s.funder} <span className="text-xs text-gray-500">{s.purpose}</span></div>
-                      <Badge text={`${pct}% נוצל`} bg={pct > 90 ? "#FEE2E2" : "#DCFCE7"} color={pct > 90 ? "#991B1B" : "#166534"} />
+      {!metrics.totalBudget ? (
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 40, textAlign: "center", color: T.slate }}>
+          עדיין אין מקורות מימון מוגדרים — <Link href="/admin/budget/funding" style={{ color: T.blue, fontWeight: 600 }}>הוסף מקור מימון</Link> כדי לראות את הדשבורד מתמלא בנתונים אמיתיים.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 8 }}>אחוז התקופה שחלפה</div>
+              <div style={{ fontSize: 34, fontWeight: 700 }}>{metrics.periodPct !== null ? `${metrics.periodPct}%` : "—"}</div>
+              <div style={{ height: 8, background: T.bg, borderRadius: 4, marginTop: 10 }}><div style={{ height: "100%", width: `${metrics.periodPct || 0}%`, background: T.navy, borderRadius: 4 }} /></div>
+            </div>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 8 }}>אחוז שנוצל</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: T.ok }}>{metrics.usedPct !== null ? `${metrics.usedPct}%` : "—"}</div>
+              <div style={{ height: 8, background: T.bg, borderRadius: 4, marginTop: 10 }}><div style={{ height: "100%", width: `${metrics.usedPct || 0}%`, background: T.ok, borderRadius: 4 }} /></div>
+              {metrics.periodPct !== null && metrics.usedPct !== null && (
+                <div style={{ fontSize: 12, color: metrics.usedPct <= metrics.periodPct ? T.ok : T.breach, marginTop: 6 }}>
+                  {metrics.usedPct <= metrics.periodPct ? "מתחת לקצב התקופה — תקין" : "מעל קצב התקופה — לבדוק"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 6 }}>קצב שריפה חודשי (ממוצע 3 חודשים אחרונים)</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }} className="ltr-numeric">{money(metrics.burnRate)}</div>
+            </div>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 6 }}>תחזית סיום תקופה</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }} className="ltr-numeric">{money(metrics.forecast)}</div>
+              {metrics.forecastPct !== null && (
+                <div style={{ fontSize: 12, color: metrics.forecastPct <= 100 ? T.ok : T.breach, marginTop: 4 }}>
+                  {metrics.forecastPct}% מהתקציב — {metrics.forecastPct <= 100 ? "צפי לעמידה בתקציב" : "צפי לחריגה"}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>הוצאות בפועל — לפי חודש</div>
+            {chartMonths.length ? (
+              <>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 140 }}>
+                  {chartMonths.map(m => (
+                    <div key={m} style={{ flex: 1, position: "relative", height: "100%" }}>
+                      <div style={{ position: "absolute", bottom: 0, width: "60%", right: "20%", height: `${((metrics.byMonth.get(m) || 0) / maxMonthAmt) * 100}%`, background: T.blue, borderRadius: "2px 2px 0 0" }} />
                     </div>
-                    <div className="text-xs text-gray-500">₪{Number(s.used_amount).toLocaleString()} / ₪{Number(s.amount).toLocaleString()} · תוקף עד {s.period_end ? fd(s.period_end) : "ללא הגבלה"}</div>
-                  </Card>
-                )
-              })}
-              {!sources.length && <div className="text-gray-500 text-center py-6">אין עדיין מקורות מימון</div>}
-            </div>
+                  ))}
+                </div>
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  {chartMonths.map(m => <div key={m} style={{ flex: 1, textAlign: "center", fontSize: 11, color: T.slate }}>{m.slice(5)}/{m.slice(2, 4)}</div>)}
+                </div>
+              </>
+            ) : <div style={{ color: T.slate, fontSize: 13, textAlign: "center", padding: 20 }}>אין עדיין הוצאות עם תאריך ששולמו</div>}
           </div>
-        )}
 
-        {tab === "vendors" && (
-          <div>
-            <Card className="p-3 mb-3 grid grid-cols-3 gap-2">
-              <input className="border rounded p-2" placeholder="שם ספק" value={vendorForm.name} onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))} />
-              <input className="border rounded p-2" placeholder="איש קשר" value={vendorForm.contact} onChange={e => setVendorForm(f => ({ ...f, contact: e.target.value }))} />
-              <input className="border rounded p-2" placeholder="קטגוריה" value={vendorForm.category} onChange={e => setVendorForm(f => ({ ...f, category: e.target.value }))} />
-              <Button size="sm" onClick={addVendor} className="col-span-3">+ הוסף ספק</Button>
-            </Card>
-            <div className="grid gap-2">
-              {vendors.map(v => (
-                <Card key={v.id} className="p-3 flex justify-between items-center">
-                  <div className="font-medium">{v.name}</div>
-                  <div className="text-sm text-gray-500">{v.category} · {v.order_count} הזמנות</div>
-                </Card>
-              ))}
-              {!vendors.length && <div className="text-gray-500 text-center py-6">אין עדיין ספקים</div>}
-            </div>
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>הוצאות לפי סעיף</div>
+            <div style={{ fontSize: 12, color: T.slate, marginBottom: 14 }}>פילוח פשוט לפי קטגוריית הוצאה — אין עדיין תקציב מוגדר לכל סעיף בנפרד, ולכן אין כאן "חריגה" מחושבת (מפת חום/רשימת חריגות מהמוק המקורי דורשות יעד תקציבי לכל סעיף).</div>
+            {metrics.categoryBreakdown.map(({ cat, amt }) => (
+              <div key={cat} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${T.bg}` }}>
+                <span>{CAT_LABEL[cat] || cat}</span>
+                <span className="ltr-numeric" style={{ fontWeight: 700 }}>{money(amt)}</span>
+              </div>
+            ))}
+            {!metrics.categoryBreakdown.length && <div style={{ color: T.slate, fontSize: 13, textAlign: "center", padding: 20 }}>אין עדיין הוצאות שולמו</div>}
           </div>
-        )}
-
-        {tab === "requests" && (
-          <div>
-            <Card className="p-3 mb-3 grid grid-cols-3 gap-2">
-              <input className="border rounded p-2" placeholder="מבקש" value={reqForm.requested_by} onChange={e => setReqForm(f => ({ ...f, requested_by: e.target.value }))} />
-              <input className="border rounded p-2" placeholder="פריט" value={reqForm.item} onChange={e => setReqForm(f => ({ ...f, item: e.target.value }))} />
-              <input className="border rounded p-2" placeholder="סיבה" value={reqForm.reason} onChange={e => setReqForm(f => ({ ...f, reason: e.target.value }))} />
-              <Button size="sm" onClick={addRequest} className="col-span-3">+ דרישת רכש חדשה</Button>
-            </Card>
-            <div className="grid gap-2">
-              {requests.map(r => (
-                <Card key={r.id} className="p-3 flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">{r.item}</div>
-                    <div className="text-xs text-gray-500">{r.requested_by} · {r.reason}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge text={r.po_number ? `הוזמן (${r.po_number})` : r.status} />
-                    {r.status === "pending" && <Button size="sm" onClick={() => approve(r.id)}>אשר והזמן</Button>}
-                  </div>
-                </Card>
-              ))}
-              {!requests.length && <div className="text-gray-500 text-center py-6">אין עדיין דרישות רכש</div>}
-            </div>
-          </div>
-        )}
-      </>}
+        </>
+      )}
     </div>
   )
 }
