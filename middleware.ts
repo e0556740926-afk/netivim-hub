@@ -41,6 +41,7 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/budget" },
   { path: "/api/field-budget" },
   { path: "/api/newsletter/audiences" },
+  { path: "/api/statistics" },
   { path: "/api/dashboards" },
   { path: "/api/admin" },
 ];
@@ -144,6 +145,11 @@ function pathInGroup(pathname: string, group: string[]) {
     }
     if (team === "field" && pathInGroup(pathname, ADVISORS_TEAM_PATHS)) {
       const url = req.nextUrl.clone(); url.pathname = "/admin/contacts";
+      return NextResponse.redirect(url);
+    }
+    // Statistics ("the scary page") is CEO + chief admin only, per spec §13.1.
+    if (pathname.startsWith("/admin/statistics") && team && !(user as any).isCeo) {
+      const url = req.nextUrl.clone(); url.pathname = "/admin/dashboard";
       return NextResponse.redirect(url);
     }
   }

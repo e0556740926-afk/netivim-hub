@@ -13,6 +13,7 @@ export interface SessionUser {
   role: string;
   area?: string;
   team?: string; // 'advisors' | 'field' | undefined (undefined = full access / chief admin)
+  isCeo?: boolean;
 }
 
 /** Strip everything that must never leave the server (password, tokens). */
@@ -24,6 +25,7 @@ export function toSessionUser(row: any): SessionUser {
     role: row.role,
     area: row.area || "",
     team: row.team || undefined,
+    isCeo: !!row.is_ceo,
   };
 }
 

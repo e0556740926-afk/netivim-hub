@@ -7,7 +7,7 @@ import GlobalSearch from "./GlobalSearch"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 import PersonalLinkPopup from "./PersonalLinkPopup"
 
-type Item = { label: string; path: string; dot: string; badgeKey?: string; missing?: boolean }
+type Item = { label: string; path: string; dot: string; badgeKey?: string; missing?: boolean; ceoOnly?: boolean }
 type Group = { key: "advisors" | "field" | "exec"; label: string; dot: string; items: Item[] }
 
 const GROUPS: Group[] = [
@@ -41,6 +41,7 @@ const GROUPS: Group[] = [
       { label: "דשבורד מנהלים", path: "/admin/dashboards/executive", dot: "#2E5C8A" },
       { label: "דשבורד מנכ״ל", path: "/admin/dashboards/ceo", dot: "#2E5C8A" },
       { label: "דשבורד מממן", path: "/admin/dashboards/funder", dot: "#2E5C8A" },
+      { label: "סטטיסטיקות", path: "/admin/statistics", dot: "#6B4E9E", ceoOnly: true },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
@@ -87,6 +88,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   // everything, מנהל צוות sees only their team's tabs.
   const team = (user as any)?.team as "advisors" | "field" | undefined
   const visibleGroups = team ? GROUPS.filter(g => g.key === team) : GROUPS
+  const canSeeStatistics = !team || (user as any)?.isCeo
 
   return (
     <aside className="w-[220px] flex-shrink-0 bg-[#0D2744] flex flex-col h-screen overflow-y-auto">
@@ -112,7 +114,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             </div>
             {open[g.key] && (
               <div className="flex flex-col gap-0.5 pr-3 mb-1">
-                {g.items.map(n => (
+                {g.items.filter(n => !n.ceoOnly || canSeeStatistics).map(n => (
                   <div key={n.path} onClick={() => navigate(n.path)}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-[9px] cursor-pointer text-[13px] transition-all ${
                       path === n.path ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"
