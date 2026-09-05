@@ -13,7 +13,7 @@ const T = {
   ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B", breachBg: "#FDECEA",
   referredFg: "#6B4E9E", referredBg: "#f2eef8",
 }
-const SLA_HOURS = 24
+const DEFAULT_SLA_HOURS = 24 // overridden at runtime by /api/admin/automation-settings
 const TABS = ["overview", "intake", "protected", "log", "referrals"] as const
 const TAB_LABEL: Record<string, string> = { overview: "סקירה", intake: "שאלון קליטה", protected: "מידע מוגן 🔒", log: "יומן קשר", referrals: "הפניות" }
 const INACTIVE_REASONS = ["אין מענה", "לא מעוניין", "לא רלוונטי", "פעילות קהילתית"]
@@ -63,15 +63,18 @@ export default function CaseDetail() {
   const [showWizard, setShowWizard] = useState(false)
   const [interactionForm, setInteractionForm] = useState({ type: "call", summary: "", next_step: "" })
   const [showInteractionForm, setShowInteractionForm] = useState(false)
+  const [slaHours, setSlaHours] = useState(DEFAULT_SLA_HOURS)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const r = await fetch(`/api/cases/${id}`)
+      const [r, sr] = await Promise.all([fetch(`/api/cases/${id}`), fetch("/api/admin/automation-settings")])
       if (!r.ok) throw new Error()
       const d = await r.json()
       setData(d)
       if (d.extended) setExtended(d.extended)
+      const s = await sr.json()
+      if (s?.settings?.sla_hours) setSlaHours(Number(s.settings.sla_hours))
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
@@ -121,7 +124,7 @@ export default function CaseDetail() {
 
   const { case: c, referrals, history, interactions, custom_values } = data
   const slaHrs = hoursSince(c.first_touch_at || c.created_at)
-  const slaBreach = slaHrs !== null && slaHrs >= SLA_HOURS
+  const slaBreach = slaHrs !== null && slaHrs >= slaHours
   const allowedNext = TRANSITIONS[c.advisor_status] || []
   const activeReferrals = referrals.filter((r: any) => !["לא התקבל", "נשר", "הסתיים"].includes(r.status))
   const pastReferrals = referrals.filter((r: any) => ["לא התקבל", "נשר", "הסתיים"].includes(r.status))
@@ -188,7 +191,7 @@ export default function CaseDetail() {
                 <div style={{ background: slaBreach ? T.breachBg : "#fff", border: `1px solid ${slaBreach ? T.breach + "55" : T.border}`, borderRadius: 12, padding: 18 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: slaBreach ? T.breach : T.slate, marginBottom: 6 }}>מד SLA</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: slaBreach ? T.breach : T.navy }}>{Math.round(slaHrs)} שעות</div>
-                  <div style={{ fontSize: 12, color: slaBreach ? T.breach : T.slate, marginTop: 2 }}>{slaBreach ? "חריגה מזמן התגובה היעד (24 שעות)" : "בתוך זמן התגובה היעד"}</div>
+                  <div style={{ fontSize: 12, color: slaBreach ? T.breach : T.slate, marginTop: 2 }}>{slaBreach ? `חריגה מזמן התגובה היעד (${slaHours} שעות)` : "בתוך זמן התגובה היעד"}</div>
                 </div>
               )}
             </div>

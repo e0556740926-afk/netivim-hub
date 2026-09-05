@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { getAutomationSettings } from "@/lib/automation-settings";
 
 /**
  * One shared aggregation endpoint for the three management dashboards
@@ -15,6 +16,7 @@ import sql from "@/lib/db";
  * fabricated figure.
  */
 export async function GET() {
+  const settings = await getAutomationSettings();
   const [
     totals, dropout, demographics, categoryPlacements, budgetSources,
     coordinatorPerf, pendingExpenses, pendingRequests, monthlyPlacements,
@@ -66,7 +68,7 @@ export async function GET() {
       GROUP BY 1 ORDER BY 1`,
     sql`
       SELECT avg(EXTRACT(EPOCH FROM (first_touch_at - created_at)) / 3600)::float AS avg_hours,
-        count(*) FILTER (WHERE EXTRACT(EPOCH FROM (first_touch_at - created_at)) / 3600 > 24)::int AS breaching
+        count(*) FILTER (WHERE EXTRACT(EPOCH FROM (first_touch_at - created_at)) / 3600 > ${settings.sla_hours})::int AS breaching
       FROM leads WHERE first_touch_at IS NOT NULL AND deleted_at IS NULL`,
     sql`
       SELECT avg(EXTRACT(EPOCH FROM (h2.changed_at - h1.changed_at)) / 86400)::float AS avg_days
@@ -91,7 +93,7 @@ export async function GET() {
     coordinator_performance: coordinatorPerf,
     pending_approvals: { expenses_count: (pendingExpenses as any[])[0].n, expenses_total: Number((pendingExpenses as any[])[0].total), requests_count: (pendingRequests as any[])[0].n },
     monthly_placements: monthlyPlacements,
-    response_time: { avg_hours: (responseTime as any[])[0]?.avg_hours ?? null, breaching_count: (responseTime as any[])[0]?.breaching ?? 0 },
+    response_time: { avg_hours: (responseTime as any[])[0]?.avg_hours ?? null, breaching_count: (responseTime as any[])[0]?.breaching ?? 0, sla_hours: settings.sla_hours },
     process_duration: { avg_days: (processDuration as any[])[0]?.avg_days ?? null },
     // Explicitly no data model exists for these yet — surfaced as null so
     // the UI can show an honest "not available" state instead of 0 or a

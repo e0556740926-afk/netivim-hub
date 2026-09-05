@@ -16,7 +16,8 @@ const T = {
   ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B", breachBg: "#FDECEA",
 }
 
-const SLA_HOURS = 24
+// Default 24h; overridden at runtime by /api/admin/automation-settings.
+const DEFAULT_SLA_HOURS = 24
 
 function hoursSince(d?: string | null) {
   if (!d) return null
@@ -27,10 +28,10 @@ function relTime(hrs: number) {
   if (hrs < 24) return `לפני ${Math.round(hrs)} שעות`
   return `לפני ${Math.round(hrs / 24)} ימים`
 }
-function slaColor(hrs: number | null) {
+function slaColor(hrs: number | null, slaHours: number) {
   if (hrs === null) return T.slate
-  if (hrs >= SLA_HOURS) return T.breach
-  if (hrs >= SLA_HOURS * 0.6) return T.warn
+  if (hrs >= slaHours) return T.breach
+  if (hrs >= slaHours * 0.6) return T.warn
   return T.ok
 }
 
@@ -57,10 +58,10 @@ function Col({ title, count, children }: { title: string; count: number; childre
   )
 }
 
-function CaseCard({ c, onOpen }: { c: any; onOpen: () => void }) {
+function CaseCard({ c, onOpen, slaHours }: { c: any; onOpen: () => void; slaHours: number }) {
   const hrs = hoursSince(c.first_touch_at || c.created_at)
-  const color = slaColor(hrs)
-  const breach = hrs !== null && hrs >= SLA_HOURS
+  const color = slaColor(hrs, slaHours)
+  const breach = hrs !== null && hrs >= slaHours
   return (
     <div onClick={onOpen} style={{ border: `1px solid ${breach ? T.breach : T.slateBorder}`, background: breach ? T.breachBg : "#fff", borderRadius: 12, padding: 12, cursor: "pointer" }}>
       <div style={{ fontSize: 14, fontWeight: 700 }}>{c.name}{c.age ? `, ${c.age}` : ""}</div>
@@ -90,15 +91,18 @@ export default function AdvisorDesk() {
   const router = useRouter()
   const [cases, setCases] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
+  const [slaHours, setSlaHours] = useState(DEFAULT_SLA_HOURS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [cr, tr] = await Promise.all([fetch("/api/cases"), fetch("/api/tasks")])
+      const [cr, tr, sr] = await Promise.all([fetch("/api/cases"), fetch("/api/tasks"), fetch("/api/admin/automation-settings")])
       setCases((await cr.json()).cases || [])
       setTasks((await tr.json()).tasks || [])
+      const s = await sr.json()
+      if (s?.settings?.sla_hours) setSlaHours(Number(s.settings.sla_hours))
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
@@ -141,7 +145,7 @@ export default function AdvisorDesk() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: T.slateBorder, minHeight: 560 }}>
         <Col title="פניות חדשות" count={newInquiries.length}>
-          {newInquiries.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} />)}
+          {newInquiries.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} slaHours={slaHours} />)}
           {!newInquiries.length && <div style={{ textAlign: "center", color: T.slate, padding: "24px 0", fontSize: 13 }}>אין פניות חדשות — כל הכבוד! 🎉</div>}
         </Col>
         <Col title="משימות שוטפות" count={openTasks.length}>
@@ -149,11 +153,11 @@ export default function AdvisorDesk() {
           {!openTasks.length && <div style={{ textAlign: "center", color: T.slate, padding: "24px 0", fontSize: 13 }}>אין משימות פתוחות</div>}
         </Col>
         <Col title="פולו-אפ — לא רלוונטי" count={followUps.length}>
-          {followUps.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} />)}
+          {followUps.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} slaHours={slaHours} />)}
           {!followUps.length && <div style={{ textAlign: "center", color: T.slate, padding: "24px 0", fontSize: 13 }}>אין פולו-אפים ממתינים</div>}
         </Col>
         <Col title="המשך ליווי" count={ongoingSupport.length}>
-          {ongoingSupport.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} />)}
+          {ongoingSupport.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} slaHours={slaHours} />)}
           {!ongoingSupport.length && <div style={{ textAlign: "center", color: T.slate, padding: "24px 0", fontSize: 13 }}>אין חניכים בליווי כרגע</div>}
         </Col>
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
+import { resetAutomationSettingsCache } from "@/lib/automation-settings";
 
 const DEFAULTS: Record<string, string> = {
   followup_window_months: "3",
@@ -29,5 +30,6 @@ export async function PATCH(req: NextRequest) {
       ON CONFLICT (key) DO UPDATE SET value=${String(d[key])}`;
     logAudit({ entityType: "setting", entityId: 0, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `הגדרת אוטומציה עודכנה: ${key} → ${d[key]}` });
   }
+  resetAutomationSettingsCache();
   return NextResponse.json({ ok: true });
 }
