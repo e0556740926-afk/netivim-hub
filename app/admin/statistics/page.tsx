@@ -5,6 +5,13 @@ import { exportToCsv } from "@/lib/csv-export"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
 const DIM_LABEL: Record<string, string> = { age_bucket: "גיל", city: "עיר", sector: "מגזר", source: "מקור", advisor_status: "סטטוס", category: "קטגוריית שיבוץ" }
+const NL_TO_PIVOT_DIM: Record<string, string> = { age: "age_bucket", city: "city", sector: "sector", source: "source", case_status: "advisor_status", placement_category: "category" }
+const EXAMPLE_QUESTIONS = [
+  "כמה מגיל 17 עד 18 מבני ברק הלכו למכינה השנה?",
+  "עלות לליד לפי רכז ברבעון הנוכחי",
+  "כמה תיקים בסטטוס בתהליך ייעוץ מירושלים?",
+  "כמה מהמגזר החסידי הופנו למסלול הסדר?",
+]
 
 function ExportButtons({ onCsv }: { onCsv: () => void }) {
   const [open, setOpen] = useState(false)
@@ -23,6 +30,7 @@ function ExportButtons({ onCsv }: { onCsv: () => void }) {
 
 export default function StatisticsPage() {
   const [dims, setDims] = useState<string[]>(["age_bucket", "city"])
+  const [filters, setFilters] = useState<Record<string, any> | null>(null)
   const [pivot, setPivot] = useState<any>(null)
   const [cost, setCost] = useState<any>(null)
   const [propensity, setPropensity] = useState<any>(null)
@@ -33,9 +41,26 @@ export default function StatisticsPage() {
   const [loading, setLoading] = useState(true)
   const drawer = useDrawer()
 
+  // Natural-language query flow (spec §4)
+  const [nlQuestion, setNlQuestion] = useState("")
+  const [nlPlaceholder, setNlPlaceholder] = useState(0)
+  const [nlState, setNlState] = useState<"idle" | "loading" | "confirm" | "clarify" | "result">("idle")
+  const [nlQuery, setNlQuery] = useState<any>(null)
+  const [nlLogId, setNlLogId] = useState<number | null>(null)
+  const [nlError, setNlError] = useState("")
+  const [nlEditing, setNlEditing] = useState<string | null>(null)
+  const [nlRecent, setNlRecent] = useState<string[]>([])
+
+  useEffect(() => {
+    const i = setInterval(() => setNlPlaceholder(p => (p + 1) % EXAMPLE_QUESTIONS.length), 3500)
+    return () => clearInterval(i)
+  }, [])
+
   async function loadPivot() {
     try {
-      const r = await fetch(`/api/statistics/pivot?dims=${dims.join(",")}`)
+      const params = new URLSearchParams({ dims: dims.join(",") })
+      if (filters) params.set("filters", JSON.stringify(filters))
+      const r = await fetch(`/api/statistics/pivot?${params}`)
       if (r.status === 403) { setForbidden(true); return }
       if (!r.ok) { setPivot({ error: `שגיאת שרת (${r.status})` }); return }
       setPivot(await r.json())
@@ -43,7 +68,43 @@ export default function StatisticsPage() {
       setPivot({ error: "שגיאת רשת" })
     }
   }
-  useEffect(() => { loadPivot() }, [dims])
+  useEffect(() => { loadPivot() }, [dims, filters])
+
+  async function askNl() {
+    if (!nlQuestion.trim()) return
+    setNlState("loading"); setNlError("")
+    try {
+      const r = await fetch("/api/statistics/nl-query", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: nlQuestion }) })
+      const d = await r.json()
+      if (!r.ok) { setNlError(d.error || "שגיאה"); setNlState("idle"); return }
+      setNlQuery(d.query); setNlLogId(d.log_id)
+      setNlState(d.query.clarification_needed ? "clarify" : "confirm")
+    } catch {
+      setNlError("שגיאת רשת"); setNlState("idle")
+    }
+  }
+  async function logNlAction(action: string, finalQuery?: any) {
+    if (nlLogId) await fetch("/api/statistics/nl-query", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ log_id: nlLogId, action, final_query: finalQuery }) })
+  }
+  function runNlQuery() {
+    const mappedDims = (nlQuery.dimensions || []).map((d: string) => NL_TO_PIVOT_DIM[d]).filter(Boolean)
+    setDims(mappedDims.length ? mappedDims : ["age_bucket"])
+    setFilters(Object.keys(nlQuery.filters || {}).length ? nlQuery.filters : null)
+    logNlAction("approved", nlQuery)
+    setNlRecent(r => [nlQuestion, ...r].slice(0, 3))
+    setNlState("result")
+  }
+  function cancelNl() {
+    logNlAction("rejected")
+    setNlState("idle"); setNlQuery(null); setNlQuestion("")
+  }
+  function rewordNl() {
+    logNlAction("rejected")
+    setNlState("idle")
+  }
+  function continueWithPartial() {
+    runNlQuery()
+  }
 
   async function loadSavedViews() {
     const r = await fetch("/api/statistics/saved-views")
@@ -77,7 +138,7 @@ export default function StatisticsPage() {
   async function saveCurrentView() {
     const name = prompt("שם לתצוגה השמורה:")
     if (!name) return
-    await fetch("/api/statistics/saved-views", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, query: { dims } }) })
+    await fetch("/api/statistics/saved-views", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, query: { dims, filters } }) })
     await loadSavedViews()
   }
   async function deleteSavedView(id: number) {
@@ -99,6 +160,74 @@ export default function StatisticsPage() {
       <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>אזור סטטיסטיקות</div>
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>מנכ&quot;ל ומנהל ראשי בלבד. אזור נפרד מהדשבורדים — לא שדרוג שלהם.</div>
 
+      {/* NL QUERY BAR — spec §4 */}
+      <div style={{ background: "#fff", border: `1px solid ${nlState === "idle" ? T.border : T.blue}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <span>🔍</span>
+          <input
+            value={nlQuestion} onChange={e => setNlQuestion(e.target.value)} onKeyDown={e => e.key === "Enter" && askNl()}
+            placeholder={`שאל שאלה בשפה חופשית, למשל: "${EXAMPLE_QUESTIONS[nlPlaceholder]}"`}
+            disabled={nlState === "loading" || nlState === "confirm" || nlState === "clarify"}
+            style={{ flex: 1, border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", background: "transparent" }} />
+          <button onClick={askNl} disabled={nlState !== "idle"} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, cursor: "pointer" }}>שאל</button>
+        </div>
+        {nlState === "loading" && <div style={{ fontSize: 12, color: T.blue, marginTop: 10 }}>מתרגם לנתונים...</div>}
+        {nlError && <div style={{ fontSize: 12, color: T.breach, marginTop: 10 }}>{nlError}</div>}
+        {nlState === "idle" && nlRecent.length > 0 && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <span style={{ fontSize: 11, color: T.slate }}>לאחרונה שאלת:</span>
+            {nlRecent.map((q, i) => <span key={i} onClick={() => { setNlQuestion(q); }} style={{ fontSize: 11, background: T.bg, color: T.slate, borderRadius: 12, padding: "4px 10px", cursor: "pointer" }}>{q}</span>)}
+          </div>
+        )}
+      </div>
+
+      {nlState === "confirm" && nlQuery && (
+        <div style={{ background: T.blueBg, borderRight: `4px solid ${T.blue}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>הבנתי שאתה שואל</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+              <span style={{ color: T.slate }}>ממדים:</span>
+              <span>{(nlQuery.dimensions || []).map((d: string) => DIM_LABEL[NL_TO_PIVOT_DIM[d]] || d).join(", ") || "—"}</span>
+            </div>
+            {Object.entries(nlQuery.filters || {}).map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                <span style={{ color: T.slate }}>{k}:</span>
+                {nlEditing === k ? (
+                  <input autoFocus defaultValue={JSON.stringify(v)} onBlur={e => { try { setNlQuery((q: any) => ({ ...q, filters: { ...q.filters, [k]: JSON.parse(e.target.value) } })) } catch {} setNlEditing(null) }}
+                    style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: 4, fontSize: 12, width: 160 }} />
+                ) : (
+                  <span onClick={() => setNlEditing(k)} style={{ cursor: "pointer" }}>{JSON.stringify(v)} <span style={{ color: T.blue, fontSize: 11 }}>✏️ ערוך</span></span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={runNlQuery} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, cursor: "pointer" }}>✓ הפעל</button>
+            <button onClick={rewordNl} style={{ background: "transparent", color: T.slate, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 18px", cursor: "pointer" }}>נסח מחדש</button>
+            <button onClick={cancelNl} style={{ background: "transparent", color: T.slate, border: "none", cursor: "pointer" }}>✕ ביטול</button>
+          </div>
+        </div>
+      )}
+
+      {nlState === "clarify" && nlQuery && (
+        <div style={{ background: "#FDF6E7", borderRight: `4px solid ${T.warn}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>לא הצלחתי להבין הכל</div>
+          <div style={{ fontSize: 13, marginBottom: 6 }}>הבנתי: {(nlQuery.dimensions || []).map((d: string) => DIM_LABEL[NL_TO_PIVOT_DIM[d]] || d).join(", ") || Object.keys(nlQuery.filters || {}).join(", ") || "חלק מהשאלה"}</div>
+          <div style={{ fontSize: 13, color: T.warn, marginBottom: 14 }}>לא ברור לי: {nlQuery.clarification_needed}</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={continueWithPartial} style={{ background: T.warn, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: 700, cursor: "pointer" }}>המשך עם מה שהובן</button>
+            <button onClick={rewordNl} style={{ background: "transparent", color: T.slate, border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 18px", cursor: "pointer" }}>נסח מחדש</button>
+          </div>
+        </div>
+      )}
+
+      {nlState === "result" && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: T.blueBg, borderRadius: 12, padding: "10px 16px", marginBottom: 12, fontSize: 13 }}>
+          <span>שאלת: {nlQuestion} <span onClick={() => setNlState("confirm")} style={{ color: T.blue, cursor: "pointer" }}>[ערוך]</span></span>
+          <span onClick={() => { setNlState("idle"); setNlQuestion(""); setFilters(null) }} style={{ cursor: "pointer", color: T.slate }}>✕ נקה</span>
+        </div>
+      )}
+
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
           <div style={{ fontSize: 16, fontWeight: 700 }}>חיתוך רב-ממדי (Pivot)</div>
@@ -116,7 +245,7 @@ export default function StatisticsPage() {
             <span style={{ fontSize: 11, color: T.slate, alignSelf: "center" }}>תצוגות שמורות:</span>
             {savedViews.map(v => (
               <span key={v.id} style={{ fontSize: 11, background: T.blueBg, color: T.blue, borderRadius: 12, padding: "4px 10px", display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                <span onClick={() => setDims(v.query.dims)}>{v.name}</span>
+                <span onClick={() => { setDims(v.query.dims); setFilters(v.query.filters || null) }}>{v.name}</span>
                 <span onClick={() => deleteSavedView(v.id)} style={{ color: T.breach }}>✕</span>
               </span>
             ))}
