@@ -30,7 +30,6 @@ const GROUPS: Group[] = [
       { label: "תקציב שטח", path: "/admin/field-budget", dot: "#FBBF24", missing: true },
       { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
       { label: "דשבורד קהילה", path: "/admin/community-dashboard", dot: "#60A5FA", missing: true },
-      { label: "לוח בקרה ראשי", path: "/admin/dashboard", dot: "#60A5FA" },
       { label: "יעדי לידים (זמני)", path: "/admin/targets", dot: "#34D399" },
       { label: "לוח מובילים (זמני)", path: "/admin/leaderboard", dot: "#FBBF24" },
     ],
@@ -39,8 +38,6 @@ const GROUPS: Group[] = [
     key: "exec", label: "הנהלה", dot: "#FBBF24",
     items: [
       { label: "דשבורד מנהלים", path: "/admin/dashboards/executive", dot: "#2E5C8A" },
-      { label: "דשבורד מנכ״ל", path: "/admin/dashboards/ceo", dot: "#2E5C8A" },
-      { label: "דשבורד מממן", path: "/admin/dashboards/funder", dot: "#2E5C8A" },
       { label: "סטטיסטיקות", path: "/admin/statistics", dot: "#6B4E9E", ceoOnly: true },
       { label: "דוחות", path: "/admin/report-builder", dot: "#6B4E9E" },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
@@ -106,6 +103,14 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       <GlobalSearch/>
       <nav className="flex-1 px-2 py-3 flex flex-col gap-1">
+        <div onClick={() => navigate("/admin/dashboard")}
+          className={`flex items-center gap-2.5 px-3 py-3 rounded-[9px] cursor-pointer text-sm font-bold mb-1 ${
+            path === "/admin/dashboard" ? "bg-white/15 text-white" : "text-white/90 hover:bg-white/8"
+          }`}>
+          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:"#60A5FA"}}/>
+          <span className="flex-1">לוח בקרה ראשי</span>
+        </div>
+        <div className="h-px bg-white/10 my-1"/>
         {visibleGroups.map(g => (
           <div key={g.key}>
             <div onClick={() => setOpen(o => ({ ...o, [g.key]: !o[g.key] }))}

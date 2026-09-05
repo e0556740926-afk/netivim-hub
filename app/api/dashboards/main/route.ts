@@ -8,6 +8,7 @@ export async function GET() {
   const [
     advisorPipeline, communityPulse, missingReports, budgetOverview,
     fundingUrgent, pendingApprovals, tasksBlock, adminBlock,
+    funnelRaw, fundingSources, coordinatorPerf, expensesPending, requestsPending, monthlyTrend,
   ] = await Promise.all([
     sql`
       SELECT
@@ -49,6 +50,39 @@ export async function GET() {
         (SELECT count(*)::int FROM institution_users WHERE migrated_at IS NULL) AS legacy_token_accounts,
         (SELECT count(*)::int FROM users WHERE status='active' AND (last_login_at IS NULL OR last_login_at < now() - interval '30 days')) AS inactive_users_30d
       FROM (SELECT 1) x`,
+    sql`
+      SELECT
+        count(*)::int AS total, count(*) FILTER (WHERE first_touch_at IS NOT NULL)::int AS contacted,
+        count(*) FILTER (WHERE advisor_status NOT IN ('פנייה חדשה'))::int AS active_process,
+        count(DISTINCT r.case_id)::int AS referred,
+        count(DISTINCT r.case_id) FILTER (WHERE r.status = 'התקבל')::int AS accepted,
+        count(*) FILTER (WHERE advisor_status IN ('שובץ במסגרת','הסתיים בהצלחה'))::int AS placed
+      FROM leads l LEFT JOIN referrals r ON r.case_id = l.id WHERE l.deleted_at IS NULL`,
+    sql`
+      SELECT funder, amount, period_end,
+        (SELECT COALESCE(sum(e.amount),0) FROM expenses e WHERE e.funding_source_id = fs.id) AS used
+      FROM funding_sources fs ORDER BY period_end NULLS LAST`,
+    sql`
+      SELECT c.name AS coordinator_name, mt.target_leads,
+        (SELECT count(*)::int FROM leads l WHERE l.coordinator_id = c.id AND date_trunc('month', l.created_at) = date_trunc('month', now())) AS leads_entered,
+        (SELECT count(*)::int FROM leads l WHERE l.coordinator_id = c.id AND l.advisor_status NOT IN ('פנייה חדשה','לא פעיל')) AS converted_to_process,
+        (SELECT count(*)::int FROM leads l WHERE l.coordinator_id = c.id AND l.advisor_status IN ('שובץ במסגרת','הסתיים בהצלחה')) AS placed
+      FROM coordinators c LEFT JOIN monthly_targets mt ON mt.coordinator_id = c.id
+        AND mt.month = EXTRACT(MONTH FROM now())::int AND mt.year = EXTRACT(YEAR FROM now())::int`,
+    sql`SELECT id, description, vendor, amount, date, category FROM expenses WHERE status='pending' ORDER BY date DESC LIMIT 10`,
+    sql`SELECT id, requested_by, item, reason, category FROM purchase_requests WHERE status='pending' ORDER BY created_at DESC LIMIT 10`,
+    sql`
+      SELECT to_char(months.month, 'YYYY-MM') AS month,
+        COALESCE(mt.target_sum, 0)::int AS planned,
+        COALESCE(actual.n, 0)::int AS actual
+      FROM (SELECT generate_series(date_trunc('month', now()) - interval '5 months', date_trunc('month', now()), interval '1 month') AS month) months
+      LEFT JOIN (
+        SELECT make_date(year, month, 1) AS month, sum(target_leads) AS target_sum FROM monthly_targets GROUP BY year, month
+      ) mt ON mt.month = months.month
+      LEFT JOIN (
+        SELECT date_trunc('month', created_at) AS month, count(*) AS n FROM leads WHERE deleted_at IS NULL GROUP BY 1
+      ) actual ON actual.month = months.month
+      ORDER BY months.month`,
   ]);
 
   const ap = (advisorPipeline as any[])[0];
@@ -64,11 +98,17 @@ export async function GET() {
     WHERE entity_type = 'case_protected' OR action = 'delete'
     ORDER BY created_at DESC LIMIT 5`;
 
+  const fr = (funnelRaw as any[])[0];
+
   return NextResponse.json({
     advisor: {
       active_cases: ap.active_cases, new_inquiries: ap.new_inquiries, breaching_sla: ap.breaching_sla,
       red_flag_cases: ap.red_flag_cases, placements_this_month: ap.placements_this_month,
       pending_institution_referrals: ap.pending_institution_referrals,
+    },
+    funnel: {
+      total: fr.total, contacted: fr.contacted, active_process: fr.active_process,
+      referred: fr.referred, accepted: fr.accepted, placed: fr.placed,
     },
     community: {
       leads_this_month: cp.leads_this_month, target_this_month: cp.target_this_month,
@@ -81,7 +121,11 @@ export async function GET() {
       utilization_pct: bo.total > 0 ? Math.round((Number(bo.used) / Number(bo.total)) * 100) : null,
       funding_sources_urgent: (fundingUrgent as any[])[0].n,
       pending_approvals: pa.expenses_pending + pa.requests_pending,
+      by_source: fundingSources,
     },
+    coordinator_performance: coordinatorPerf,
+    pending_items: { expenses: expensesPending, requests: requestsPending },
+    monthly_trend: monthlyTrend,
     tasks: { overdue: tb.overdue_tasks, open_rav_consultations: tb.open_rav_consultations },
     admin: {
       pending_retention: ab.pending_retention, legacy_token_accounts: ab.legacy_token_accounts,
