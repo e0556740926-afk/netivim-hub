@@ -6,10 +6,13 @@ import { logAudit } from "@/lib/audit";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const caseId = Number(id);
-  const [caseRow] = await sql`SELECT * FROM leads WHERE id=${caseId}`;
+  const [caseRow] = await sql`
+    SELECT l.*, c.name AS coordinator_name
+    FROM leads l LEFT JOIN coordinators c ON c.id = l.coordinator_id
+    WHERE l.id=${caseId}`;
   if (!caseRow) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const [extended, protectedInfo, referrals, history, customValues] = await Promise.all([
+  const [extended, protectedInfo, referrals, history, customValues, interactions] = await Promise.all([
     sql`SELECT * FROM case_extended WHERE case_id=${caseId}`,
     sql`SELECT case_id, last_accessed_by, last_accessed_at FROM case_protected WHERE case_id=${caseId}`, // sensitive_data withheld unless explicitly opened, see POST /open-protected
     sql`SELECT r.*, o.name AS organization_name, p.name AS program_name
@@ -21,13 +24,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     sql`SELECT cv.field_id, cv.value, cf.label, cf.field_type
         FROM case_custom_values cv JOIN custom_field_defs cf ON cf.id = cv.field_id
         WHERE cv.case_id=${caseId}`,
+    sql`SELECT * FROM case_interactions WHERE case_id=${caseId} ORDER BY created_at DESC`,
   ]);
 
   return NextResponse.json({
     case: caseRow,
     extended: extended[0] || null,
     protected_meta: protectedInfo[0] || null,
-    referrals, history, custom_values: customValues,
+    referrals, history, custom_values: customValues, interactions,
   });
 }
 
@@ -36,6 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
  *   { action: "open_protected" }                       — logged access, returns sensitive_data
  *   { action: "update_protected", sensitive_data }
  *   { action: "set_triage", triage_color }              — "red" auto-escalates to Rav Obermeister
+ *   { action: "log_interaction", type, summary, next_step }
  */
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -85,12 +90,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // deliberately doesn't invent a rav user if none is configured.
       const [rav] = await sql`SELECT name FROM users WHERE role='rav' LIMIT 1`;
       const [caseRow] = await sql`SELECT name FROM leads WHERE id=${caseId}`;
+      const details = [d.description, d.ask ? `נדרש מהרב: ${d.ask}` : null].filter(Boolean).join("\n") || "תיק סווג אדום — מורכבות גבוהה, דורש טיפול הרב";
       await sql`
         INSERT INTO tasks (contact_id, title, details, type, assignees, status, priority)
-        VALUES (${null}, ${`אסקלציה: ${caseRow?.name || 'תיק #' + caseId}`}, ${'תיק סווג אדום — מורכבות גבוהה, דורש טיפול הרב'}, 'backoffice', ${rav ? [rav.name] : []}, 'todo', 'urgent')`;
+        VALUES (${null}, ${`אסקלציה לרב אוברמייסטר: ${caseRow?.name || 'תיק #' + caseId}`}, ${details}, 'backoffice', ${rav ? [rav.name] : []}, 'todo', ${d.urgency === 'low' ? 'normal' : d.urgency === 'medium' ? 'normal' : 'urgent'})`;
       logAudit({ entityType: "case", entityId: caseId, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "סווג אדום — נפתחה פנייה לרב" });
     }
     return NextResponse.json({ ok: true });
+  }
+
+  if (d.action === "log_interaction") {
+    const rows = await sql`
+      INSERT INTO case_interactions (case_id, type, summary, next_step, created_by)
+      VALUES (${caseId}, ${d.type || "call"}, ${d.summary || null}, ${d.next_step || null}, ${me?.name || null})
+      RETURNING *`;
+    logAudit({ entityType: "case", entityId: caseId, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "אינטראקציה תועדה" });
+    return NextResponse.json({ interaction: rows[0] });
   }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });

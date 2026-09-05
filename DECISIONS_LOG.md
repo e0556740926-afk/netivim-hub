@@ -114,6 +114,31 @@ handled separately.
 - Verified: `npm run build` — TypeScript clean, all 93 routes compiled,
   static generation succeeded.
 
+## 2026-09-05 — Stage 1 (Case File, B2-B3): rebuilt to match the mockup exactly
+
+- New table `case_interactions` (case_id, type, summary, next_step,
+  created_by, created_at) — the design's "יומן קשר" tab needed a log tied
+  to the *case*, distinct from the existing `interactions` table which is
+  keyed to `contacts.id` (organization-side people), not `leads.id`.
+- `/api/cases/[id]` extended: `GET` now joins `coordinators` for the
+  "הובאה ע״י" referrer badge; new `log_interaction` action; `set_triage`
+  now accepts `description`/`urgency`/`ask` and writes them into the
+  auto-created Rav Obermeister escalation task instead of a hardcoded string.
+- `/admin/cases/[id]` rebuilt from `screens/B2-Case-File.dc.html` directly:
+  sticky action rail (סטטוס/רמזור/הפניה/תיעוד), header with SLA breach dot
+  and referrer badge, 5 tabs (סקירה/שאלון קליטה/מידע מוגן/יומן קשר/הפניות),
+  3 modals matching the mock's exact copy and blocking behavior (status
+  change with a radio-gated "לא פעיל" reason, "הופנה למסגרת" blocked with
+  the exact warning copy when no active referral exists, red-triage form
+  addressed to Rav Obermeister). Colors/radii/spacing taken from
+  `design-tokens/tokens.css`, not improvised.
+- Two tabs from the mock (משימות, מסמכים, התייעצות רב) are visible in the
+  design as placeholders and were **not** built — no backing data model
+  exists yet for case-scoped task filtering beyond the general task list,
+  or for document attachments.
+- Verified: `npm run build` clean, `/admin/cases/[id]` and `/api/cases/[id]`
+  compiled successfully.
+
 ## Verification methodology
 
 Every stage: built and verified on a disposable Neon branch first
