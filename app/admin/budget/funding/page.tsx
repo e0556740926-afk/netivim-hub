@@ -57,7 +57,7 @@ export default function FundingSources() {
       </div>
 
       {showForm && (
-        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
           <input placeholder="מממן" value={form.funder} onChange={e => setForm(f => ({ ...f, funder: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
           <input placeholder="מטרה" value={form.purpose} onChange={e => setForm(f => ({ ...f, purpose: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
           <input placeholder="סכום" type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
@@ -67,7 +67,7 @@ export default function FundingSources() {
       )}
 
       {loading ? <SkeletonCard /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
           {sources.map(f => {
             const st = computeStatus(f)
             const flagged = st.urgent

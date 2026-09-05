@@ -474,7 +474,7 @@ export default function ContactsPage() {
       {/* Table */}
       {loading ? <SkeletonTable rows={5} cols={7}/> : <Card>
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <div style={{ overflowX: "auto" }}><table className="w-full text-sm border-collapse">
             <thead><tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
               <th className="px-3 py-2.5 w-8">
                 <input type="checkbox"
@@ -525,7 +525,7 @@ export default function ContactsPage() {
                 </tr>
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
         <div className="hidden md:block">
           <Pagination {...pg} onChange={pg.setPage}/>

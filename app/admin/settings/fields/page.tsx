@@ -59,10 +59,12 @@ export default function FieldBuilder() {
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>בונה שדות מותאמים</span></div>
       <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>בונה שדות מותאמים</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 340px 300px", gap: 20, marginBottom: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 32 }}>
         {/* FIELD LIST */}
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, fontSize: 15, fontWeight: 700 }}>שדות מותאמים בתיק</div>
+          <div style={{ overflowX: "auto" }}>
+          <div style={{ minWidth: 480 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 60px 60px 100px 60px", gap: 10, padding: "8px 18px", fontSize: 11, fontWeight: 600, color: T.slate, background: T.bg }}>
             <span>תווית</span><span>סוג</span><span>חובה</span><span>ברשימה</span><span>מי רואה</span><span></span>
           </div>
@@ -80,6 +82,8 @@ export default function FieldBuilder() {
             </div>
           ))}
           {!loading && !fields.length && <div style={{ padding: 20, color: T.slate, fontSize: 13, textAlign: "center" }}>אין עדיין שדות מותאמים</div>}
+          </div>
+          </div>
           <div style={{ padding: "14px 18px", borderTop: `1px solid ${T.border}` }}>
             <button onClick={() => { setForm({ label: "", field_type: "select", options: [], required: false, in_list: false, visible_roles: [], group_name: "שדות מותאמים כלליים" }); setEditing(null) }}
               style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>+ שדה חדש</button>

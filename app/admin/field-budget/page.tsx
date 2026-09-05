@@ -46,7 +46,7 @@ export default function FieldBudgetPage() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${categories.length}, 1fr)`, gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12, marginBottom: 20 }}>
             {categories.map(cat => (
               <div key={cat} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 12, color: T.slate }}>{CAT_LABEL[cat] || cat}</div>
@@ -55,7 +55,7 @@ export default function FieldBudgetPage() {
             ))}
           </div>
 
-          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 20, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
             <input placeholder="תיאור ההוצאה" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
             <input placeholder="ספק" value={form.vendor} onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
             <input placeholder="סכום" type="number" value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
@@ -67,7 +67,7 @@ export default function FieldBudgetPage() {
           </div>
 
           <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr style={{ background: "#EDF2F8" }}>
                 {["תיאור", "סעיף", "סכום", "תאריך", "סטטוס"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
               </tr></thead>
@@ -83,7 +83,7 @@ export default function FieldBudgetPage() {
                 ))}
                 {!expenses.length && <tr><td colSpan={5} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין הוצאות בסעיפים שהוקצו</td></tr>}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </>
       )}

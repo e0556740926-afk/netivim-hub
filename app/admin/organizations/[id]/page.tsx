@@ -92,7 +92,7 @@ export default function OrganizationDetail() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 20 }}>
           <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: "20px 24px" }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.slate, marginBottom: 6 }}>שלחנו אליהם</div>
             <div style={{ fontSize: 36, fontWeight: 700, color: T.blue }}>{stats.sent_count} <span style={{ fontSize: 15, fontWeight: 600, color: T.slate }}>נועצים</span></div>
@@ -137,7 +137,7 @@ export default function OrganizationDetail() {
         <div style={{ padding: "24px 32px", display: "flex", flexDirection: "column", gap: 16 }}>
           <button onClick={() => setShowProgramForm(s => !s)} style={{ alignSelf: "flex-start", background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ מסלול חדש</button>
           {showProgramForm && (
-            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
               <input placeholder="שם המסלול" value={programForm.name} onChange={e => setProgramForm(f => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
               <input placeholder="קטגוריה" value={programForm.category} onChange={e => setProgramForm(f => ({ ...f, category: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
               <input placeholder="מועדי פתיחה" value={programForm.intake_dates} onChange={e => setProgramForm(f => ({ ...f, intake_dates: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
@@ -157,7 +157,7 @@ export default function OrganizationDetail() {
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{p.name}</div>
                   {left !== null && <span style={{ fontSize: 12, fontWeight: 700, color: left > 0 ? T.ok : T.breach }}>{left} מקומות פנויים</span>}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 14, fontSize: 13 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginTop: 14, fontSize: 13 }}>
                   <div><div style={{ color: T.slate, marginBottom: 4 }}>מועדי פתיחה</div><div style={{ fontWeight: 600 }}>{p.intake_dates || "—"}</div></div>
                   <div><div style={{ color: T.slate, marginBottom: 4 }}>תנאי קבלה</div><div style={{ fontWeight: 600 }}>{p.admission_conditions || "—"}</div></div>
                   <div><div style={{ color: T.slate, marginBottom: 4 }}>טווח גילאים</div><div style={{ fontWeight: 600 }}>{p.age_min || "?"}–{p.age_max || "?"}</div></div>
@@ -173,7 +173,7 @@ export default function OrganizationDetail() {
       {tab === "guys" && (
         <div style={{ padding: "24px 32px" }}>
           <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr style={{ background: T.blueBg }}>
                 {["שם", "תאריך הפניה", "סטטוס", "תוצאה"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
               </tr></thead>
@@ -193,7 +193,7 @@ export default function OrganizationDetail() {
                 })}
                 {!guysRows.length && <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין הפניות למוסד זה</td></tr>}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
       )}

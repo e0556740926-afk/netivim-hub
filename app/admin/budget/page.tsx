@@ -92,7 +92,7 @@ export default function BudgetDashboard() {
         </div>
       ) : (
         <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 8 }}>אחוז התקופה שחלפה</div>
               <div style={{ fontSize: 34, fontWeight: 700 }}>{metrics.periodPct !== null ? `${metrics.periodPct}%` : "—"}</div>
@@ -110,7 +110,7 @@ export default function BudgetDashboard() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 22 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 6 }}>קצב שריפה חודשי (ממוצע 3 חודשים אחרונים)</div>
               <div style={{ fontSize: 28, fontWeight: 700 }} className="ltr-numeric">{money(metrics.burnRate)}</div>

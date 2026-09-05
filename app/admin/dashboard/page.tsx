@@ -99,7 +99,7 @@ export default function MainDashboard() {
         <Hero label="ממתין לאישורך" value={d.budget.pending_approvals} color="#fff" bg={d.budget.pending_approvals > 0 ? T.warn : T.ok} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 20, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 20, alignItems: "start" }}>
         <div>
           <Section title="משפך תהליכי ייעוץ" color={T.breach}>
             <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -138,7 +138,7 @@ export default function MainDashboard() {
           </Section>
 
           <Section title="ביצועי רכזים" color={T.ok}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr>
                 {["רכז", "לידים/יעד", "בתהליך פעיל", "שובצו"].map(h => <th key={h} style={{ textAlign: "right", padding: "6px 10px", fontSize: 11, color: T.slate, fontWeight: 600 }}>{h}</th>)}
               </tr></thead>
@@ -160,13 +160,13 @@ export default function MainDashboard() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
           </Section>
         </div>
 
         <div>
           <Section title="שטח וקהילה" color={T.ok}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
               <MiniStat label="לידים / יעד" value={`${d.community.leads_this_month} / ${d.community.target_this_month || "—"}`} color={leadsPct !== null && leadsPct < 100 ? T.warn : T.ok} />
               <MiniStat label="אירועים החודש" value={d.community.events_this_month} />
               <MiniStat label="עלות לליד" value={money(d.community.cost_per_lead)} />
@@ -215,7 +215,7 @@ export default function MainDashboard() {
           </Section>
 
           <Section title="מנהלה ומערכת" color={T.purple}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14, marginBottom: 16 }}>
               <MiniStat label="אישורי התמדה ממתינים" value={d.admin.pending_retention} />
               <MiniStat label="חשבונות על טוקן ישן" value={d.admin.legacy_token_accounts} />
               <MiniStat label="משתמשים לא פעילים 30+" value={d.admin.inactive_users_30d} />

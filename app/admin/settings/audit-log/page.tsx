@@ -59,7 +59,7 @@ export default function AuditLogPage() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", overflow: "hidden", marginTop: 1 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: T.blueBg }}>
             {["מתי", "מי", "מה", "ישות", "פירוט"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -75,7 +75,7 @@ export default function AuditLogPage() {
             ))}
             {!loading && !filtered.length && <tr><td colSpan={5} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין רשומות תואמות</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </div>
       <div style={{ fontSize: 12, color: T.slate, marginTop: 10 }}>
         הערה: יומן הביקורת הקיים שומר "מה קרה" כטקסט חופשי (עמודת summary), לא ערכי "לפני/אחרי" נפרדים כמו במוק המקורי — זה דורש שינוי מבני נוסף (שני שדות jsonb) שלא בוצע בסבב הזה.

@@ -413,7 +413,7 @@ export default function AdminNewsletterPage() {
       ) : (
       <>
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <KPICard label="נרשמים פעילים" value={stats?.total || 0}/>
           <KPICard label="נרשמו החודש" value={stats?.thisMonth || 0} color="#166534"/>
           <KPICard label="הוסרו" value={stats?.unsubscribed || 0} color={stats?.unsubscribed > 0 ? "#960010" : "#0D2744"}/>

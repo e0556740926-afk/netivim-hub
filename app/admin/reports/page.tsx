@@ -145,7 +145,7 @@ export default function CoordManagementPage() {
             <Card className="mb-5 border-2 border-[#00488D]">
               <div className="p-5">
                 <div className="text-sm font-bold text-[#00488D] mb-4">סיכום פגישה חדש</div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                   <div>
                     <label className="text-xs font-semibold block mb-1">רכז *</label>
                     <select value={mtgForm.coordinator_id} onChange={e=>setMtgForm(f=>({...f,coordinator_id:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D]">
@@ -336,7 +336,7 @@ export default function CoordManagementPage() {
                       <ExportButton type="coord-activity" label="ייצוא דוח פעילות" params={{coordinator_id:coord.id}}/>
                     </div>
                     {/* Stats */}
-                    <div className="grid grid-cols-4 border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
                       {([
                         {label:"משימות",count:activity.tasks?.length||0,key:"tasks"},
                         {label:"לידים",count:activity.leads?.length||0,key:"leads"},

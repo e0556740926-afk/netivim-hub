@@ -280,7 +280,7 @@ export default function EventsPage() {
       {/* Insights modal */}
       <Modal open={showInsights} onClose={()=>setShowInsights(false)} title="📊 ביצועי אירועים — מצטבר" width="640px">
         {!insights ? <div className="text-sm text-[#94A3B8] text-center py-6">טוען...</div> : <>
-          <div className="grid grid-cols-4 gap-2 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
             <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold">{insights.totals.events}</div><div className="text-[10px] text-[#64748B]">אירועים שבוצעו</div></div>
             <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold text-[#00488D]">{insights.totals.leads}</div><div className="text-[10px] text-[#64748B]">לידים סה"כ</div></div>
             <div className="bg-[#F8FAFC] rounded-[10px] p-3 text-center"><div className="text-lg font-extrabold">₪{insights.totals.spent.toLocaleString()}</div><div className="text-[10px] text-[#64748B]">הוצאה כוללת</div></div>
@@ -593,7 +593,7 @@ export default function EventsPage() {
                     </div>
 
                     {/* Stats row */}
-                    <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                       <div className="bg-[#F8FAFC] rounded-[9px] p-2 text-center">
                         <div className="text-sm font-bold">₪{(+e.budget_planned||0).toLocaleString()}</div>
                         <div className="text-[10px] text-[#64748B]">תקציב</div>

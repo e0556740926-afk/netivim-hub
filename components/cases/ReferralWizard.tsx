@@ -113,7 +113,7 @@ export default function ReferralWizard({ caseData, onClose, onSent }: { caseData
           <div style={{ padding: "0 32px 28px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.breach, marginBottom: 16 }}>כך בדיוק המוסד יראה את ההפניה — יש לוודא תצוגה מקדימה מדויקת לפני שליחה.</div>
             <div style={{ border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 16, fontSize: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 16, fontSize: 14 }}>
                 <div><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>שם</div><div style={{ fontWeight: 600 }}>{caseData.name}</div></div>
                 <div><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>גיל</div><div style={{ fontWeight: 600 }}>{caseData.age || "—"}</div></div>
                 <div><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>תחום עניין</div><div style={{ fontWeight: 600 }}>{caseData.interest || "—"}</div></div>

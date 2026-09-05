@@ -5,10 +5,10 @@ const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD
 
 function Row({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 220px 70px", gap: 16, alignItems: "center", padding: "16px 20px", borderBottom: `1px solid ${T.bg}` }}>
-      <div><div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>{sub}</div></div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>{children}</div>
-      <span style={{ fontSize: 12, fontWeight: 700, color: T.ok, textAlign: "center" }}>✓ פעיל</span>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", padding: "16px 20px", borderBottom: `1px solid ${T.bg}` }}>
+      <div style={{ flex: "1 1 200px" }}><div style={{ fontSize: 14, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>{sub}</div></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end", flexWrap: "wrap", flex: "0 1 220px" }}>{children}</div>
+      <span style={{ fontSize: 12, fontWeight: 700, color: T.ok, textAlign: "center", flex: "0 0 70px" }}>✓ פעיל</span>
     </div>
   )
 }
@@ -65,12 +65,12 @@ export default function AutomationSettings() {
           <input type="number" value={s.no_answer_attempts} onChange={e => save({ no_answer_attempts: e.target.value })} style={inputStyle} />
           <span style={{ fontSize: 13, color: T.slate }}>ניסיונות</span>
         </Row>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 220px 70px", gap: 16, alignItems: "center", padding: "16px 20px" }}>
-          <div><div style={{ fontSize: 14, fontWeight: 700 }}>תדירות אישורי התמדה למוסדות</div><div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>מוסד יתבקש לאשר אילו בחורים עדיין אצלו</div></div>
-          <select value={s.retention_frequency} onChange={e => save({ retention_frequency: e.target.value })} style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: "7px 10px", fontSize: 13, justifySelf: "end" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", padding: "16px 20px" }}>
+          <div style={{ flex: "1 1 200px" }}><div style={{ fontSize: 14, fontWeight: 700 }}>תדירות אישורי התמדה למוסדות</div><div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>מוסד יתבקש לאשר אילו בחורים עדיין אצלו</div></div>
+          <select value={s.retention_frequency} onChange={e => save({ retention_frequency: e.target.value })} style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: "7px 10px", fontSize: 13, flex: "0 1 220px" }}>
             <option>חודשי</option><option>רבעוני</option><option>חצי שנתי</option>
           </select>
-          <span style={{ fontSize: 12, fontWeight: 700, color: T.ok, textAlign: "center" }}>✓ פעיל</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: T.ok, textAlign: "center", flex: "0 0 70px" }}>✓ פעיל</span>
         </div>
       </div>
     </div>

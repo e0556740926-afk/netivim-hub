@@ -67,7 +67,7 @@ export default function InstitutionAccountPortal() {
           <span onClick={logout} style={{ fontSize: 12, color: "#9AA6BE", cursor: "pointer", textDecoration: "underline" }}>יציאה</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, padding: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10, padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 12, padding: 18, textAlign: "center" }}><div style={{ fontSize: 34, fontWeight: 700, color: T.blue }}>{data.active.length}</div><div style={{ fontSize: 13, color: T.slate, marginTop: 4 }}>בחורים שלנו אצלכם כרגע</div></div>
           <div style={{ background: "#fff", borderRadius: 12, padding: 18, textAlign: "center" }}><div style={{ fontSize: 34, fontWeight: 700 }}>{data.pending.length + data.active.length + data.history.length}</div><div style={{ fontSize: 13, color: T.slate, marginTop: 4 }}>הופנו אליכם סה&quot;כ</div></div>
           <div style={{ background: "#fff", borderRadius: 12, padding: 18, textAlign: "center" }}><div style={{ fontSize: 34, fontWeight: 700, color: T.ok }}>{data.active.length + data.history.filter((h: any) => h.status !== "לא התקבל").length}</div><div style={{ fontSize: 13, color: T.slate, marginTop: 4 }}>התקבלו</div></div>

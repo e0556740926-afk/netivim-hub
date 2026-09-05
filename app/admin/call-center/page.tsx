@@ -43,7 +43,7 @@ export default function CallCenterPage() {
       )}
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
             {["תיק", "משך", "תוצאה", "סיבת סימון", "ציון QA", ""].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -68,13 +68,13 @@ export default function CallCenterPage() {
             ))}
             {!flagged.length && <tr><td colSpan={6} style={{ padding: 20, textAlign: "center", color: T.slate }}>אין שיחות מסומנות</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       {scoring !== null && (
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginTop: 16 }}>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>טופס ניקוד משוקלל (0.20 לכל קריטריון, ברירת מחדל)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
             {CRITERIA.map(([key, label]) => (
               <label key={key} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
                 {label}

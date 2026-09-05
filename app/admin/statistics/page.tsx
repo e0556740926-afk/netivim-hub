@@ -66,7 +66,7 @@ export default function StatisticsPage() {
           ))}
         </div>
         {pivot?.error ? <div style={{ color: T.breach, fontSize: 13 }}>{pivot.error}</div> : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ background: "#EDF2F8" }}>
               {dims.map(d => <th key={d} style={{ textAlign: "right", padding: "8px 12px", fontSize: 12, color: T.slate }}>{DIM_LABEL[d]}</th>)}
               <th style={{ textAlign: "right", padding: "8px 12px", fontSize: 12, color: T.slate }}>כמות</th>
@@ -80,11 +80,11 @@ export default function StatisticsPage() {
               ))}
               {!pivot?.rows?.length && <tr><td colSpan={dims.length + 1} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין נתונים</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>עלות לתוצאה — לפי מקור (קמפיין)</div>
           <div style={{ fontSize: 11, color: T.slate, marginBottom: 12 }}>{cost?.campaign_note}</div>
@@ -109,7 +109,7 @@ export default function StatisticsPage() {
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>דירוג נטייה — שילובים עם שיעור המרה גבוה</div>
         <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>{propensity?.methodology}</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
             {["גיל", "עיר", "מגזר", "מקור", "סה\"כ", "שובצו", "שיעור המרה"].map(h => <th key={h} style={{ textAlign: "right", padding: "8px 12px", fontSize: 12, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -126,7 +126,7 @@ export default function StatisticsPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>

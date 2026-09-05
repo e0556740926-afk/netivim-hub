@@ -76,7 +76,7 @@ function MonthlyReportContent() {
         {/* Coordinator comparison */}
         <div className="section">
           <div className="section-title">🏆 השוואת רכזים</div>
-          <table>
+          <div style={{ overflowX: "auto" }}><table>
             <thead><tr><th></th><th>רכז</th><th>אזור</th><th>לידים</th><th>יעד</th><th>משימות</th><th>אינטראקציות</th><th>דיווחים</th><th>ציון</th></tr></thead>
             <tbody>
               {coordinators.map((c: any, i: number) => (
@@ -100,13 +100,13 @@ function MonthlyReportContent() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         {/* Events */}
         {events.length > 0 && <div className="section">
           <div className="section-title">📅 אירועים החודש ({events.length})</div>
-          <table>
+          <div style={{ overflowX: "auto" }}><table>
             <thead><tr><th>שם</th><th>תאריך</th><th>סטטוס</th><th>תקציב</th><th>משתתפים</th><th>לידים</th></tr></thead>
             <tbody>
               {events.map((e: any) => (
@@ -120,7 +120,7 @@ function MonthlyReportContent() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>}
 
         <div style={{marginTop:20,textAlign:"center",fontSize:10,color:"#94A3B8",borderTop:"1px solid #E2E8F0",paddingTop:12}}>

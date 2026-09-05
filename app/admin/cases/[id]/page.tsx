@@ -214,7 +214,7 @@ export default function CaseDetail() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: "24px 32px" }}>
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>בסיסי</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, fontSize: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, fontSize: 14 }}>
                 {[["שם", c.name], ["טלפון", c.phone], ["גיל", c.age], ["עיר", c.city], ["מגזר", c.sector], ["מקור", c.source], ["תחום עניין", c.interest]].map(([label, val]) => (
                   <div key={label as string}><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>{label}</div><div style={{ fontWeight: 600 }}>{val || "—"}</div></div>
                 ))}
@@ -226,7 +226,7 @@ export default function CaseDetail() {
                 <span style={{ color: T.slate }}>{showExtendedAccordion ? "︿" : "﹀"}</span>
               </div>
               {showExtendedAccordion && (
-                <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+                <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
                   {(["education_background", "army_status", "family_status", "aspirations", "skills"] as const).map(key => (
                     <div key={key}>
                       <div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>
@@ -242,7 +242,7 @@ export default function CaseDetail() {
             {custom_values?.length > 0 && (
               <div style={{ background: "#fff", border: `2px dashed ${T.border}`, borderRadius: 12, padding: 24 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>שדות מותאמים</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, fontSize: 14 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, fontSize: 14 }}>
                   {custom_values.map((cv: any) => (
                     <div key={cv.field_id}><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>{cv.label}</div><div style={{ fontWeight: 600 }}>{cv.value || "—"}</div></div>
                   ))}
@@ -305,7 +305,7 @@ export default function CaseDetail() {
           <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "24px 32px" }}>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 12 }}>הפניות פעילות (עד 3 במקביל)</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16 }}>
                 {activeReferrals.map((r: any) => (
                   <div key={r.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
                     <div style={{ fontSize: 14, fontWeight: 700 }}>{r.organization_name}</div>
@@ -328,7 +328,7 @@ export default function CaseDetail() {
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 12 }}>היסטוריית הפניות קודמות</div>
               <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead><tr style={{ background: T.blueBg }}>
                     <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>מוסד</th>
                     <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>מסלול</th>
@@ -346,7 +346,7 @@ export default function CaseDetail() {
                     ))}
                     {!pastReferrals.length && <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין הפניות שנסגרו</td></tr>}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             </div>
           </div>
@@ -355,7 +355,7 @@ export default function CaseDetail() {
         {tab === "tasks" && (
           <div style={{ padding: "24px 32px" }}>
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead><tr style={{ background: T.blueBg }}>
                   {["כותרת", "סוג", "יעד", "סטטוס", "דחיפות"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
                 </tr></thead>
@@ -371,7 +371,7 @@ export default function CaseDetail() {
                   ))}
                   {!caseTasks.length && <tr><td colSpan={5} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין משימות לתיק זה</td></tr>}
                 </tbody>
-              </table>
+              </table></div>
             </div>
             <div style={{ fontSize: 12, color: T.slate, marginTop: 10 }}>זהו סינון של מסך המשימות הכללי לפי תיק זה — לא מודול נפרד. לניהול מלא (עריכה/שיוך) יש לעבור למסך המשימות.</div>
           </div>

@@ -64,7 +64,7 @@ export default function ProcurementPage() {
       {loading ? <SkeletonCard /> : <>
         {tab === "vendors" && (
           <div>
-            <Card className="p-3 mb-3 grid grid-cols-3 gap-2">
+            <Card className="p-3 mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input className="border rounded p-2" placeholder="שם ספק" value={vendorForm.name} onChange={e => setVendorForm(f => ({ ...f, name: e.target.value }))} />
               <input className="border rounded p-2" placeholder="איש קשר" value={vendorForm.contact} onChange={e => setVendorForm(f => ({ ...f, contact: e.target.value }))} />
               <input className="border rounded p-2" placeholder="קטגוריה" value={vendorForm.category} onChange={e => setVendorForm(f => ({ ...f, category: e.target.value }))} />
@@ -83,7 +83,7 @@ export default function ProcurementPage() {
         )}
         {tab === "requests" && (
           <div>
-            <Card className="p-3 mb-3 grid grid-cols-3 gap-2">
+            <Card className="p-3 mb-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
               <input className="border rounded p-2" placeholder="מבקש" value={reqForm.requested_by} onChange={e => setReqForm(f => ({ ...f, requested_by: e.target.value }))} />
               <input className="border rounded p-2" placeholder="פריט" value={reqForm.item} onChange={e => setReqForm(f => ({ ...f, item: e.target.value }))} />
               <input className="border rounded p-2" placeholder="סיבה" value={reqForm.reason} onChange={e => setReqForm(f => ({ ...f, reason: e.target.value }))} />

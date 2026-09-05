@@ -25,7 +25,7 @@ export default function CommunityDashboard() {
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>מד דופק קהילה</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
           <div onClick={() => drawer.openDrawer("total_inquiries", `לידים החודש`)} style={{ cursor: "pointer" }}>
             <div style={{ fontSize: 12, color: T.slate }}>לידים החודש מול יעד</div>
             <div style={{ fontSize: 26, fontWeight: 700 }}>{p.leads_this_month} / {p.target_this_month || "—"}</div>
@@ -39,7 +39,7 @@ export default function CommunityDashboard() {
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>ביצועי רכזים</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
             {["רכז", "לידים / יעד", "הומרו לתהליך פעיל", "שובצו בפועל", "אירועים"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -54,12 +54,12 @@ export default function CommunityDashboard() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>לוח מובילים בין אירועים</div>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
             {["אירוע", "מיקום", "לידים", "משתתפים", "עלות לליד"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -75,7 +75,7 @@ export default function CommunityDashboard() {
             ))}
             {!data.event_leaderboard.length && <tr><td colSpan={5} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין אירועים שאושרו</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, fontSize: 12, color: T.slate }}>

@@ -14,11 +14,11 @@ export function SkeletonCard({ rows = 3 }: { rows?: number }) {
 export function SkeletonTable({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-[14px] overflow-hidden">
-      <div className="grid gap-3 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]" style={{gridTemplateColumns:`repeat(${cols},1fr)`}}>
+      <div className="grid gap-3 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]" style={{gridTemplateColumns:`repeat(auto-fit, minmax(90px, 1fr))`}}>
         {Array.from({length:cols}).map((_,i)=><SkeletonLine key={i} h="12px"/>)}
       </div>
       {Array.from({length:rows}).map((_,i)=>(
-        <div key={i} className="grid gap-3 px-4 py-3 border-b border-[#F1F5F9] last:border-0" style={{gridTemplateColumns:`repeat(${cols},1fr)`}}>
+        <div key={i} className="grid gap-3 px-4 py-3 border-b border-[#F1F5F9] last:border-0" style={{gridTemplateColumns:`repeat(auto-fit, minmax(90px, 1fr))`}}>
           {Array.from({length:cols}).map((_,j)=><SkeletonLine key={j} w={j===0?"70%":"50%"}/>)}
         </div>
       ))}

@@ -388,7 +388,7 @@ export default function TasksPage() {
 
     {/* Kanban */}
     <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 sm:grid-cols-4 gap-3">
         {COLS.map(col => {
           const colTasks = filtered.filter(t => t.status===col.key)
           return <DroppableColumn key={col.key} id={col.key} col={col} count={colTasks.length}>

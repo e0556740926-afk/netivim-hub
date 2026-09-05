@@ -46,7 +46,7 @@ export default function ExecutiveDashboard() {
           })}
         </div>
         <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 12 }}>שיבוצים לפי קטגוריה (הפניות שהתקבלו)</div>
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, data.category_placements.length)}, 1fr)`, gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
           {data.category_placements.map((c: any) => (
             <div key={c.category} onClick={() => drawer.openDrawer(`category_${c.category}`, `${c.category} — ${c.n} שיבוצים`)} style={{ background: T.bg, borderRadius: 10, padding: 14, textAlign: "center", cursor: "pointer" }}>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{c.n}</div>
@@ -57,7 +57,7 @@ export default function ExecutiveDashboard() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 6 }}>זמן תגובה ראשוני ממוצע</div>
           <div style={{ fontSize: 40, fontWeight: 700 }}>{data.response_time.avg_hours !== null ? data.response_time.avg_hours.toFixed(1) : "—"} <span style={{ fontSize: 16, fontWeight: 600, color: T.slate }}>שעות</span></div>
@@ -70,7 +70,7 @@ export default function ExecutiveDashboard() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>סיבות נטישה</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

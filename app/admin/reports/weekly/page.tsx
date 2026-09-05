@@ -129,7 +129,7 @@ function WeeklyReportContent() {
         {/* SCORE BREAKDOWN */}
         <div className="section" style={{marginBottom:20}}>
           <div className="section-title">📊 פירוט ציון שבועי</div>
-          <div style={{padding:"12px 14px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+          <div style={{padding:"12px 14px",display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",gap:10}}>
             {[["לידים",score.leads,30],["אינטראקציות",score.interactions,30],["משימות",score.tasks,20],["דיווח",score.report,20]].map(([l,v,m])=>(
               <div key={l as string} style={{textAlign:"center"}}>
                 <div style={{fontSize:13,fontWeight:700,color:"#0D2744"}}>{v}/{m}</div>
@@ -147,7 +147,7 @@ function WeeklyReportContent() {
           <div className="section-title">⭐ לידים חדשים השבוע ({leads.length})</div>
           {leads.length === 0
             ? <div className="empty">אין לידים חדשים השבוע</div>
-            : <table>
+            : <div style={{ overflowX: "auto" }}><table>
                 <thead><tr><th>שם</th><th>טלפון</th><th>גיל</th><th>ציון</th><th>מקור</th><th>סטטוס</th><th>הערות</th></tr></thead>
                 <tbody>
                   {leads.map((l:any) => (
@@ -162,7 +162,7 @@ function WeeklyReportContent() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
           }
         </div>
 
@@ -171,7 +171,7 @@ function WeeklyReportContent() {
           <div className="section-title">🤝 אינטראקציות עם שותפים ({interactions.length})</div>
           {interactions.length === 0
             ? <div className="empty">אין אינטראקציות השבוע</div>
-            : <table>
+            : <div style={{ overflowX: "auto" }}><table>
                 <thead><tr><th>תאריך</th><th>איש קשר</th><th>ארגון</th><th>סוג</th><th>סיכום</th><th>צעד הבא</th></tr></thead>
                 <tbody>
                   {interactions.map((i:any) => (
@@ -185,7 +185,7 @@ function WeeklyReportContent() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
           }
         </div>
 
@@ -200,7 +200,7 @@ function WeeklyReportContent() {
           </div>
           {tasks.all.length === 0
             ? <div className="empty">אין משימות</div>
-            : <table>
+            : <div style={{ overflowX: "auto" }}><table>
                 <thead><tr><th>כותרת</th><th>סוג</th><th>תאריך יעד</th><th>סטטוס</th><th>פרטים</th></tr></thead>
                 <tbody>
                   {[...tasks.late, ...tasks.inProgress, ...tasks.done, ...tasks.todo].map((t:any) => {
@@ -219,14 +219,14 @@ function WeeklyReportContent() {
                     )
                   })}
                 </tbody>
-              </table>
+              </table></div>
           }
         </div>
 
         {/* EVENTS */}
         {events.length > 0 && <div className="section">
           <div className="section-title">📅 אירועים השבוע ({events.length})</div>
-          <table>
+          <div style={{ overflowX: "auto" }}><table>
             <thead><tr><th>שם</th><th>תאריך</th><th>מיקום</th><th>סטטוס</th><th>משתתפים</th><th>לידים</th></tr></thead>
             <tbody>
               {events.map((e:any) => (
@@ -240,13 +240,13 @@ function WeeklyReportContent() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>}
 
         {/* CONTACTS TOUCHED */}
         {contacts.length > 0 && <div className="section">
           <div className="section-title">👥 אנשי קשר שטופלו ({contacts.length})</div>
-          <table>
+          <div style={{ overflowX: "auto" }}><table>
             <thead><tr><th>שם</th><th>ארגון</th><th>תפקיד</th><th>סטטוס</th><th>קשר אחרון</th></tr></thead>
             <tbody>
               {contacts.map((c:any) => (
@@ -259,7 +259,7 @@ function WeeklyReportContent() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>}
 
         {/* WEEKLY REPORT */}

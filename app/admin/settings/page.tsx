@@ -191,7 +191,7 @@ export default function SettingsPage() {
           {/* Activity Panel */}
           {isOpen && activity && <div className="border border-t-0 border-[#00488D] rounded-b-[12px] bg-white overflow-hidden">
             {/* Summary bar */}
-            <div className="grid grid-cols-4 divide-x divide-[#F1F5F9] border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[#F1F5F9] border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
               {[
                 {label:"משימות",count:activity.tasks?.length||0,tab:"tasks"},
                 {label:"לידים",count:activity.leads?.length||0,tab:"leads"},

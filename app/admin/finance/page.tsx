@@ -79,7 +79,7 @@ export default function FinancePage() {
     <h1 className="text-2xl font-extrabold text-[#0D2744] mb-5">מרכז פיננסי</h1>
 
     {/* KPIs */}
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+    <div className="grid grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
       <KPICard label="תקציב מאושר (סעיפים)" value={`₪${totBudget.toLocaleString()}`}/>
       <KPICard label="הוצאות בפועל" value={`₪${totSpent.toLocaleString()}`} color={pct>90?"#960010":pct>75?"#B45309":"#0D2744"}/>
       <KPICard label="יתרה" value={`₪${(totBudget-totSpent).toLocaleString()}`} color={totBudget-totSpent<0?"#960010":"#166534"}/>
@@ -130,7 +130,7 @@ export default function FinancePage() {
       </div></Card>}
 
       <Card>
-        <table className="w-full text-sm border-collapse">
+        <div style={{ overflowX: "auto" }}><table className="w-full text-sm border-collapse">
           <thead><tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
             {["תיאור","אירוע","ספק","קטגוריה","תאריך","סכום","סטטוס",""].map(h=><th key={h} className="px-3 py-2.5 text-right text-xs font-bold text-[#64748B]">{h}</th>)}
           </tr></thead>
@@ -150,7 +150,7 @@ export default function FinancePage() {
             </tr>)}
             {filtered.length===0&&<tr><td colSpan={8} className="text-center py-8 text-sm text-[#94A3B8]">אין הוצאות</td></tr>}
           </tbody>
-        </table>
+        </table></div>
       </Card>
     </>}
 
@@ -190,7 +190,7 @@ export default function FinancePage() {
                 <button onClick={()=>delSrc(src.id)} className="px-2 py-1 rounded text-xs border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 mb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
               <div className="bg-[#F0F7FF] rounded-[10px] p-3 text-center"><div className="text-xs text-[#64748B]">מאושר</div><div className="text-lg font-extrabold text-[#0D2744] mt-0.5">₪{(+src.total_amount).toLocaleString()}</div></div>
               <div className="bg-[#FFF0F0] rounded-[10px] p-3 text-center"><div className="text-xs text-[#64748B]">נוצל</div><div className="text-lg font-extrabold text-[#960010] mt-0.5">₪{(+src.used_amount).toLocaleString()}</div></div>
               <div className="bg-[#F0FFF4] rounded-[10px] p-3 text-center"><div className="text-xs text-[#64748B]">יתרה</div><div className="text-lg font-extrabold text-[#166534] mt-0.5">₪{(+src.total_amount-+src.used_amount).toLocaleString()}</div></div>

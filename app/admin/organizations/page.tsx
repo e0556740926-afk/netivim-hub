@@ -88,7 +88,7 @@ export default function OrganizationsList() {
       </div>
 
       {loading ? <SkeletonCard /> : view === "cards" ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16 }}>
           {filtered.map(o => (
             <Link key={o.id} href={`/admin/organizations/${o.id}`}>
               <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: "pointer", height: "100%" }}>
@@ -109,7 +109,7 @@ export default function OrganizationsList() {
         </div>
       ) : (
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ background: T.blueBg }}>
               {["שם", "סוג", "אזור", "בעלים אחראי", "סטטוס יחסים", "מקומות פנויים", "דירוג"].map(h => (
                 <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>
@@ -131,7 +131,7 @@ export default function OrganizationsList() {
                 )
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
       )}
     </div>

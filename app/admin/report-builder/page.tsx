@@ -60,7 +60,7 @@ export default function ReportBuilderPage() {
 
       {tab === "auto" && (
         <div>
-          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
             <input placeholder="שם התזמון" value={scheduleForm.name} onChange={e => setScheduleForm(f => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
             <select value={scheduleForm.frequency} onChange={e => setScheduleForm(f => ({ ...f, frequency: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }}>
               <option value="daily">יומי</option><option value="weekly">שבועי</option><option value="monthly">חודשי</option>

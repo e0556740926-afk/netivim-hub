@@ -58,7 +58,7 @@ export default function AdvisorsTeamPage() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
             {["יועץ", "זמין", "התמחויות", "תיקים פעילים", "משימות פתוחות", "מדד עומס"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
@@ -90,7 +90,7 @@ export default function AdvisorsTeamPage() {
               )
             })}
           </tbody>
-        </table>
+        </table></div>
       </div>
       <div style={{ fontSize: 12, color: T.slate, marginTop: 10 }}>
         מדד העומס משוקלל (תיקים פעילים + משימות פתוחות×0.5 + פריטי פולו-אפ×0.3) לתצוגה בלבד — אין עדיין סף ידוע ל&quot;עומס תקין&quot;, ולכן זה לא חוסם שיבוץ, בדיוק כפי שסוכם.

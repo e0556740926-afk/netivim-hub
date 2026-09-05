@@ -126,7 +126,7 @@ export default function CoordEvents() {
             ⏳ מחכה לאישור המנהל
           </div>}
 
-          <div className="grid grid-cols-3 gap-2 text-center mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center mb-3">
             <div className="bg-[#F8FAFC] rounded-[8px] p-2"><div className="text-sm font-bold">₪{e.budget_planned?.toLocaleString()||0}</div><div className="text-[10px] text-[#64748B]">תקציב</div></div>
             <div className="bg-[#F8FAFC] rounded-[8px] p-2"><div className="text-sm font-bold">{e.target_attendees||0}{e.attendee_count>0?`/${e.attendee_count}`:""}</div><div className="text-[10px] text-[#64748B]">יעד/נרשמו</div></div>
             <div className="bg-[#F8FAFC] rounded-[8px] p-2"><div className="text-sm font-bold text-[#00488D]">{e.leads_from_event>0?e.leads_from_event:(e.leads_collected||0)}</div><div className="text-[10px] text-[#64748B]">לידים</div></div>

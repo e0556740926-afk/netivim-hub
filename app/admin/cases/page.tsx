@@ -135,7 +135,7 @@ export default function AdvisorDesk() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ fontSize: 24, fontWeight: 700 }}>מסך העבודה שלי</div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginBottom: 24 }}>
           <KPI label="פניות פתוחות" value={newInquiries.length} />
           <KPI label="משימות באיחור" value={overdueTasks.length} dark />
           <KPI label="תיקים פעילים" value={activeCases.length} />
@@ -143,7 +143,7 @@ export default function AdvisorDesk() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, background: T.slateBorder, minHeight: 560 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 1, background: T.slateBorder, minHeight: 560 }}>
         <Col title="פניות חדשות" count={newInquiries.length}>
           {newInquiries.map(c => <CaseCard key={c.id} c={c} onOpen={() => router.push(`/admin/cases/${c.id}`)} slaHours={slaHours} />)}
           {!newInquiries.length && <div style={{ textAlign: "center", color: T.slate, padding: "24px 0", fontSize: 13 }}>אין פניות חדשות — כל הכבוד! 🎉</div>}
