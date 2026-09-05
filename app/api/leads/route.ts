@@ -59,11 +59,12 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
-  const [hasScore, hasId, hasOwnerCol, hasEmail] = await Promise.all([
+  const [hasScore, hasId, hasOwnerCol, hasEmail, hasIsParent] = await Promise.all([
     hasColumn("leads", "score"),
     hasColumn("leads", "id_number"),
     hasColumn("leads", "owner_name"),
     hasColumn("leads", "email"),
+    hasColumn("leads", "is_parent"),
   ]);
 
   // Build the insert from whichever optional columns actually exist,
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
   if (hasOwnerCol) { cols.push("owner_name"); vals.push(d.owner_name||''); }
   if (hasScore)    { cols.push("score");      vals.push(score); }
   if (hasEmail)    { cols.push("email");      vals.push(d.email||''); }
+  if (hasIsParent) { cols.push("is_parent");  vals.push(!!d.is_parent); }
 
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
   const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;

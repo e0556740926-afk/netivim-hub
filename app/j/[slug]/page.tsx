@@ -8,7 +8,7 @@ export default function PublicForm({ params }: { params: Promise<{ slug: string 
   const [coordId, setCoordId] = useState<number | null>(null)
   const [ownerType, setOwnerType] = useState<"coordinator" | "admin" | null>(null)
   const [form, setForm] = useState({
-    firstName: "", lastName: "", age: "", phone: "", email: "", notes: "", consent: false
+    firstName: "", lastName: "", age: "", phone: "", email: "", notes: "", consent: false, isParent: false
   })
   const [sent, setSent] = useState(false)
   const [err, setErr] = useState("")
@@ -42,6 +42,7 @@ export default function PublicForm({ params }: { params: Promise<{ slug: string 
         source: "link",
         interest: "training",
         notes,
+        is_parent: form.isParent,
       }),
     })
     setLoading(false)
@@ -148,6 +149,16 @@ export default function PublicForm({ params }: { params: Promise<{ slug: string 
             className="w-full px-4 py-3.5 bg-white/10 border border-white/30 rounded-[12px] text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#C9A84C] focus:bg-white/15 transition-all resize-none backdrop-blur-sm"
             style={{ fontSize: "16px" }}
           />
+
+          {/* Parent classification — feeds the newsletter's new "parents" audience (spec §12.1) */}
+          <label className="flex items-center gap-3 cursor-pointer group py-1">
+            <div
+              onClick={() => setForm(f => ({ ...f, isParent: !f.isParent }))}
+              className={`w-5 h-5 rounded-[5px] border-2 flex items-center justify-center flex-shrink-0 transition-all ${form.isParent ? "bg-[#C9A84C] border-[#C9A84C]" : "border-white/40 bg-transparent"}`}>
+              {form.isParent && <svg width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            </div>
+            <span className="text-white/70 text-sm">אני הורה, פונה בשם בני/ביתי</span>
+          </label>
 
           {/* Consent */}
           <label className="flex items-center gap-3 cursor-pointer group py-1">

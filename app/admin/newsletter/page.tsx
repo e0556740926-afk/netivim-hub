@@ -357,6 +357,7 @@ export default function AdminNewsletterPage() {
           <div className="text-sm text-[#64748B] mt-0.5">רשימת תפוצה, כתיבה ושליחת גיליונות</div>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <a href="/admin/newsletter/audiences" className="text-sm font-semibold text-[#00488D] self-center">דיוורים לקהלים נוספים ←</a>
           <a href="/newsletter/archive" target="_blank" rel="noreferrer"
             className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC] flex items-center">
             📰 ארכיון ציבורי
