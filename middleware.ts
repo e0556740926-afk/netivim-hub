@@ -111,7 +111,7 @@ export async function middleware(req: NextRequest) {
 
 // Which /admin sub-paths belong to which team, mirroring the Sidebar
 // groups. Paths not listed here (shared/exec pages) stay open to any admin.
-const ADVISORS_TEAM_PATHS = ["/admin/leads", "/admin/cases", "/admin/organizations"];
+const ADVISORS_TEAM_PATHS = ["/admin/leads", "/admin/cases", "/admin/organizations", "/admin/advisors-team", "/admin/call-center"];
 const FIELD_TEAM_PATHS = ["/admin/contacts", "/admin/events", "/admin/reports",
   "/admin/dashboard", "/admin/targets", "/admin/leaderboard", "/admin/field-budget", "/admin/community-dashboard"];
 
