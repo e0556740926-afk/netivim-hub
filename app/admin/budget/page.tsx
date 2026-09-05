@@ -11,18 +11,26 @@ function money(n: number) { return `₪${Math.round(n).toLocaleString()}` }
 export default function BudgetDashboard() {
   const [sources, setSources] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
+  const [fieldCategories, setFieldCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [sr, er] = await Promise.all([fetch("/api/budget/funding-sources"), fetch("/api/expenses")])
+      const [sr, er, fr] = await Promise.all([fetch("/api/budget/funding-sources"), fetch("/api/expenses"), fetch("/api/admin/field-budget-categories")])
       setSources((await sr.json()).funding_sources || [])
       setExpenses((await er.json()).expenses || [])
+      setFieldCategories((await fr.json()).categories || [])
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
+
+  async function toggleFieldCategory(cat: string) {
+    const method = fieldCategories.includes(cat) ? "DELETE" : "POST"
+    await fetch("/api/admin/field-budget-categories", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: cat }) })
+    await load()
+  }
 
   const metrics = useMemo(() => {
     const totalBudget = sources.reduce((s, f) => s + Number(f.amount || 0), 0)
@@ -146,6 +154,18 @@ export default function BudgetDashboard() {
               </div>
             ))}
             {!metrics.categoryBreakdown.length && <div style={{ color: T.slate, fontSize: 13, textAlign: "center", padding: 20 }}>אין עדיין הוצאות שולמו</div>}
+          </div>
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginTop: 16 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>הקצאת סעיפים לתקציב שטח</div>
+            <div style={{ fontSize: 12, color: T.slate, marginBottom: 14 }}>מי שרואה &quot;תקציב שטח&quot; יראה וירשום הוצאות רק על הסעיפים המסומנים כאן.</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {Object.keys(CAT_LABEL).map(cat => (
+                <span key={cat} onClick={() => toggleFieldCategory(cat)}
+                  style={{ cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 14, background: fieldCategories.includes(cat) ? "#EAF3EE" : T.bg, color: fieldCategories.includes(cat) ? T.ok : T.slate }}>
+                  {CAT_LABEL[cat]}{fieldCategories.includes(cat) ? " ✓" : ""}
+                </span>
+              ))}
+            </div>
           </div>
         </>
       )}
