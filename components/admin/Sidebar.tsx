@@ -30,7 +30,7 @@ const GROUPS: Group[] = [
       { label: "תקציב שטח", path: "/admin/field-budget", dot: "#FBBF24", missing: true },
       { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
       { label: "דשבורד קהילה", path: "/admin/community-dashboard", dot: "#60A5FA", missing: true },
-      { label: "מגדל פיקוח (זמני)", path: "/admin/dashboard", dot: "#60A5FA" },
+      { label: "לוח בקרה ראשי", path: "/admin/dashboard", dot: "#60A5FA" },
       { label: "יעדי לידים (זמני)", path: "/admin/targets", dot: "#34D399" },
       { label: "לוח מובילים (זמני)", path: "/admin/leaderboard", dot: "#FBBF24" },
     ],

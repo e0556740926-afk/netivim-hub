@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 
   const user = toSessionUser(row);
   const token = await signSession(user);
+  await sql`UPDATE users SET last_login_at = now() WHERE id = ${row.id}`;
 
   const res = NextResponse.json({ user });
   res.cookies.set(SESSION_COOKIE, token, {

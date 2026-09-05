@@ -1,216 +1,114 @@
 "use client"
-import { useEffect, useState, useCallback } from "react"
-import { useAuth } from "@/lib/auth-context"
-import { leadColor, pct, MONTH_HE } from "@/lib/utils"
-import KPICard from "@/components/ui/KPICard"
-import Speedometer from "@/components/ui/Speedometer"
-import Badge from "@/components/ui/Badge"
-import Card from "@/components/ui/Card"
-import PageLoader from "@/components/ui/Skeleton"
-import ErrorState from "@/components/ui/ErrorState"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
 
-interface Board { name:string; area:string; actual:number; target:number }
-interface ManagerBoard { name:string; actual:number }
-const MEDAL = ["🥇","🥈","🥉"]
-const ST_LABEL: Record<string,string> = { marketing:"בפרסום", pending_approval:"ממתין לאישור", approved:"מאושר", planning:"תכנון", done:"בוצע" }
+const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
+function money(n: number | null) { return n === null ? "—" : `₪${Math.round(n).toLocaleString()}` }
 
-export default function Dashboard() {
-  const { user } = useAuth()
-  const [board, setBoard] = useState<Board[]>([])
-  const [managerBoard, setManagerBoard] = useState<ManagerBoard[]>([])
-  const [pending, setPending] = useState<any[]>([])
-  const [radar, setRadar] = useState<any[]>([])
-  const [alerts, setAlerts] = useState<any[]>([])
-  const [kpis, setKpis] = useState({ events:0, budgetPct:0, lateTasks:0, pendingCount:0 })
-  const [orgLeads, setOrgLeads] = useState(0)
-  const [leadsTrend, setLeadsTrend] = useState(0)
-  const [orgTarget, setOrgTarget] = useState(0)
+function Stat({ label, value, color, onClick }: { label: string; value: string | number; color?: string; onClick?: () => void }) {
+  return (
+    <div onClick={onClick} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, cursor: onClick ? "pointer" : undefined }}>
+      <div style={{ fontSize: 12, color: T.slate }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, marginTop: 4, color: color || T.navy }}>{value}</div>
+    </div>
+  )
+}
+function Block({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: T.slate, marginBottom: 10 }}>{title}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>{children}</div>
+    </div>
+  )
+}
+
+export default function MainDashboard() {
+  const router = useRouter()
+  const [d, setD] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const month = new Date().getMonth()
+  const drawer = useDrawer()
 
-  const loadAll = useCallback(async () => {
+  async function load() {
     setLoading(true); setError(false)
     try {
-      const res = await fetch("/api/dashboard")
-      if (!res.ok) throw new Error()
-      const d = await res.json()
-      const { coordinators, targets, events, leadCounts, managerLeadCounts, expenseByEvent, reports, totals } = d
-
-      // Counting now happens in SQL; these are small lookup maps.
-      const leadsByCoord = new Map<number,number>(
-        (leadCounts||[]).map((r:any)=>[r.coordinator_id, r.count])
-      )
-      const expByEvent: Record<number,number> = {}
-      ;(expenseByEvent||[]).forEach((r:any)=>{ expByEvent[r.event_id] = r.total })
-
-      const b: Board[] = (coordinators||[]).map((c:any)=>({
-        name: c.name,
-        area: c.area,
-        actual: leadsByCoord.get(c.id) || 0,
-        target: (targets||[]).find((x:any)=>x.coordinator_id===c.id)?.target_leads || 0,
-      })).sort((a:Board,b:Board)=>b.actual-a.actual)
-      setBoard(b)
-
-      // Leads a manager brought in directly (their own personal link).
-      // Deliberately not compared against a target — general count only.
-      const mb: ManagerBoard[] = (managerLeadCounts||[])
-        .map((r:any)=>({ name: r.owner_name, actual: r.count }))
-        .sort((a:ManagerBoard,b:ManagerBoard)=>b.actual-a.actual)
-      setManagerBoard(mb)
-
-      const totTarget = (targets||[]).reduce((s:number,t:any)=>s+(+t.target_leads||0),0)
-      setOrgLeads(totals?.leads||0); setOrgTarget(totTarget)
-      setLeadsTrend(totals?.leadsTrendPct ?? 0)
-
-      const active = (events||[]).filter((e:any)=>e.status!=="done"&&e.status!=="cancelled")
-      const pend = (events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval")
-      setPending(pend.slice(0,3))
-
-      const budgetPct = totals?.budget>0 ? Math.round(totals.spent/totals.budget*100) : 0
-      const lateTasks = totals?.lateTasks || 0
-
-      setKpis({ events:active.length, budgetPct, lateTasks, pendingCount:pend.length })
-
-      setRadar(active.slice(0,4).map((e:any)=>({...e,spent:expByEvent[e.id]||0})))
-
-      const al: any[]=[]
-      const subIds=new Set((reports||[]).map((r:any)=>r.coordinator_id))
-      const missing=(coordinators||[]).filter((c:any)=>!subIds.has(c.id))
-      if(missing.length) al.push({type:"error",title:"דיווח שבועי חסר",body:`${missing.map((c:any)=>c.name).join(", ")} לא הגישו`,cta:"שלח תזכורת"})
-      if(lateTasks>0) al.push({type:"warning",title:`${lateTasks} משימות באיחור`,body:"עברו את תאריך היעד",cta:"צפה במשימות"})
-      if(pend.length) al.push({type:"warning",title:"ממתינים לאישורך",body:`${pend.length} אירועים דורשים אישור`,cta:"עבור לאישורים"})
-      setAlerts(al)
-    } catch { setError(true) }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(()=>{ loadAll() },[loadAll])
-
-  async function approveEvent(id:number) {
-    await fetch(`/api/events/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({approve:true})})
-    setPending(p=>p.filter(e=>e.id!==id))
-    setKpis(k=>({...k,pendingCount:k.pendingCount-1}))
+      const r = await fetch("/api/dashboards/main")
+      if (!r.ok) throw new Error()
+      setD(await r.json())
+    } catch { setError(true) } finally { setLoading(false) }
   }
+  useEffect(() => { load() }, [])
 
-  if(loading) return <PageLoader/>
-  if(error) return <div className="p-4 md:p-6"><ErrorState retry={loadAll}/></div>
+  if (loading) return <div style={{ padding: 32 }}>טוען...</div>
+  if (error || !d) return <div style={{ padding: 32, textAlign: "center", color: T.breach }}>שגיאה בטעינה — נסה לרענן.</div>
+
+  const leadsPct = d.community.target_this_month > 0 ? Math.round((d.community.leads_this_month / d.community.target_this_month) * 100) : null
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-up">
-      <div className="flex items-end justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#0D2744]">מגדל פיקוח</h1>
-          <div className="text-sm text-[#64748B] mt-1">{MONTH_HE[month]} {new Date().getFullYear()} · מעודכן בזמן אמת</div>
+    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
+      <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>לוח בקרה ראשי</div>
+      <div style={{ fontSize: 12, color: T.slate, marginBottom: 24 }}>תמונת מצב מלאה של נתיבים — ייעוץ, שטח, מוקד, תקציב ומשימות. כל מספר לחיץ פותח את הרשימה שמאחוריו.</div>
+
+      <Block title="תיקי ייעוץ">
+        <Stat label="תיקים פעילים" value={d.advisor.active_cases} onClick={() => drawer.openDrawer("active_process", `תיקים פעילים — ${d.advisor.active_cases}`)} />
+        <Stat label="פניות חדשות" value={d.advisor.new_inquiries} color={d.advisor.breaching_sla > 0 ? T.breach : undefined}
+          onClick={() => drawer.openDrawer("new_inquiries", `פניות חדשות — ${d.advisor.new_inquiries}`)} />
+        {d.advisor.breaching_sla > 0 && <Stat label="מתוכן — חריגת SLA" value={d.advisor.breaching_sla} color={T.breach} />}
+        <Stat label="תיקים בסיווג אדום" value={d.advisor.red_flag_cases} color={d.advisor.red_flag_cases > 0 ? T.breach : undefined}
+          onClick={() => drawer.openDrawer("red_flag_cases", `סיווג אדום — ${d.advisor.red_flag_cases}`)} />
+        <Stat label="שיבוצים החודש" value={d.advisor.placements_this_month} color={T.ok} />
+        <Stat label="הפניות ממתינות למוסד" value={d.advisor.pending_institution_referrals}
+          onClick={() => drawer.openDrawer("pending_institution_referrals", `הפניות ממתינות — ${d.advisor.pending_institution_referrals}`)} />
+      </Block>
+
+      <Block title="שטח וקהילה">
+        <Stat label="לידים החודש מול יעד" value={`${d.community.leads_this_month} / ${d.community.target_this_month || "—"}`} color={leadsPct !== null && leadsPct < 100 ? T.warn : T.ok} />
+        <Stat label="אירועים החודש" value={d.community.events_this_month} />
+        <Stat label="עלות לליד ממוצעת" value={money(d.community.cost_per_lead)} />
+        <Stat label="רכזים בלי דוח שבועי" value={d.community.coordinators_missing_report} color={d.community.coordinators_missing_report > 0 ? T.warn : T.ok} />
+      </Block>
+
+      <Block title="מוקד">
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, gridColumn: "1 / -1" }}>
+          <div style={{ fontSize: 13, color: T.slate }}>אין עדיין נתוני מוקד במערכת — ממתין לאינטגרציית Aspire. לא מוצג מספר מומצא.</div>
         </div>
-        <div className="px-3 py-1.5 bg-[#DCFCE7] text-[#166534] text-sm font-semibold rounded-lg">{board.length} רכזים פעילים</div>
-      </div>
+      </Block>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <KPICard label="אירועים פעילים" value={kpis.events}/>
-        <KPICard label="ניצול תקציב" value={`${kpis.budgetPct}%`} color={kpis.budgetPct>90?"#960010":kpis.budgetPct>75?"#B45309":"#0D2744"}/>
-        <KPICard label="משימות באיחור" value={kpis.lateTasks} color={kpis.lateTasks>0?"#960010":"#0D2744"}/>
-        <KPICard label="ממתינים לאישור" value={kpis.pendingCount} color={kpis.pendingCount>0?"#B45309":"#166534"}/>
-      </div>
+      <Block title="תקציב">
+        <Stat label="ניצול תקציב כולל" value={d.budget.utilization_pct !== null ? `${d.budget.utilization_pct}%` : "—"} color={d.budget.utilization_pct !== null && d.budget.utilization_pct > 90 ? T.warn : undefined} />
+        <Stat label="מקורות מימון דורשים טיפול דחוף" value={d.budget.funding_sources_urgent} color={d.budget.funding_sources_urgent > 0 ? T.breach : T.ok}
+          onClick={() => router.push("/admin/budget/funding")} />
+        <Stat label="ממתין לאישורך (הוצאות+רכש)" value={d.budget.pending_approvals} color={d.budget.pending_approvals > 0 ? T.warn : T.ok}
+          onClick={() => router.push("/admin/dashboards/ceo")} />
+      </Block>
 
-      {/* Pending approval */}
-      {pending.length>0 && <Card className="mb-4 border-r-4 border-[#B45309]">
-        <div className="px-4 py-3 border-b border-[#E2E8F0] text-sm font-bold text-[#B45309]">⏳ ממתינים לאישורך</div>
-        <div className="p-3 space-y-2">
-          {pending.map(e=><div key={e.id} className="flex items-center gap-3 p-3 bg-[#F0F4F8] rounded-[10px]">
-            <div className="flex-1"><div className="text-sm font-semibold">{e.name}</div><div className="text-xs text-[#64748B]">{e.date} · ₪{(+e.budget_planned).toLocaleString()}</div></div>
-            <button onClick={()=>approveEvent(e.id)} className="px-4 py-1.5 bg-[#166534] text-white text-sm font-semibold rounded-lg hover:bg-[#15803d] transition-colors">אשר ✓</button>
-          </div>)}
+      <Block title="משימות">
+        <Stat label="משימות באיחור" value={d.tasks.overdue} color={d.tasks.overdue > 0 ? T.breach : T.ok}
+          onClick={() => drawer.openDrawer("overdue_tasks", `משימות באיחור — ${d.tasks.overdue}`)} />
+        <Stat label="פניות פתוחות לרב אוברמייסטר" value={d.tasks.open_rav_consultations} color={d.tasks.open_rav_consultations > 0 ? T.warn : T.ok} />
+      </Block>
+
+      <Block title="מנהלה ומערכת">
+        <Stat label="אישורי התמדה ממתינים למוסד" value={d.admin.pending_retention} />
+        <Stat label="חשבונות פורטל על טוקן ישן" value={d.admin.legacy_token_accounts} />
+        <Stat label="משתמשים לא פעילים 30+ יום" value={d.admin.inactive_users_30d} />
+      </Block>
+
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>יומן ביקורת — פעולות רגישות אחרונות</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {d.admin.recent_sensitive_audit.map((a: any) => (
+            <div key={a.id} style={{ fontSize: 13, borderTop: `1px solid ${T.bg}`, padding: "6px 0", display: "flex", justifyContent: "space-between" }}>
+              <span>{a.actor_name || "אוטומטי"} — {a.summary || a.action}</span>
+              <span style={{ color: T.slate }}>{new Date(a.created_at).toLocaleString("he-IL")}</span>
+            </div>
+          ))}
+          {!d.admin.recent_sensitive_audit.length && <div style={{ color: T.slate, fontSize: 13 }}>אין רשומות רגישות לאחרונה</div>}
         </div>
-      </Card>}
-
-      {/* Speedometer + Leaderboard */}
-      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 mb-4">
-        <Card className="p-5 flex flex-col items-center gap-3">
-          <div className="flex items-center justify-between w-full">
-            <div className="text-sm font-bold">מד לידים ארגוני</div>
-            {leadsTrend !== 0 && (
-              <span
-                style={{ color: leadsTrend > 0 ? "#166534" : "#960010", background: leadsTrend > 0 ? "#DCFCE7" : "#FFF0F0" }}
-                className="text-xs font-bold px-2 py-0.5 rounded-full"
-              >
-                {leadsTrend > 0 ? "▲" : "▼"} {Math.abs(leadsTrend)}%
-              </span>
-            )}
-          </div>
-          <Speedometer actual={orgLeads} target={orgTarget} size={170}/>
-          <div className="text-xs text-[#64748B] text-center">{orgLeads} / {orgTarget} לידים החודש</div>
-        </Card>
-        <Card className="p-5">
-          <div className="text-sm font-bold mb-4">דירוג רכזים · לידים החודש</div>
-          <div className="space-y-3">
-            {board.map((c,i)=>{
-              const p=pct(c.actual,c.target); const col=leadColor(p)
-              return <div key={c.name} className="flex items-center gap-3">
-                <div className="w-6 text-sm font-bold text-[#94A3B8] text-center">{MEDAL[i]||i+1}</div>
-                <div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold">{c.name.split(" ").map(w=>w[0]).join("")}</div>
-                <div className="w-24 text-sm font-semibold truncate">{c.name}</div>
-                <div className="w-12 text-xs text-[#64748B]">{c.area}</div>
-                <div className="flex-1 h-2 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${p}%`,background:col}} className="h-full rounded-full transition-all duration-700"/></div>
-                <div className="w-16 text-left text-sm font-bold" style={{color:col}}>{c.actual}/{c.target}</div>
-              </div>
-            })}
-            {board.length===0&&<div className="text-sm text-[#94A3B8] text-center py-4">אין רכזים</div>}
-          </div>
-
-          {managerBoard.length > 0 && <>
-            <div className="text-xs font-bold text-[#94A3B8] uppercase tracking-wide mt-5 mb-3 pt-4 border-t border-[#F1F5F9]">
-              לידים ממנהלים · כללי (ללא יעד)
-            </div>
-            <div className="space-y-2.5">
-              {managerBoard.map((m) => (
-                <div key={m.name} className="flex items-center gap-3">
-                  <div className="w-6 text-center flex-shrink-0">👑</div>
-                  <div className="w-8 h-8 rounded-full bg-[#EDE9FE] text-[#5B21B6] flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {m.name.split(" ").map(w=>w[0]).join("")}
-                  </div>
-                  <div className="flex-1 text-sm font-semibold truncate">{m.name}</div>
-                  <div className="text-sm font-bold text-[#5B21B6]">{m.actual} לידים</div>
-                </div>
-              ))}
-            </div>
-          </>}
-        </Card>
       </div>
 
-      {/* Radar + Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-        <Card className="p-5">
-          <div className="text-sm font-bold mb-4">📡 רדאר אירועים קרובים</div>
-          <div className="space-y-2.5">
-            {radar.map(e=>{
-              const d=new Date(e.date); const bp=e.budget_planned>0?Math.round(+e.spent/e.budget_planned*100):0
-              return <div key={e.id} className="flex items-center gap-3 p-3 border border-[#E2E8F0] rounded-[11px] hover:border-[#00488D] transition-colors">
-                <div className="w-12 text-center flex-shrink-0"><div className="text-lg font-extrabold leading-none">{d.getDate()}</div><div className="text-xs text-[#64748B]">{["ינו","פבר","מרץ","אפר","מאי","יונ","יול","אוג","ספט","אוק","נוב","דצמ"][d.getMonth()]}</div></div>
-                <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{e.name}</div><div className="text-xs text-[#64748B] truncate">{e.location}</div></div>
-                <Badge text={ST_LABEL[e.status]||e.status}/>
-                <div className="w-20 flex-shrink-0"><div className="h-1.5 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${Math.min(bp,100)}%`,background:bp>90?"#960010":"#00488D"}} className="h-full rounded-full"/></div><div className="text-xs text-[#64748B] mt-1">₪{e.spent?.toLocaleString()}</div></div>
-              </div>
-            })}
-            {radar.length===0&&<div className="text-sm text-[#94A3B8] text-center py-4">אין אירועים קרובים</div>}
-          </div>
-        </Card>
-        <Card className="p-5">
-          <div className="text-sm font-bold mb-4">🚨 מרכז פעולות</div>
-          <div className="space-y-2.5">
-            {alerts.map((a,i)=>{
-              const COLORS:Record<string,{bg:string,border:string,text:string}>={error:{bg:"#FFF0F0",border:"#960010",text:"#960010"},warning:{bg:"#FFFBEB",border:"#B45309",text:"#B45309"},info:{bg:"#F0F7FF",border:"#00488D",text:"#00488D"}}; const c=COLORS[a.type]||{bg:"#F8FAFC",border:"#64748B",text:"#64748B"}
-              return <div key={i} style={{background:c.bg,borderRight:`3px solid ${c.border}`}} className="p-3 rounded-[11px]">
-                <div style={{color:c.text}} className="text-sm font-semibold">{a.title}</div>
-                <div className="text-xs text-[#475569] mt-1">{a.body}</div>
-                <div className="text-xs font-bold text-[#00488D] mt-2 cursor-pointer">{a.cta} →</div>
-              </div>
-            })}
-            {alerts.length===0&&<div className="p-4 text-center text-sm text-[#94A3B8]">✓ אין התראות פעילות</div>}
-          </div>
-        </Card>
-      </div>
+      <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
     </div>
   )
 }

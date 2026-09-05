@@ -37,7 +37,7 @@ export function Drawer({ open, title, rows, loading, onClose }: { open: boolean;
           {loading ? <div style={{ color: T.slate, fontSize: 13 }}>טוען...</div> : rows.map((r, i) => (
             <div key={r.id ?? i} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: "10px 12px", fontSize: 13, display: "flex", justifyContent: "space-between" }}>
               <span>{r.name}{r.age ? `, ${r.age}` : ""}</span>
-              <span style={{ color: T.slate }}>{r.organization_name || r.city || r.advisor_status || ""}</span>
+              <span style={{ color: T.slate }}>{r.organization_name || r.city || r.advisor_status || r.due_date || r.status || ""}</span>
             </div>
           ))}
           {!loading && !rows.length && <div style={{ color: T.slate, fontSize: 13, textAlign: "center", padding: 20 }}>אין רשומות</div>}

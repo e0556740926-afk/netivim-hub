@@ -25,6 +25,17 @@ async function getDrawerDetail(key: string) {
         WHERE l.deleted_at IS NULL AND r.status = 'התקבל' ORDER BY l.id DESC`;
     case "placed":
       return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND advisor_status IN ('שובץ במסגרת','הסתיים בהצלחה') ORDER BY created_at DESC`;
+    case "new_inquiries":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND advisor_status = 'פנייה חדשה' ORDER BY created_at DESC`;
+    case "red_flag_cases":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND triage_color = 'red' ORDER BY created_at DESC`;
+    case "overdue_tasks":
+      return sql`SELECT id, title AS name, due_date, status FROM tasks WHERE status != 'done' AND due_date < CURRENT_DATE ORDER BY due_date`;
+    case "pending_institution_referrals":
+      return sql`
+        SELECT r.id, l.name, o.name AS organization_name FROM referrals r
+        JOIN leads l ON l.id = r.case_id JOIN organizations o ON o.id = r.organization_id
+        WHERE r.status IN ('ממתין','הוזמן לראיון') ORDER BY r.created_at DESC`;
     default:
       if (key.startsWith("category_")) {
         const cat = key.slice("category_".length);
