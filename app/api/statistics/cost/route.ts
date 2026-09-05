@@ -4,7 +4,7 @@ import sql from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   if (!(await canAccessStatistics(req))) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-  const [byCampaign, byCoordinator, monthlyTrend] = await Promise.all([
+  const [byCampaign, byCoordinator, leadsByMonth, expensesByMonth] = await Promise.all([
     sql`
       SELECT l.source AS campaign,
         count(DISTINCT l.id)::int AS leads,
@@ -19,11 +19,21 @@ export async function GET(req: NextRequest) {
       FROM coordinators c LEFT JOIN leads l ON l.coordinator_id = c.id AND l.deleted_at IS NULL
       GROUP BY c.id, c.name`,
     sql`
-      SELECT to_char(l.created_at, 'YYYY-MM') AS month,
-        count(*)::int AS leads,
-        (SELECT COALESCE(sum(amount), 0) FROM expenses WHERE status='paid' AND to_char(date, 'YYYY-MM') = to_char(l.created_at, 'YYYY-MM')) AS spend
-      FROM leads l WHERE l.deleted_at IS NULL GROUP BY 1 ORDER BY 1`,
+      SELECT to_char(created_at, 'YYYY-MM') AS month, count(*)::int AS leads
+      FROM leads WHERE deleted_at IS NULL GROUP BY 1 ORDER BY 1`,
+    sql`
+      SELECT to_char(date, 'YYYY-MM') AS month, COALESCE(sum(amount), 0) AS spend
+      FROM expenses WHERE status='paid' GROUP BY 1`,
   ]);
+
+  // Two independent aggregates merged in JS — the previous version tried
+  // to correlate a subquery on l.created_at against an outer query
+  // grouped by to_char(l.created_at, ...), which Postgres rejects
+  // ("subquery uses ungrouped column") since the raw column isn't in the
+  // GROUP BY, only its derived alias is. This avoids the correlation
+  // entirely instead of trying to patch around it.
+  const spendByMonth = new Map((expensesByMonth as any[]).map(r => [r.month, Number(r.spend)]));
+  const monthlyTrend = (leadsByMonth as any[]).map(r => ({ month: r.month, leads: r.leads, spend: spendByMonth.get(r.month) || 0 }));
 
   const campaignRows = (byCampaign as any[]).map(c => ({
     campaign: c.campaign, leads: c.leads, placements: c.placements,

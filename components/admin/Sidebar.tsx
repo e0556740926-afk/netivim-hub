@@ -44,6 +44,7 @@ const GROUPS: Group[] = [
       { label: "סטטיסטיקות", path: "/admin/statistics", dot: "#6B4E9E", ceoOnly: true },
       { label: "דוחות", path: "/admin/report-builder", dot: "#6B4E9E" },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
+      { label: "דיוורים לקהלים", path: "/admin/newsletter/audiences", dot: "#C9A84C" },
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
       { label: "תקציב ורכש", path: "/admin/budget", dot: "#FBBF24" },

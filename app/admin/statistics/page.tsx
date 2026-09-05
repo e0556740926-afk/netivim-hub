@@ -11,21 +11,33 @@ export default function StatisticsPage() {
   const [propensity, setPropensity] = useState<any>(null)
   const [anomalies, setAnomalies] = useState<any>(null)
   const [forbidden, setForbidden] = useState(false)
+  const [loadError, setLoadError] = useState("")
   const [loading, setLoading] = useState(true)
 
   async function loadPivot() {
-    const r = await fetch(`/api/statistics/pivot?dims=${dims.join(",")}`)
-    if (r.status === 403) { setForbidden(true); return }
-    setPivot(await r.json())
+    try {
+      const r = await fetch(`/api/statistics/pivot?dims=${dims.join(",")}`)
+      if (r.status === 403) { setForbidden(true); return }
+      if (!r.ok) { setPivot({ error: `שגיאת שרת (${r.status})` }); return }
+      setPivot(await r.json())
+    } catch {
+      setPivot({ error: "שגיאת רשת" })
+    }
   }
   useEffect(() => { loadPivot() }, [dims])
 
   useEffect(() => {
     (async () => {
-      const [c, p, a] = await Promise.all([fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies")])
-      if (c.status === 403) { setForbidden(true); setLoading(false); return }
-      setCost(await c.json()); setPropensity(await p.json()); setAnomalies(await a.json())
-      setLoading(false)
+      try {
+        const [c, p, a] = await Promise.all([fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies")])
+        if (c.status === 403) { setForbidden(true); setLoading(false); return }
+        if (!c.ok || !p.ok || !a.ok) { setLoadError(`שגיאת שרת (${c.status}/${p.status}/${a.status}) — נסה לרענן`); setLoading(false); return }
+        setCost(await c.json()); setPropensity(await p.json()); setAnomalies(await a.json())
+      } catch (e) {
+        setLoadError("שגיאת רשת או תשובה לא תקינה מהשרת")
+      } finally {
+        setLoading(false)
+      }
     })()
   }, [])
 
@@ -34,6 +46,7 @@ export default function StatisticsPage() {
   }
 
   if (forbidden) return <div style={{ padding: 32, textAlign: "center", color: T.breach }}>אזור זה זמין למנכ&quot;ל ולמנהל ראשי בלבד.</div>
+  if (loadError) return <div style={{ padding: 32, textAlign: "center", color: T.breach }}>{loadError}</div>
   if (loading) return <div style={{ padding: 32 }}>טוען...</div>
 
   return (
