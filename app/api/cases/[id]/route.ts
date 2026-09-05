@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     WHERE l.id=${caseId}`;
   if (!caseRow) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const [extended, protectedInfo, referrals, history, customValues, interactions] = await Promise.all([
+  const [extended, protectedInfo, referrals, history, customValues, interactions, caseTasks, documents, consultations] = await Promise.all([
     sql`SELECT * FROM case_extended WHERE case_id=${caseId}`,
     sql`SELECT case_id, last_accessed_by, last_accessed_at FROM case_protected WHERE case_id=${caseId}`, // sensitive_data withheld unless explicitly opened, see POST /open-protected
     sql`SELECT r.*, o.name AS organization_name, p.name AS program_name
@@ -25,6 +25,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         FROM case_custom_values cv JOIN custom_field_defs cf ON cf.id = cv.field_id
         WHERE cv.case_id=${caseId}`,
     sql`SELECT * FROM case_interactions WHERE case_id=${caseId} ORDER BY created_at DESC`,
+    sql`SELECT * FROM tasks WHERE case_id=${caseId} ORDER BY due_date NULLS LAST, created_at DESC`,
+    sql`SELECT * FROM documents_case WHERE case_id=${caseId} ORDER BY uploaded_at DESC`,
+    sql`SELECT * FROM consultations_rav WHERE case_id=${caseId} ORDER BY created_at DESC`,
   ]);
 
   return NextResponse.json({
@@ -32,6 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     extended: extended[0] || null,
     protected_meta: protectedInfo[0] || null,
     referrals, history, custom_values: customValues, interactions,
+    tasks: caseTasks, documents, consultations,
   });
 }
 
@@ -84,16 +88,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     await sql`UPDATE leads SET triage_color=${d.triage_color} WHERE id=${caseId}`;
     if (d.triage_color === "red") {
-      // Red flag -> opens a task for the Rav, per spec §6.2. Kept simple:
-      // assigns to any user with role='rav' if one exists; otherwise just
-      // logs it so a manager notices and can assign manually — this route
-      // deliberately doesn't invent a rav user if none is configured.
+      // Red flag -> opens a task for the Rav, per spec §6.2, PLUS a
+      // consultations_rav row that the Case File's "התייעצות רב" tab
+      // reads/updates directly — same event, not a separate mechanism
+      // (per completion spec §7: "הטאב הזה הוא התצוגה/הממשק לאותה משימה").
       const [rav] = await sql`SELECT name FROM users WHERE role='rav' LIMIT 1`;
       const [caseRow] = await sql`SELECT name FROM leads WHERE id=${caseId}`;
       const details = [d.description, d.ask ? `נדרש מהרב: ${d.ask}` : null].filter(Boolean).join("\n") || "תיק סווג אדום — מורכבות גבוהה, דורש טיפול הרב";
+      const [task] = await sql`
+        INSERT INTO tasks (contact_id, case_id, title, details, type, assignees, status, priority)
+        VALUES (${null}, ${caseId}, ${`אסקלציה לרב אוברמייסטר: ${caseRow?.name || 'תיק #' + caseId}`}, ${details}, 'backoffice', ${rav ? [rav.name] : []}, 'todo', ${d.urgency === 'low' ? 'normal' : d.urgency === 'medium' ? 'normal' : 'urgent'})
+        RETURNING id`;
       await sql`
-        INSERT INTO tasks (contact_id, title, details, type, assignees, status, priority)
-        VALUES (${null}, ${`אסקלציה לרב אוברמייסטר: ${caseRow?.name || 'תיק #' + caseId}`}, ${details}, 'backoffice', ${rav ? [rav.name] : []}, 'todo', ${d.urgency === 'low' ? 'normal' : d.urgency === 'medium' ? 'normal' : 'urgent'})`;
+        INSERT INTO consultations_rav (case_id, description, urgency, request, task_id)
+        VALUES (${caseId}, ${d.description || null}, ${d.urgency || null}, ${d.ask || null}, ${task.id})`;
       logAudit({ entityType: "case", entityId: caseId, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "סווג אדום — נפתחה פנייה לרב" });
     }
     return NextResponse.json({ ok: true });
@@ -106,6 +114,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       RETURNING *`;
     logAudit({ entityType: "case", entityId: caseId, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "אינטראקציה תועדה" });
     return NextResponse.json({ interaction: rows[0] });
+  }
+
+  if (d.action === "add_document") {
+    // Metadata-only: stores a link to a file already hosted elsewhere
+    // (e.g. Google Drive) rather than accepting an upload — no object
+    // storage is wired into this app yet, so this doesn't pretend to be
+    // real file hosting.
+    if (!d.file_url) return NextResponse.json({ error: "missing file_url" }, { status: 400 });
+    const rows = await sql`
+      INSERT INTO documents_case (case_id, file_url, doc_type, uploaded_by)
+      VALUES (${caseId}, ${d.file_url}, ${d.doc_type || null}, ${me?.name || null})
+      RETURNING *`;
+    logAudit({ entityType: "case", entityId: caseId, action: "create", actorName: me?.name, actorEmail: me?.email, summary: "מסמך צורף לתיק" });
+    return NextResponse.json({ document: rows[0] });
+  }
+
+  if (d.action === "respond_rav") {
+    if (!d.consultation_id) return NextResponse.json({ error: "missing consultation_id" }, { status: 400 });
+    await sql`UPDATE consultations_rav SET response=${d.response || null}, status='נענה', responded_at=now() WHERE id=${d.consultation_id} AND case_id=${caseId}`;
+    logAudit({ entityType: "case", entityId: caseId, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "התייעצות רב — נענה" });
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "unknown action" }, { status: 400 });

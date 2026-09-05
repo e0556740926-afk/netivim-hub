@@ -14,8 +14,8 @@ const T = {
   referredFg: "#6B4E9E", referredBg: "#f2eef8",
 }
 const DEFAULT_SLA_HOURS = 24 // overridden at runtime by /api/admin/automation-settings
-const TABS = ["overview", "intake", "protected", "log", "referrals"] as const
-const TAB_LABEL: Record<string, string> = { overview: "סקירה", intake: "שאלון קליטה", protected: "מידע מוגן 🔒", log: "יומן קשר", referrals: "הפניות" }
+const TABS = ["overview", "intake", "protected", "log", "referrals", "tasks", "documents", "rav"] as const
+const TAB_LABEL: Record<string, string> = { overview: "סקירה", intake: "שאלון קליטה", protected: "מידע מוגן 🔒", log: "יומן קשר", referrals: "הפניות", tasks: "משימות", documents: "מסמכים", rav: "התייעצות רב" }
 const INACTIVE_REASONS = ["אין מענה", "לא מעוניין", "לא רלוונטי", "פעילות קהילתית"]
 const TRANSITIONS: Record<string, string[]> = {
   "פנייה חדשה": ["בתהליך ייעוץ", "לא פעיל"],
@@ -64,6 +64,8 @@ export default function CaseDetail() {
   const [interactionForm, setInteractionForm] = useState({ type: "call", summary: "", next_step: "" })
   const [showInteractionForm, setShowInteractionForm] = useState(false)
   const [slaHours, setSlaHours] = useState(DEFAULT_SLA_HOURS)
+  const [docForm, setDocForm] = useState({ file_url: "", doc_type: "" })
+  const [ravResponses, setRavResponses] = useState<Record<number, string>>({})
 
   async function load() {
     setLoading(true); setError(false)
@@ -111,6 +113,16 @@ export default function CaseDetail() {
     if (siblings_to_close?.length) alert(`התקבל! ${siblings_to_close.length} הפניות מקבילות נותרו פתוחות — סגור אותן ידנית עם סיבה.`)
     await load()
   }
+  async function addDocument() {
+    if (!docForm.file_url) return
+    await fetch(`/api/cases/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_document", ...docForm }) })
+    setDocForm({ file_url: "", doc_type: "" })
+    await load()
+  }
+  async function respondRav(consultationId: number) {
+    await fetch(`/api/cases/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "respond_rav", consultation_id: consultationId, response: ravResponses[consultationId] || "" }) })
+    await load()
+  }
   async function logInteraction() {
     if (!interactionForm.summary) return
     await fetch(`/api/cases/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "log_interaction", ...interactionForm }) })
@@ -122,7 +134,7 @@ export default function CaseDetail() {
   if (loading) return <div className="p-6"><SkeletonCard /></div>
   if (error || !data) return <ErrorState retry={load} />
 
-  const { case: c, referrals, history, interactions, custom_values } = data
+  const { case: c, referrals, history, interactions, custom_values, tasks: caseTasks, documents, consultations } = data
   const slaHrs = hoursSince(c.first_touch_at || c.created_at)
   const slaBreach = slaHrs !== null && slaHrs >= slaHours
   const allowedNext = TRANSITIONS[c.advisor_status] || []
@@ -337,6 +349,74 @@ export default function CaseDetail() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {tab === "tasks" && (
+          <div style={{ padding: "24px 32px" }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr style={{ background: T.blueBg }}>
+                  {["כותרת", "סוג", "יעד", "סטטוס", "דחיפות"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {caseTasks.map((t: any) => (
+                    <tr key={t.id} style={{ borderTop: `1px solid ${T.bg}` }}>
+                      <td style={{ padding: "10px 16px", fontWeight: 600 }}>{t.title}</td>
+                      <td style={{ padding: "10px 16px", color: T.slate }}>{t.type}</td>
+                      <td style={{ padding: "10px 16px", color: T.slate }}>{t.due_date ? String(t.due_date).slice(0, 10) : "—"}</td>
+                      <td style={{ padding: "10px 16px" }}>{t.status}</td>
+                      <td style={{ padding: "10px 16px" }}>{t.priority}</td>
+                    </tr>
+                  ))}
+                  {!caseTasks.length && <tr><td colSpan={5} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין משימות לתיק זה</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 12, color: T.slate, marginTop: 10 }}>זהו סינון של מסך המשימות הכללי לפי תיק זה — לא מודול נפרד. לניהול מלא (עריכה/שיוך) יש לעבור למסך המשימות.</div>
+          </div>
+        )}
+
+        {tab === "documents" && (
+          <div style={{ padding: "24px 32px" }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 16, display: "flex", gap: 8 }}>
+              <input placeholder="קישור למסמך (Google Drive וכו')" value={docForm.file_url} onChange={e => setDocForm(f => ({ ...f, file_url: e.target.value }))} style={{ flex: 2, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <input placeholder="סוג מסמך" value={docForm.doc_type} onChange={e => setDocForm(f => ({ ...f, doc_type: e.target.value }))} style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <button onClick={addDocument} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 600, cursor: "pointer" }}>+ צרף</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {documents.map((doc: any) => (
+                <a key={doc.id} href={doc.file_url} target="_blank" rel="noreferrer" style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 10, padding: 14, display: "flex", justifyContent: "space-between", textDecoration: "none", color: T.navy }}>
+                  <span>📎 {doc.doc_type || "מסמך"}</span>
+                  <span style={{ fontSize: 12, color: T.slate }}>{doc.uploaded_by} · {String(doc.uploaded_at).slice(0, 10)}</span>
+                </a>
+              ))}
+              {!documents.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין מסמכים מצורפים. הערה: זה קישור למסמך שכבר מאוחסן (למשל Google Drive) — אין עדיין העלאת קבצים ישירה למערכת.</div>}
+            </div>
+          </div>
+        )}
+
+        {tab === "rav" && (
+          <div style={{ padding: "24px 32px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {consultations.map((cons: any) => (
+              <div key={cons.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>פנייה מ-{String(cons.created_at).slice(0, 10)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: cons.status === "נענה" ? T.ok : T.warn }}>{cons.status}</span>
+                </div>
+                <div style={{ fontSize: 13, marginBottom: 6 }}>{cons.description}</div>
+                {cons.request && <div style={{ fontSize: 13, color: T.slate, marginBottom: 10 }}>נדרש: {cons.request}</div>}
+                {cons.response ? (
+                  <div style={{ background: T.bg, borderRadius: 8, padding: 12, fontSize: 13 }}>תגובת הרב: {cons.response}</div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input placeholder="תגובת הרב..." value={ravResponses[cons.id] || ""} onChange={e => setRavResponses(r => ({ ...r, [cons.id]: e.target.value }))} style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+                    <button onClick={() => respondRav(cons.id)} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>שמור תגובה</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            {!consultations.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין פניות לרב אוברמייסטר — אלה נפתחות אוטומטית כשתיק מסווג &quot;אדום&quot;.</div>}
           </div>
         )}
       </div>

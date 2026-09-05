@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
 
   await sql`INSERT INTO case_interactions (case_id, type, summary, created_by) VALUES (${c.id}, 'portal_message', ${d.message}, ${c.name})`;
   await sql`
-    INSERT INTO tasks (contact_id, title, details, type, assignees, status, priority)
-    VALUES (${null}, ${`הודעה מהנועץ: ${c.name}`}, ${d.message}, 'call', ${c.owner_name ? [c.owner_name] : []}, 'todo', 'normal')`;
+    INSERT INTO tasks (contact_id, case_id, title, details, type, assignees, status, priority)
+    VALUES (${null}, ${c.id}, ${`הודעה מהנועץ: ${c.name}`}, ${d.message}, 'call', ${c.owner_name ? [c.owner_name] : []}, 'todo', 'normal')`;
 
   return NextResponse.json({ ok: true });
 }

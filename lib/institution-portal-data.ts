@@ -43,7 +43,7 @@ export async function updateInstitutionReferral(orgId: number, referralId: numbe
   if (status === "נכנס בפועל") await sql`UPDATE leads SET advisor_status='שובץ במסגרת' WHERE id=${ref.case_id}`;
   if (mapped === "לא התקבל") {
     await sql`UPDATE leads SET advisor_status='בתהליך ייעוץ' WHERE id=${ref.case_id}`;
-    await sql`INSERT INTO tasks (contact_id, title, details, type, status, priority) VALUES (${null}, 'למצוא מסגרת חלופית', ${`הפניה #${referralId} לא התקבלה: ${reason || ""}`}, 'backoffice', 'todo', 'normal')`;
+    await sql`INSERT INTO tasks (contact_id, case_id, title, details, type, status, priority) VALUES (${null}, ${ref.case_id}, 'למצוא מסגרת חלופית', ${`הפניה #${referralId} לא התקבלה: ${reason || ""}`}, 'backoffice', 'todo', 'normal')`;
   }
   if (mapped === "נשר") await sql`UPDATE leads SET advisor_status='לא פעיל', inactive_reason='נשר ממסגרת' WHERE id=${ref.case_id}`;
   return { ok: true as const };

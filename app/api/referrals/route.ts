@@ -72,8 +72,8 @@ export async function PATCH(req: NextRequest) {
     // Not accepted -> case returns to consultation, per spec §7.1 ("לא נסגר").
     await sql`UPDATE leads SET advisor_status='בתהליך ייעוץ' WHERE id=${ref.case_id}`;
     await sql`
-      INSERT INTO tasks (contact_id, title, details, type, status, priority)
-      VALUES (${null}, ${'למצוא מסגרת חלופית'}, ${`הפניה #${d.id} לא התקבלה: ${d.rejection_reason || ''}`}, 'backoffice', 'todo', 'normal')`;
+      INSERT INTO tasks (contact_id, case_id, title, details, type, status, priority)
+      VALUES (${null}, ${ref.case_id}, ${'למצוא מסגרת חלופית'}, ${`הפניה #${d.id} לא התקבלה: ${d.rejection_reason || ''}`}, 'backoffice', 'todo', 'normal')`;
   }
 
   if (d.status === "נשר") {
