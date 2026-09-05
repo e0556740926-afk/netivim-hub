@@ -9,6 +9,9 @@ import PersonalLinkPopup from "./PersonalLinkPopup"
 
 const nav = [
   { label:"מגדל פיקוח", path:"/admin/dashboard", dot:"#60A5FA" },
+  { label:"דשבורד מנהלים", path:"/admin/dashboards/executive", dot:"#2E5C8A" },
+  { label:"דשבורד מנכ״ל", path:"/admin/dashboards/ceo", dot:"#2E5C8A" },
+  { label:"דשבורד מממן", path:"/admin/dashboards/funder", dot:"#2E5C8A" },
   { label:"יעדי לידים",  path:"/admin/targets",   dot:"#34D399" },
   { label:"לוח מובילים", path:"/admin/leaderboard",dot:"#FBBF24" },
   null,

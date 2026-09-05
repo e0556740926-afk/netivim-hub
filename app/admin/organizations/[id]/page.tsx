@@ -6,13 +6,15 @@ import ErrorState from "@/components/ui/ErrorState"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B", referredFg: "#6B4E9E", referredBg: "#f2eef8" }
 const REL_COLOR: Record<string, { bg: string; fg: string }> = { "פעיל": { bg: "#EAF3EE", fg: T.ok }, "חדש": { bg: T.bg, fg: T.slate }, "בבדיקה": { bg: "#FDF6E7", fg: T.warn } }
-const TABS = ["overview", "tracks", "guys"] as const
-const TAB_LABEL: Record<string, string> = { overview: "סקירה", tracks: "מסלולים", guys: "הבחורים שלנו" }
+const TABS = ["overview", "tracks", "guys", "portal"] as const
+const TAB_LABEL: Record<string, string> = { overview: "סקירה", tracks: "מסלולים", guys: "הבחורים שלנו", portal: "פורטל מוסד" }
 function Stars({ n }: { n: number }) { return <span style={{ color: T.warn }}>{"★".repeat(n)}<span style={{ color: T.border }}>{"☆".repeat(5 - n)}</span></span> }
 function fdt(d?: string | null) { return d ? new Date(d).toLocaleDateString("he-IL") : "" }
 
 export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>()
+  const [portalUsers, setPortalUsers] = useState<any[]>([])
+  const [newPortalName, setNewPortalName] = useState("")
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -23,12 +25,20 @@ export default function OrganizationDetail() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const r = await fetch(`/api/organizations/${id}`)
+      const [r, pr] = await Promise.all([fetch(`/api/organizations/${id}`), fetch(`/api/admin/institution-portal-users/${id}`)])
       if (!r.ok) throw new Error()
       setData(await r.json())
+      if (pr.ok) setPortalUsers((await pr.json()).portal_users || [])
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
+
+  async function addPortalUser() {
+    if (!newPortalName) return
+    await fetch(`/api/admin/institution-portal-users/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: newPortalName }) })
+    setNewPortalName("")
+    await load()
+  }
 
   async function addProgram() {
     if (!programForm.name) return
@@ -166,6 +176,33 @@ export default function OrganizationDetail() {
                 {!guysRows.length && <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין הפניות למוסד זה</td></tr>}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "portal" && (
+        <div style={{ padding: "24px 32px" }}>
+          <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={newPortalName} onChange={e => setNewPortalName(e.target.value)} placeholder="שם איש הקשר במוסד" style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <button onClick={addPortalUser} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 600, cursor: "pointer" }}>+ צור חשבון פורטל</button>
+            </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {portalUsers.map(u => {
+              const link = typeof window !== "undefined" ? `${window.location.origin}/portal/institution/${u.access_token}` : ""
+              return (
+                <div key={u.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>{u.name}</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input readOnly value={link} style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 6, padding: 6, fontSize: 12, color: T.slate }} />
+                    <button onClick={() => navigator.clipboard.writeText(link)} style={{ background: T.bg, color: T.slate, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>העתק</button>
+                  </div>
+                  <div style={{ fontSize: 11, color: T.slate, marginTop: 6 }}>כניסה אחרונה: {u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL") : "טרם נכנס"}</div>
+                </div>
+              )
+            })}
+            {!portalUsers.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין חשבונות פורטל למוסד זה</div>}
           </div>
         </div>
       )}

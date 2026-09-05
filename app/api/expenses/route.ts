@@ -17,6 +17,13 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
+  // Status-only update (dashboard approve/reject) — never touches other
+  // fields, mirrors the same guard already used in /api/tasks.
+  if (d.status_only || (d.description === undefined && d.amount === undefined)) {
+    if (d.status === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+    await sql`UPDATE expenses SET status=${d.status} WHERE id=${d.id}`;
+    return NextResponse.json({ ok: true });
+  }
   await sql`UPDATE expenses SET event_id=${d.event_id||null},description=${d.description},vendor=${d.vendor||''},amount=${d.amount||0},date=${d.date||null},status=${d.status},category=${d.category||'other'} WHERE id=${d.id}`;
   return NextResponse.json({ ok: true });
 }

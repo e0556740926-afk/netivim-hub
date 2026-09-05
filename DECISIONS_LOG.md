@@ -220,6 +220,68 @@ handled separately.
   (`/admin/settings/fields`, `/automation`, `/audit-log`,
   `/api/admin/custom-fields`, `/api/admin/automation-settings`).
 
+## 2026-09-05 — Stage 6 (Dashboards G1-G3 + External Portals H1-H5)
+
+- **Shared aggregation**: `/api/dashboards/summary` computes every metric
+  used by all three management dashboards once (funnel, dropout reasons,
+  demographics, category placements, budget-by-source, coordinator
+  performance vs targets, pending approvals, 12-month placement trend,
+  response time, process duration) — all real queries, not mock numbers.
+  Fields with genuinely no backing data model (`call_center_qc`,
+  `staffing_positions`, `retention_rates`) are returned as `null` so the UI
+  shows an honest "not available yet" state instead of a fabricated figure.
+- **G1 Executive / G2 CEO / G3 Funder** dashboards built against that
+  endpoint. G2's approve/reject buttons required adding a safe
+  `status_only` PATCH mode to `/api/expenses` (mirroring the existing
+  pattern in `/api/tasks`) — the prior PATCH required every field and would
+  have silently wiped `description`/`vendor`/`amount` on a bare
+  `{id, status}` call. G3 is fully aggregate/de-identified (no names in the
+  query at all) but its "export" button is a raw JSON download of the
+  summary, not a per-block formatted Excel/PDF export like the mock implies.
+- **Correction on numbering**: the brief calls G1 "Director Dashboard" —
+  the design package's own file is `G1-Executive-Dashboard.dc.html`; built
+  against the real file.
+- **External portals — real token-based auth, not staff sessions**:
+  added `institution_users.access_token` and `leads.advisee_access_token`
+  (unique random tokens, additive). `/api/portal/*` added to the public
+  route list (secured by the token in the URL, matching the existing
+  `calendar_token` pattern in this codebase) — every portal query resolves
+  organization/case from the token server-side first; a referral or
+  confirmation ID belonging to a different institution is rejected even if
+  guessed, because the `WHERE` clause checks `organization_id`/token-derived
+  scope too, not just the record's own ID.
+- **H1-H3 Institution Portal**: one combined mobile-first page — 4-number
+  dashboard, pending referrals with inline status update (interview
+  scheduled/accepted/rejected/enrolled), current roster, history, and the
+  quarterly retention "is everyone still here" flow with a per-person
+  "left" toggle — all matching the mock's copy and layout closely, backed
+  by real `referrals`/`leads`/`retention_confirmations` data. Added a
+  "פורטל מוסד" tab on the Organizations detail page to create portal
+  accounts and copy their links.
+- **H4 Advisee Portal**: real status message (mapped from `advisor_status`),
+  real active referrals, and a working "message to advisor" that logs to
+  the new `case_interactions` table and opens a real task for the case
+  owner. The mock's "forms to fill" and "upcoming meetings" sections were
+  **not built** — there's no forms system or advisee-facing meeting model
+  in this schema (the existing `meetings` table is an internal
+  coordinator/manager log, not advisee-facing).
+- **H5 Public Info Portal**: fully static (guides/FAQ/alumni stories are
+  hardcoded content, no DB read) with zero external scripts, per the
+  spec's constraint. Its contact form reuses the existing public
+  `POST /api/leads` endpoint rather than a new one. Required widening
+  `leads.source`'s CHECK constraint to add `'info_portal'` as a 4th allowed
+  value (additive — existing `manual`/`link`/`event` rows untouched,
+  verified 18/18 preserved with source values intact).
+- Verified: `npm run build` clean, all new routes compiled
+  (`/admin/dashboards/{executive,ceo,funder}`, `/api/dashboards/summary`,
+  `/portal/institution/[token]`, `/portal/advisee/[token]`, `/portal/info`,
+  `/api/portal/**`, `/api/admin/institution-portal-users/[orgId]`).
+- Full data-integrity check across the whole build-out: `leads`=18,
+  `contacts`=108, `organizations`=46, `events`=2, `coordinators`=2,
+  `users`=6 — all unchanged from the session's original baseline.
+  `tasks`=26 (was 25) — this reflects real coordinator activity on the live
+  system during this session, not anything this build touched.
+
 ## Verification methodology
 
 Every stage: built and verified on a disposable Neon branch first
