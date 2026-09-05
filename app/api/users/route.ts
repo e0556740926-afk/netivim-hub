@@ -3,7 +3,7 @@ import sql from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 
 export async function GET() {
-  const rows = await sql`SELECT id,name,email,role,status,phone,area,created_at FROM users ORDER BY id`;
+  const rows = await sql`SELECT id,name,email,role,status,phone,area,team,created_at FROM users ORDER BY id`;
   return NextResponse.json({ users: rows });
 }
 
@@ -13,9 +13,9 @@ export async function POST(req: NextRequest) {
   const pw = d.password ? await hashPassword(d.password) : '';
   if (existing.length) return NextResponse.json({ error: "דואל כבר קיים במערכת" }, { status: 400 });
   const rows = await sql`
-    INSERT INTO users (name,email,password,role,status,phone,area)
-    VALUES (${d.name},${d.email},${pw},${d.role||'coordinator'},${d.status||'active'},${d.phone||''},${d.area||''})
-    RETURNING id,name,email,role,status,phone,area`;
+    INSERT INTO users (name,email,password,role,status,phone,area,team)
+    VALUES (${d.name},${d.email},${pw},${d.role||'coordinator'},${d.status||'active'},${d.phone||''},${d.area||''},${d.team||null})
+    RETURNING id,name,email,role,status,phone,area,team`;
   const u = rows[0];
   let coordinatorSlug: string | null = null;
   let coordinatorId: number | null = null;
@@ -39,9 +39,9 @@ export async function PATCH(req: NextRequest) {
   const d = await req.json();
   const newPw = d.password ? await hashPassword(d.password) : null;
   if (newPw) {
-    await sql`UPDATE users SET name=${d.name},email=${d.email},role=${d.role},status=${d.status},phone=${d.phone||''},area=${d.area||''},password=${newPw} WHERE id=${d.id}`;
+    await sql`UPDATE users SET name=${d.name},email=${d.email},role=${d.role},status=${d.status},phone=${d.phone||''},area=${d.area||''},team=${d.team||null},password=${newPw} WHERE id=${d.id}`;
   } else {
-    await sql`UPDATE users SET name=${d.name},email=${d.email},role=${d.role},status=${d.status},phone=${d.phone||''},area=${d.area||''} WHERE id=${d.id}`;
+    await sql`UPDATE users SET name=${d.name},email=${d.email},role=${d.role},status=${d.status},phone=${d.phone||''},area=${d.area||''},team=${d.team||null} WHERE id=${d.id}`;
   }
   await sql`UPDATE coordinators SET name=${d.name},area=${d.area||''},email=${d.email},phone=${d.phone||''} WHERE user_id=${d.id}`;
   return NextResponse.json({ ok: true });

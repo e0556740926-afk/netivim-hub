@@ -42,7 +42,7 @@ export default function SettingsPage() {
     setCalTokens(tokens)
   }
   const [err, setErr] = useState("")
-  const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"" })
+  const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"" })
 
   async function load() {
     setLoading(true); setError(false)
@@ -67,12 +67,12 @@ export default function SettingsPage() {
 
   function startEdit(u: any) {
     setEditUser(u)
-    setForm({ name:u.name, email:u.email, password:"", role:u.role, status:u.status, phone:u.phone||"", area:u.area||"" })
+    setForm({ name:u.name, email:u.email, password:"", role:u.role, status:u.status, phone:u.phone||"", area:u.area||"", team:u.team||"" })
     setShowForm(true); setErr(""); setActiveCoord(null); setActivity(null)
   }
   function startAdd() {
     setEditUser(null)
-    setForm({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"" })
+    setForm({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"" })
     setShowForm(true); setErr("")
   }
 
@@ -144,6 +144,14 @@ export default function SettingsPage() {
           <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             {Object.entries(ROLE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
           </select></div>
+        {form.role === "admin" && (
+          <div><label className="text-xs font-semibold block mb-1">צוות (לתפריט הצדדי)</label>
+            <select value={form.team} onChange={e=>setForm(f=>({...f,team:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+              <option value="">מנהל ראשי — רואה הכל</option>
+              <option value="advisors">מנהל צוות ייעוץ</option>
+              <option value="field">מנהל צוות שטח וקהילה</option>
+            </select></div>
+        )}
         <div><label className="text-xs font-semibold block mb-1">אזור פעילות</label><input value={form.area} onChange={e=>setForm(f=>({...f,area:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
         <div><label className="text-xs font-semibold block mb-1">סטטוס</label>
           <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">

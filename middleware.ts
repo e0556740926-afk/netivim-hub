@@ -109,6 +109,16 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+// Which /admin sub-paths belong to which team, mirroring the Sidebar
+// groups. Paths not listed here (shared/exec pages) stay open to any admin.
+const ADVISORS_TEAM_PATHS = ["/admin/leads", "/admin/cases", "/admin/organizations"];
+const FIELD_TEAM_PATHS = ["/admin/contacts", "/admin/events", "/admin/reports",
+  "/admin/dashboard", "/admin/targets", "/admin/leaderboard", "/admin/field-budget", "/admin/community-dashboard"];
+
+function pathInGroup(pathname: string, group: string[]) {
+  return group.some(p => pathname === p || pathname.startsWith(p + "/"));
+}
+
   // ── Admin pages ─────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {
     const user = await getUser(req);
@@ -120,6 +130,18 @@ export async function middleware(req: NextRequest) {
     if (user.role === "coordinator") {
       const url = req.nextUrl.clone();
       url.pathname = "/coord/home";
+      return NextResponse.redirect(url);
+    }
+    // Team managers (users.team = 'advisors' | 'field') are confined to
+    // their own group's pages — real enforcement, not just a hidden nav
+    // item. A chief admin (no team set) is unrestricted.
+    const team = (user as any).team as string | undefined;
+    if (team === "advisors" && pathInGroup(pathname, FIELD_TEAM_PATHS)) {
+      const url = req.nextUrl.clone(); url.pathname = "/admin/leads";
+      return NextResponse.redirect(url);
+    }
+    if (team === "field" && pathInGroup(pathname, ADVISORS_TEAM_PATHS)) {
+      const url = req.nextUrl.clone(); url.pathname = "/admin/contacts";
       return NextResponse.redirect(url);
     }
   }
