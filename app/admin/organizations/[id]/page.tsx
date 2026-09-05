@@ -6,8 +6,8 @@ import ErrorState from "@/components/ui/ErrorState"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B", referredFg: "#6B4E9E", referredBg: "#f2eef8" }
 const REL_COLOR: Record<string, { bg: string; fg: string }> = { "פעיל": { bg: "#EAF3EE", fg: T.ok }, "חדש": { bg: T.bg, fg: T.slate }, "בבדיקה": { bg: "#FDF6E7", fg: T.warn } }
-const TABS = ["overview", "tracks", "guys", "portal"] as const
-const TAB_LABEL: Record<string, string> = { overview: "סקירה", tracks: "מסלולים", guys: "הבחורים שלנו", portal: "פורטל מוסד" }
+const TABS = ["overview", "tracks", "guys", "contacts", "interactions", "meetings", "portal"] as const
+const TAB_LABEL: Record<string, string> = { overview: "סקירה", tracks: "מסלולים", guys: "הבחורים שלנו", contacts: "אנשי קשר", interactions: "יומן אינטראקציות", meetings: "פגישות", portal: "פורטל מוסד" }
 function Stars({ n }: { n: number }) { return <span style={{ color: T.warn }}>{"★".repeat(n)}<span style={{ color: T.border }}>{"☆".repeat(5 - n)}</span></span> }
 function fdt(d?: string | null) { return d ? new Date(d).toLocaleDateString("he-IL") : "" }
 
@@ -17,6 +17,8 @@ export default function OrganizationDetail() {
   const [newPortalName, setNewPortalName] = useState("")
   const [migrating, setMigrating] = useState<number | null>(null)
   const [migrateForm, setMigrateForm] = useState({ email: "", password: "" })
+  const [meetingForm, setMeetingForm] = useState({ meeting_date: "", attendees: "", summary: "" })
+  const [showMeetingForm, setShowMeetingForm] = useState(false)
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -49,6 +51,13 @@ export default function OrganizationDetail() {
     await load()
   }
 
+  async function addMeeting() {
+    if (!meetingForm.meeting_date) return
+    await fetch(`/api/organizations/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "meeting", ...meetingForm }) })
+    setMeetingForm({ meeting_date: "", attendees: "", summary: "" }); setShowMeetingForm(false)
+    await load()
+  }
+
   async function addProgram() {
     if (!programForm.name) return
     await fetch(`/api/organizations/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(programForm) })
@@ -60,7 +69,7 @@ export default function OrganizationDetail() {
   if (loading) return <div className="p-6"><SkeletonCard /></div>
   if (error || !data) return <ErrorState retry={load} />
 
-  const { organization: o, programs, referrals, stats } = data
+  const { organization: o, contacts, programs, referrals, stats, interactions, meetings } = data
   const rel = REL_COLOR[o.relationship_status] || REL_COLOR["חדש"]
   const guysRows = referrals.filter((r: any) => r.case_id)
 
@@ -185,6 +194,65 @@ export default function OrganizationDetail() {
                 {!guysRows.length && <tr><td colSpan={4} style={{ padding: 16, textAlign: "center", color: T.slate }}>אין עדיין הפניות למוסד זה</td></tr>}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {tab === "contacts" && (
+        <div style={{ padding: "24px 32px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {contacts.map((c: any) => (
+              <div key={c.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ fontWeight: 700 }}>{c.name} <span style={{ fontSize: 12, color: T.slate, fontWeight: 400 }}>{c.role}</span></div>
+                <div style={{ fontSize: 13, color: T.slate, marginTop: 4 }}>{c.phone} · {c.email}</div>
+                {c.notes && <div style={{ fontSize: 12, color: T.slate, marginTop: 4 }}>{c.notes}</div>}
+              </div>
+            ))}
+            {!contacts.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין אנשי קשר משויכים למוסד זה</div>}
+          </div>
+        </div>
+      )}
+
+      {tab === "interactions" && (
+        <div style={{ padding: "24px 32px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {interactions.map((i: any) => (
+              <div key={i.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700 }}>{i.contact_name}</span>
+                  <span style={{ fontSize: 12, color: T.slate }}>{i.date ? String(i.date).slice(0, 10) : ""}</span>
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>{i.summary}</div>
+                {i.next_step && <div style={{ fontSize: 12, color: T.slate, marginTop: 4 }}>צעד הבא: {i.next_step}</div>}
+              </div>
+            ))}
+            {!interactions.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין אינטראקציות מתועדות מול אנשי הקשר של מוסד זה</div>}
+          </div>
+        </div>
+      )}
+
+      {tab === "meetings" && (
+        <div style={{ padding: "24px 32px" }}>
+          <button onClick={() => setShowMeetingForm(s => !s)} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>+ פגישה חדשה</button>
+          {showMeetingForm && (
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <input type="date" value={meetingForm.meeting_date} onChange={e => setMeetingForm(f => ({ ...f, meeting_date: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <input placeholder="משתתפים" value={meetingForm.attendees} onChange={e => setMeetingForm(f => ({ ...f, attendees: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <textarea placeholder="סיכום" value={meetingForm.summary} onChange={e => setMeetingForm(f => ({ ...f, summary: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <button onClick={addMeeting} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: 8, fontWeight: 600, cursor: "pointer" }}>שמור</button>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {meetings.map((m: any) => (
+              <div key={m.id} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontWeight: 700 }}>{m.meeting_date ? String(m.meeting_date).slice(0, 10) : ""}</span>
+                  <span style={{ fontSize: 12, color: T.slate }}>{m.attendees}</span>
+                </div>
+                {m.summary && <div style={{ fontSize: 13, marginTop: 4 }}>{m.summary}</div>}
+              </div>
+            ))}
+            {!meetings.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין פגישות מתועדות מול מוסד זה (שונה מיומן הפגישות הפנימי בין רכז למנהל)</div>}
           </div>
         </div>
       )}
