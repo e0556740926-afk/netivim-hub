@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
+import ReferralWizard from "@/components/cases/ReferralWizard"
 
 // Tokens from design-tokens/tokens.css, kept local to this screen (see
 // /admin/cases/page.tsx and DECISIONS_LOG.md for why it isn't global yet).
@@ -49,7 +50,6 @@ export default function CaseDetail() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const [data, setData] = useState<any>(null)
-  const [orgs, setOrgs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [tab, setTab] = useState<typeof TABS[number]>("overview")
@@ -60,19 +60,18 @@ export default function CaseDetail() {
   const [protectedData, setProtectedData] = useState<any>(null)
   const [protectedOpen, setProtectedOpen] = useState(false)
   const [showExtendedAccordion, setShowExtendedAccordion] = useState(false)
-  const [referralForm, setReferralForm] = useState({ organization_id: "", summary_text: "" })
+  const [showWizard, setShowWizard] = useState(false)
   const [interactionForm, setInteractionForm] = useState({ type: "call", summary: "", next_step: "" })
   const [showInteractionForm, setShowInteractionForm] = useState(false)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [r, orgR] = await Promise.all([fetch(`/api/cases/${id}`), fetch("/api/organizations")])
+      const r = await fetch(`/api/cases/${id}`)
       if (!r.ok) throw new Error()
       const d = await r.json()
       setData(d)
       if (d.extended) setExtended(d.extended)
-      setOrgs((await orgR.json()).organizations || [])
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
@@ -102,13 +101,6 @@ export default function CaseDetail() {
   }
   async function saveProtected() {
     await fetch(`/api/cases/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_protected", sensitive_data: protectedData }) })
-  }
-  async function sendReferral() {
-    if (!referralForm.organization_id) return
-    const r = await fetch("/api/referrals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ case_id: Number(id), organization_id: Number(referralForm.organization_id), summary_text: referralForm.summary_text }) })
-    if (!r.ok) { const { error } = await r.json(); alert(error); return }
-    setReferralForm({ organization_id: "", summary_text: "" })
-    await load()
   }
   async function updateReferralStatus(refId: number, status: string) {
     const r = await fetch("/api/referrals", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: refId, status }) })
@@ -140,7 +132,7 @@ export default function CaseDetail() {
       <div style={{ width: 96, background: "#fff", borderLeft: `1px solid ${T.border}`, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "20px 0", position: "sticky", top: 0, height: "100vh" }}>
         <RailBtn label="שינוי סטטוס" shape="square" color={T.blue} onClick={() => setModal("status")} />
         <RailBtn label="שינוי סיווג רמזור" shape="circle" color={T.breach} onClick={() => setModal("triage")} />
-        <RailBtn label="יצירת הפניה" shape="square" color={T.slate} onClick={() => setTab("referrals")} />
+        <RailBtn label="יצירת הפניה" shape="square" color={T.slate} onClick={() => setShowWizard(true)} />
         <RailBtn label="תיעוד שיחה" shape="square" color={T.slate} onClick={() => { setTab("log"); setShowInteractionForm(true) }} />
       </div>
 
@@ -314,13 +306,7 @@ export default function CaseDetail() {
                   </div>
                 ))}
                 {activeReferrals.length < 3 && (
-                  <div style={{ background: "#fff", border: `2px dashed ${T.border}`, borderRadius: 12, padding: 16, display: "flex", flexDirection: "column", gap: 8, justifyContent: "center" }}>
-                    <select value={referralForm.organization_id} onChange={e => setReferralForm(f => ({ ...f, organization_id: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 6, fontSize: 12 }}>
-                      <option value="">בחר מוסד...</option>
-                      {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>
-                    <button onClick={sendReferral} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 6, padding: 6, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>+ שלח הפניה</button>
-                  </div>
+                  <div onClick={() => setShowWizard(true)} style={{ background: "#fff", border: `2px dashed ${T.border}`, borderRadius: 12, padding: 16, display: "flex", alignItems: "center", justifyContent: "center", color: T.blue, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ מקום פנוי להפניה נוספת</div>
                 )}
               </div>
             </div>
@@ -389,7 +375,7 @@ export default function CaseDetail() {
           <div style={{ background: "#FDF6E7", border: "1px solid #B7791F33", borderRadius: 8, padding: "12px 14px", fontSize: 13, color: T.warn, margin: "14px 0 20px" }}>לא ניתן לעבור לסטטוס זה — לתיק אין הפנייה פעילה. יש ליצור הפניה למסגרת לפני שינוי הסטטוס.</div>
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
             <button onClick={() => setModal(null)} style={{ background: "transparent", color: T.slate, border: `1px solid ${T.border}`, borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>סגור</button>
-            <button onClick={() => { setModal(null); setTab("referrals") }} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>+ יצירת הפניה</button>
+            <button onClick={() => { setModal(null); setShowWizard(true) }} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>+ יצירת הפניה</button>
           </div>
         </Modal>
       )}
@@ -426,6 +412,10 @@ export default function CaseDetail() {
             <button onClick={submitTriage} style={{ background: T.breach, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>שלח לרב אוברמייסטר</button>
           </div>
         </Modal>
+      )}
+
+      {showWizard && (
+        <ReferralWizard caseData={c} onClose={() => setShowWizard(false)} onSent={() => { setShowWizard(false); load() }} />
       )}
     </div>
   )
