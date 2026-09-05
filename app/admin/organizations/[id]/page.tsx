@@ -15,6 +15,8 @@ export default function OrganizationDetail() {
   const { id } = useParams<{ id: string }>()
   const [portalUsers, setPortalUsers] = useState<any[]>([])
   const [newPortalName, setNewPortalName] = useState("")
+  const [migrating, setMigrating] = useState<number | null>(null)
+  const [migrateForm, setMigrateForm] = useState({ email: "", password: "" })
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -32,6 +34,13 @@ export default function OrganizationDetail() {
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
+
+  async function migrateToAccount(userId: number) {
+    if (!migrateForm.email || !migrateForm.password) return
+    await fetch(`/api/admin/institution-portal-users/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "migrate_to_account", user_id: userId, email: migrateForm.email, password: migrateForm.password }) })
+    setMigrating(null); setMigrateForm({ email: "", password: "" })
+    await load()
+  }
 
   async function addPortalUser() {
     if (!newPortalName) return
@@ -199,6 +208,17 @@ export default function OrganizationDetail() {
                     <button onClick={() => navigator.clipboard.writeText(link)} style={{ background: T.bg, color: T.slate, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>העתק</button>
                   </div>
                   <div style={{ fontSize: 11, color: T.slate, marginTop: 6 }}>כניסה אחרונה: {u.last_login_at ? new Date(u.last_login_at).toLocaleString("he-IL") : "טרם נכנס"}</div>
+                  {u.migrated_at ? (
+                    <div style={{ fontSize: 11, color: T.ok, marginTop: 6, fontWeight: 600 }}>✓ חשבון פעיל ({u.email})</div>
+                  ) : migrating === u.id ? (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                      <input placeholder="דוא&quot;ל" value={migrateForm.email} onChange={e => setMigrateForm(f => ({ ...f, email: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: 6, fontSize: 12 }} />
+                      <input placeholder="סיסמה זמנית" value={migrateForm.password} onChange={e => setMigrateForm(f => ({ ...f, password: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 6, padding: 6, fontSize: 12 }} />
+                      <button onClick={() => migrateToAccount(u.id)} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 6, padding: 6, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>שמור וצור חשבון</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setMigrating(u.id)} style={{ marginTop: 6, background: "none", border: "none", color: T.blue, fontSize: 11, cursor: "pointer", padding: 0 }}>שדרג לחשבון (דוא&quot;ל+סיסמה) ←</button>
+                  )}
                 </div>
               )
             })}
