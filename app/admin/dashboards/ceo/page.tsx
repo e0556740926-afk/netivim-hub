@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
 function money(n: number) { return `₪${Math.round(n).toLocaleString()}` }
@@ -10,6 +11,7 @@ export default function CEODashboard() {
   const [approving, setApproving] = useState<number | null>(null)
   const [expenses, setExpenses] = useState<any[]>([])
   const [requests, setRequests] = useState<any[]>([])
+  const drawer = useDrawer()
 
   async function load() {
     const [s, e, r] = await Promise.all([fetch("/api/dashboards/summary"), fetch("/api/expenses"), fetch("/api/budget/purchase-requests")])
@@ -45,9 +47,9 @@ export default function CEODashboard() {
       <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>דשבורד מנכ&quot;ל</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>סך תיקים</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4 }}>{f.total_inquiries}</div></div>
-        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>תיקים פעילים</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4 }}>{f.active_process}</div></div>
-        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>שיבוצים סה&quot;כ</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, color: T.ok }}>{f.placed}</div></div>
+        <div onClick={() => drawer.openDrawer("total_inquiries", `סך תיקים — ${f.total_inquiries}`)} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, cursor: "pointer" }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>סך תיקים</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4 }}>{f.total_inquiries}</div></div>
+        <div onClick={() => drawer.openDrawer("active_process", `תיקים פעילים — ${f.active_process}`)} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, cursor: "pointer" }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>תיקים פעילים</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4 }}>{f.active_process}</div></div>
+        <div onClick={() => drawer.openDrawer("placed", `שיבוצים — ${f.placed}`)} style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18, cursor: "pointer" }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>שיבוצים סה&quot;כ</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4, color: T.ok }}>{f.placed}</div></div>
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 18 }}><div style={{ fontSize: 12, fontWeight: 600, color: T.slate }}>שיעור המרה</div><div style={{ fontSize: 30, fontWeight: 700, marginTop: 4 }}>{f.conversion_rate !== null ? `${f.conversion_rate}%` : "—"}</div></div>
       </div>
 
@@ -120,6 +122,7 @@ export default function CEODashboard() {
           </div>
         </div>
       </div>
+      <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
     </div>
   )
 }

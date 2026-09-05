@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
 const FUNNEL_COLORS = ["#14213D", "#1F3864", "#2E5C8A", "#6B4E9E", "#B7791F", "#2E6B4F"]
@@ -7,6 +8,7 @@ const FUNNEL_COLORS = ["#14213D", "#1F3864", "#2E5C8A", "#6B4E9E", "#B7791F", "#
 export default function ExecutiveDashboard() {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const drawer = useDrawer()
 
   useEffect(() => {
     fetch("/api/dashboards/summary").then(r => r.json()).then(setData).finally(() => setLoading(false))
@@ -16,9 +18,9 @@ export default function ExecutiveDashboard() {
 
   const f = data.funnel
   const stages = [
-    ["סך פניות", f.total_inquiries], ["נוצר קשר", f.contacted], ["בתהליך פעיל", f.active_process],
-    ["הופנו", f.referred], ["התקבלו", f.accepted], ["שובצו", f.placed],
-  ] as [string, number][]
+    ["סך פניות", f.total_inquiries, "total_inquiries"], ["נוצר קשר", f.contacted, "contacted"], ["בתהליך פעיל", f.active_process, "active_process"],
+    ["הופנו", f.referred, "referred"], ["התקבלו", f.accepted, "accepted"], ["שובצו", f.placed, "placed"],
+  ] as [string, number, string][]
   const maxVal = Math.max(1, f.total_inquiries)
 
   return (
@@ -29,13 +31,13 @@ export default function ExecutiveDashboard() {
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 18 }}>משפך תהליכי ייעוץ</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 24 }}>
-          {stages.map(([label, val], i) => {
+          {stages.map(([label, val, key], i) => {
             const widthPct = Math.max(20, Math.round((val / maxVal) * 100))
             const prev = i > 0 ? stages[i - 1][1] : val
             const pct = prev > 0 ? Math.round((val / prev) * 100) : null
             return (
               <div key={label}>
-                <div style={{ width: `${widthPct}%`, margin: "0 auto", background: FUNNEL_COLORS[i], color: "#fff", borderRadius: 8, padding: "12px 20px", display: "flex", justifyContent: "space-between" }}>
+                <div onClick={() => drawer.openDrawer(key, `${label} — ${val}`)} style={{ width: `${widthPct}%`, margin: "0 auto", background: FUNNEL_COLORS[i], color: "#fff", borderRadius: 8, padding: "12px 20px", display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
                   <span>{label}</span><span style={{ fontWeight: 700 }}>{val}</span>
                 </div>
                 {i < stages.length - 1 && pct !== null && <div style={{ fontSize: 11, color: T.slate, textAlign: "center", marginTop: 4 }}>↓ {pct}%</div>}
@@ -46,7 +48,7 @@ export default function ExecutiveDashboard() {
         <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 12 }}>שיבוצים לפי קטגוריה (הפניות שהתקבלו)</div>
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, data.category_placements.length)}, 1fr)`, gap: 12 }}>
           {data.category_placements.map((c: any) => (
-            <div key={c.category} style={{ background: T.bg, borderRadius: 10, padding: 14, textAlign: "center" }}>
+            <div key={c.category} onClick={() => drawer.openDrawer(`category_${c.category}`, `${c.category} — ${c.n} שיבוצים`)} style={{ background: T.bg, borderRadius: 10, padding: 14, textAlign: "center", cursor: "pointer" }}>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{c.n}</div>
               <div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>{c.category}</div>
             </div>
@@ -73,7 +75,7 @@ export default function ExecutiveDashboard() {
           <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>סיבות נטישה</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {data.dropout_reasons.map((d: any, i: number) => (
-              <div key={d.reason}>
+              <div key={d.reason} onClick={() => drawer.openDrawer(`dropout_${d.reason}`, `${d.reason} — ${d.count} תיקים`)} style={{ cursor: "pointer" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}><span>{d.reason}</span><span style={{ fontWeight: 700 }}>{d.pct}%</span></div>
                 <div style={{ height: 10, background: T.bg, borderRadius: 5 }}><div style={{ height: "100%", width: `${d.pct}%`, background: [T.slate, T.warn, T.border][i % 3], borderRadius: 5 }} /></div>
               </div>
@@ -97,8 +99,9 @@ export default function ExecutiveDashboard() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, fontSize: 12, color: T.slate }}>
-        הערה: לחיצה על כל מספר כדי לפתוח מגירה עם הרשימה שמאחוריו (כמו במוק המקורי) לא נבנתה בסבב הזה — כל המספרים כאן הם מחושבים אמיתיים, אך אינם לחיצים.
+        הערה: זמן תגובה/משך תהליך ודמוגרפיה עדיין לא לחיצים בסבב הזה — רק מספרי המשפך, פילוח הקטגוריות וסיבות הנטישה.
       </div>
+      <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
     </div>
   )
 }

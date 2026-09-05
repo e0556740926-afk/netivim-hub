@@ -1,21 +1,54 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { getAutomationSettings } from "@/lib/automation-settings";
 
 /**
- * One shared aggregation endpoint for the three management dashboards
- * (G1 Executive, G2 CEO, G3 Funder) — they overlap heavily (funnel,
- * category split, dropout reasons, demographics, budget utilization),
- * so this computes each metric once from real data rather than three
- * times with drift risk between them.
- *
- * Everything here is a real query against live tables. Where the mock
- * shows a number with no backing data model in this system (call-center
- * QC, staffing positions, campaign-level dropout), the corresponding
- * field is `null` and the UI shows an honest empty state instead of a
- * fabricated figure.
+ * ?detail=<key> returns the underlying row list for one dashboard number,
+ * built from the exact same WHERE-clause logic as the aggregate below —
+ * per completion spec §9, "not calculated twice two different ways".
  */
-export async function GET() {
+async function getDrawerDetail(key: string) {
+  switch (key) {
+    case "total_inquiries":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL ORDER BY created_at DESC`;
+    case "contacted":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND first_touch_at IS NOT NULL ORDER BY created_at DESC`;
+    case "active_process":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND advisor_status NOT IN ('פנייה חדשה') ORDER BY created_at DESC`;
+    case "referred":
+      return sql`
+        SELECT DISTINCT l.id, l.name, l.age, l.city, l.advisor_status FROM leads l JOIN referrals r ON r.case_id = l.id
+        WHERE l.deleted_at IS NULL ORDER BY l.id DESC`;
+    case "accepted":
+      return sql`
+        SELECT DISTINCT l.id, l.name, l.age, l.city, l.advisor_status FROM leads l JOIN referrals r ON r.case_id = l.id
+        WHERE l.deleted_at IS NULL AND r.status = 'התקבל' ORDER BY l.id DESC`;
+    case "placed":
+      return sql`SELECT id, name, age, city, advisor_status FROM leads WHERE deleted_at IS NULL AND advisor_status IN ('שובץ במסגרת','הסתיים בהצלחה') ORDER BY created_at DESC`;
+    default:
+      if (key.startsWith("category_")) {
+        const cat = key.slice("category_".length);
+        return sql`
+          SELECT l.id, l.name, l.age, o.name AS organization_name
+          FROM referrals r JOIN leads l ON l.id = r.case_id JOIN organizations o ON o.id = r.organization_id
+          LEFT JOIN org_programs op ON op.id = r.program_id
+          WHERE r.status = 'התקבל' AND COALESCE(op.category, o.category, 'לא סווג') = ${cat}`;
+      }
+      if (key.startsWith("dropout_")) {
+        const reason = key.slice("dropout_".length);
+        return sql`SELECT id, name, age, city FROM leads WHERE advisor_status='לא פעיל' AND inactive_reason=${reason} ORDER BY created_at DESC`;
+      }
+      return [];
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const detailKey = req.nextUrl.searchParams.get("detail");
+  if (detailKey) {
+    const rows = await getDrawerDetail(detailKey);
+    return NextResponse.json({ rows });
+  }
+
   const settings = await getAutomationSettings();
   const [
     totals, dropout, demographics, categoryPlacements, budgetSources,
