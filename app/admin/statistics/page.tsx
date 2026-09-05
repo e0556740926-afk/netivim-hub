@@ -360,6 +360,11 @@ export default function StatisticsPage() {
         {anomalies?.anomalies.length ? anomalies.anomalies.map((a: any, i: number) => (
           <div key={i} style={{ background: "#FDF6E7", border: "1px solid #B7791F33", borderRadius: 8, padding: 12, marginBottom: 8, fontSize: 13 }}>
             <strong>{a.coordinator_name}</strong> — {a.month}: שיעור המרה {a.current_rate}% מול ממוצע היסטורי {a.historical_avg}% ({a.deviation_pct > 0 ? "+" : ""}{a.deviation_pct}%)
+            {a.story && (
+              <div style={{ background: T.bg, borderRadius: 6, padding: "8px 10px", marginTop: 8, fontSize: 12, color: T.slate, fontStyle: "italic", display: "flex", gap: 6 }}>
+                <span>💡</span><span>{a.story}</span>
+              </div>
+            )}
           </div>
         )) : <div style={{ color: T.slate, fontSize: 13 }}>אין חריגות משמעותיות כרגע (או שאין מספיק היסטוריה עדיין — {anomalies?.insufficient_data_for?.join(", ") || "אין"})</div>}
       </div>

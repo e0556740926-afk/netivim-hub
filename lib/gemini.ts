@@ -60,3 +60,47 @@ export async function translateQuestionToPivotQuery(question: string): Promise<
   }
   return { ok: true, query: parsed.data, raw };
 }
+
+/**
+ * Phrases already-computed numeric anomalies into one short sentence
+ * each, in the same order given. Gemini never sees raw data — only the
+ * already-computed numbers — and is explicitly told not to invent any
+ * interpretation beyond what the numbers state (spec §6: "the text
+ * phrases an already-computed numeric result, it doesn't invent a new
+ * insight").
+ */
+export async function narrateAnomalies(anomalies: Array<Record<string, any>>): Promise<string[] | null> {
+  if (!anomalies.length) return [];
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return null;
+
+  const prompt = `נתונות ${anomalies.length} חריגות סטטיסטיות שכבר חושבו במלואן (המספרים סופיים, אל תשנה ואל תחשב מחדש).
+עבור כל אחת, כתוב משפט קצר אחד בעברית שמנסח את המספרים במילים — לא תובנה חדשה, לא ניחוש לגבי הסיבה, רק ניסוח.
+החזר JSON: {"sentences": ["...", "..."]} באותו סדר בדיוק, בלי טקסט נוסף.
+
+הנתונים:
+${JSON.stringify(anomalies)}`;
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
+        }),
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) return null;
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed?.sentences) || parsed.sentences.length !== anomalies.length) return null;
+    return parsed.sentences;
+  } catch {
+    return null;
+  }
+}

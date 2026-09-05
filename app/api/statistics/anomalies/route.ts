@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { canAccessStatistics } from "@/lib/statistics-guard";
+import { narrateAnomalies } from "@/lib/gemini";
 import sql from "@/lib/db";
 
 const MIN_HISTORY_MONTHS = 2; // need at least this many prior months to call something a "deviation"
@@ -39,6 +40,13 @@ export async function GET(req: NextRequest) {
       });
     }
   }
+
+  // Data-storytelling layer (spec §6) — best-effort: if Gemini is
+  // unreachable or misbehaves, the numbers above are still shown
+  // exactly as computed; narration is a pure addition, never a
+  // dependency for the numeric result itself.
+  const stories = await narrateAnomalies(anomalies);
+  if (stories) anomalies.forEach((a, i) => { a.story = stories[i]; });
 
   return NextResponse.json({
     anomalies, insufficient_data_for: insufficientData,
