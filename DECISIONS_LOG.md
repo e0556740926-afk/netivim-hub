@@ -139,6 +139,37 @@ handled separately.
 - Verified: `npm run build` clean, `/admin/cases/[id]` and `/api/cases/[id]`
   compiled successfully.
 
+## 2026-09-05 — Stage 2 (Referral Wizard, B4-B5) + Stage 3 (Organizations, D1-D2)
+
+- **Referral Wizard**: `components/cases/ReferralWizard.tsx`, a 3-step modal
+  matching `screens/B4-B5-Referral-Wizard.dc.html` exactly (institution/track
+  selection with match %, exact preview of what the institution will see,
+  confirm & send). New `/api/referrals/suggestions`: a transparent scoring
+  heuristic (category/interest overlap + program capacity + age fit) — **not
+  a trained matching model**, since none exists; every suggestion carries a
+  `reason` string so the advisor sees why, not just a bare percentage.
+- **Organizations**: added `organizations.rating`, `relationship_status`,
+  `description`, `total_students` (all nullable/defaulted, additive).
+  `/admin/organizations` (D1) rebuilt with the cards/table toggle, filters,
+  and free search from the mock. `/admin/organizations/[id]` (D2) rebuilt
+  with the two stat cards, 3 tabs (סקירה/מסלולים/הבחורים שלנו).
+  - "שלחנו אליהם" (sent) is real, computed from `referrals`.
+  - "הם הפנו אלינו" (received) has **no backing data model** — Hub never
+    recorded inbound institution-initiated referrals as a distinct concept —
+    shown honestly as "עדיין לא נמדד" rather than a fabricated number.
+  - "מדד התמדה היסטורי" computed as completed-successfully ÷ ever-accepted
+    referrals for that org; shows "אין עדיין נתונים" when there's no
+    referral history yet, rather than 0% or a guess.
+  - The mock's D2 also shows tabs for אנשי קשר / יומן אינטראקציות / פגישות
+    — **not built**: contacts are visible via the Organizations detail's own
+    `contacts` array in the API response but not surfaced as their own tab
+    yet, and there's no org-level interaction/meeting log distinct from
+    `case_interactions` (which is case-scoped, not institution-scoped).
+  - Note: the brief's D1-D3 numbering doesn't map to 3 separate files — the
+    design package only ships D1 (list) and D2 (profile, tracks as one of
+    its tabs); there's no separate "D3" mock to build against.
+- Verified: `npm run build` clean after both stages.
+
 ## Verification methodology
 
 Every stage: built and verified on a disposable Neon branch first
