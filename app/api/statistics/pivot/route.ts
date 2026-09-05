@@ -24,13 +24,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "בחר בין 1 ל-4 ממדים מהרשימה: " + Object.keys(DIMENSIONS).join(", ") }, { status: 400 });
   }
   const needsReferralJoin = valid.includes("category");
+  const joinClause = needsReferralJoin ? "LEFT JOIN referrals r ON r.case_id = l.id AND r.status = 'התקבל' LEFT JOIN organizations o ON o.id = r.organization_id LEFT JOIN org_programs op ON op.id = r.program_id" : "";
+
+  // Drawer support: same dimension expressions, filtered to one exact
+  // combination instead of grouped — the row-level records behind one
+  // pivot cell, per spec §3.1 ("the drawer reads the same query, not a
+  // separate one that could disagree with the COUNT").
+  const detailParam = req.nextUrl.searchParams.get("detail");
+  if (detailParam !== null) {
+    const values = detailParam.split("|||");
+    if (values.length !== valid.length) return NextResponse.json({ error: "mismatched detail values" }, { status: 400 });
+    const whereClauses = valid.map((d, i) => `(${DIMENSIONS[d]}) = $${i + 1}`);
+    const detailQuery = `
+      SELECT DISTINCT l.id, l.name, l.age, l.city, l.advisor_status
+      FROM leads l ${joinClause}
+      WHERE l.deleted_at IS NULL AND ${whereClauses.join(" AND ")}
+      ORDER BY l.id DESC LIMIT 200`;
+    const rows = await sql.query(detailQuery, values);
+    return NextResponse.json({ rows });
+  }
+
   const selectCols = valid.map((d, i) => `${DIMENSIONS[d]} AS dim${i}`).join(", ");
   const groupCols = valid.map((_, i) => `dim${i}`).join(", ");
 
   const query = `
     SELECT ${selectCols}, count(DISTINCT l.id)::int AS n
     FROM leads l
-    ${needsReferralJoin ? "LEFT JOIN referrals r ON r.case_id = l.id AND r.status = 'התקבל' LEFT JOIN organizations o ON o.id = r.organization_id LEFT JOIN org_programs op ON op.id = r.program_id" : ""}
+    ${joinClause}
     WHERE l.deleted_at IS NULL
     GROUP BY ${groupCols}
     ORDER BY n DESC`;

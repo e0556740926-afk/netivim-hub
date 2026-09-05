@@ -17,9 +17,18 @@ export function useDrawer() {
       setRows(d.rows || [])
     } finally { setLoading(false) }
   }
+  /** Same drawer, but fetches an arbitrary URL — for callers outside the dashboards/summary endpoint (e.g. statistics pivot detail). */
+  async function openDrawerRaw(url: string, label: string) {
+    setTitle(label); setOpen(true); setLoading(true)
+    try {
+      const r = await fetch(url)
+      const d = await r.json()
+      setRows(d.rows || [])
+    } finally { setLoading(false) }
+  }
   function close() { setOpen(false) }
 
-  return { open, title, rows, loading, openDrawer, close }
+  return { open, title, rows, loading, openDrawer, openDrawerRaw, close }
 }
 
 export function Drawer({ open, title, rows, loading, onClose }: { open: boolean; title: string; rows: any[]; loading: boolean; onClose: () => void }) {
