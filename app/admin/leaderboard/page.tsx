@@ -1,59 +1,134 @@
 "use client"
-import { SkeletonCard } from "@/components/ui/Skeleton"
-import ErrorState from "@/components/ui/ErrorState"
-import {useEffect,useState} from "react"
-import {pct,leadColor} from "@/lib/utils"
-import Card from "@/components/ui/Card"
-import Speedometer from "@/components/ui/Speedometer"
+import { useEffect, useState } from "react"
 
-export default function LeaderboardPage(){
-  const [error, setError] = useState(false)
+const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
+const MEDAL = ["🥇", "🥈", "🥉"]
+
+function pct(actual: number, target: number) {
+  if (!target) return null
+  return Math.min(100, Math.round((actual / target) * 100))
+}
+function colorFor(p: number | null) {
+  if (p === null) return T.slate
+  if (p >= 100) return T.ok
+  if (p >= 60) return T.warn
+  return T.breach
+}
+
+export default function LeaderboardPage() {
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [board,setBoard]=useState<any[]>([])
-  const [org,setOrg]=useState({actual:0,target:0})
-  const MEDAL=["🥇","🥈","🥉"]
+  const [editingOrgTarget, setEditingOrgTarget] = useState(false)
+  const [orgTargetInput, setOrgTargetInput] = useState("")
+  const [editingSource, setEditingSource] = useState<number | null>(null)
+  const [sourceTargetInput, setSourceTargetInput] = useState("")
 
-  useEffect(()=>{
-    fetch("/api/targets").then(r=>r.json()).then(({coordinators,targets,leads})=>{
-      const rows=coordinators.map((c:any)=>{
-        const t=targets.find((x:any)=>x.coordinator_id===c.id)?.target_leads||0
-        const mine=leads.filter((l:any)=>l.coordinator_id===c.id)
-        const a=mine.length
-        const fromEvents=mine.filter((l:any)=>l.event_id).length
-        return{name:c.name,area:c.area,actual:a,target:t,fromEvents}
-      }).sort((a:any,b:any)=>b.actual-a.actual)
-      setBoard(rows)
-      setOrg({actual:leads.length,target:targets.reduce((s:any,t:any)=>s+ +t.target_leads,0)})
-    })
-  },[])
+  async function load() {
+    const r = await fetch("/api/admin/leaderboard-sources")
+    const d = await r.json()
+    setData(d)
+    setOrgTargetInput(String(d.org_target || 0))
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
 
-  if (error) return <div className="p-6"><ErrorState retry={()=>window.location.reload()}/></div>
+  async function saveOrgTarget() {
+    await fetch("/api/admin/leaderboard-sources", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ org_target: Number(orgTargetInput) || 0 }) })
+    setEditingOrgTarget(false)
+    await load()
+  }
+  async function saveSourceTarget(id: number) {
+    await fetch("/api/admin/leaderboard-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_source_id: id, target_leads: Number(sourceTargetInput) || 0 }) })
+    setEditingSource(null)
+    await load()
+  }
 
-  return <div className="p-4 md:p-6 lg:p-8 fade-up">
-    <h1 className="text-2xl font-extrabold mb-5">Leaderboard · לידים החודש</h1>
-    <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-5 mb-5">
-      <Card className="p-5 flex flex-col items-center gap-3">
-        <div className="text-sm font-bold">מד לידים ארגוני</div>
-        <Speedometer actual={org.actual} target={org.target} size={160}/>
-        <div className="text-xs text-[#64748B] text-center">{org.actual} / {org.target} לידים</div>
-      </Card>
-      <Card>
-        <div className="p-4 border-b border-[#E2E8F0] text-xs font-bold text-[#64748B] grid grid-cols-[2rem_2fr_1fr_1fr_1fr_2fr_3rem] gap-3">
-          <div>#</div><div>רכז</div><div>אזור</div><div>לידים</div><div title="מתוכם מאירועים">מאירועים</div><div>התקדמות</div><div>%</div>
-        </div>
-        {board.map((r,i)=>{
-          const p=pct(r.actual,r.target);const col=leadColor(p)
-          return <div key={r.name} className="grid grid-cols-[2rem_2fr_1fr_1fr_1fr_2fr_3rem] gap-3 px-4 py-3 border-b border-[#F1F5F9] items-center last:border-b-0">
-            <div className="text-base">{MEDAL[i]||i+1}</div>
-            <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold">{r.name.split(" ").map((w:string)=>w[0]).join("")}</div><div className="text-sm font-semibold">{r.name}</div></div>
-            <div className="text-sm text-[#64748B]">{r.area}</div>
-            <div className="text-sm font-bold" style={{color:col}}>{r.actual}</div>
-            <div className="text-sm text-[#5B21B6] font-semibold">{r.fromEvents>0?`🎪 ${r.fromEvents}`:"—"}</div>
-            <div className="h-2 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${p}%`,background:col}} className="h-full rounded-full transition-all"/></div>
-            <div className="text-xs font-bold text-right" style={{color:col}}>{p}%</div>
+  if (loading || !data) return <div style={{ padding: 32 }}>טוען...</div>
+
+  const orgPct = pct(data.total_this_month, data.org_target)
+  const sorted = [...data.sources].sort((a: any, b: any) => b.total_this_month - a.total_this_month)
+
+  return (
+    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
+      <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>לוח מובילים · לידים החודש לפי מקור</div>
+      <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>
+        כל מקור (רכז או גורם חופשי) שהוגדר ב&quot;מקורות ליד&quot; בהגדרות, וכמה לידים הוא הביא — לא רק רכזים.
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.slate }}>יעד כללי לארגון החודש</div>
+            <div style={{ fontSize: 34, fontWeight: 700, marginTop: 4, color: colorFor(orgPct) }}>
+              {data.total_this_month} / {data.org_target || "—"}
+              {orgPct !== null && <span style={{ fontSize: 16, marginRight: 10 }}>({orgPct}%)</span>}
+            </div>
+            {data.unattributed_this_month > 0 && (
+              <div style={{ fontSize: 11, color: T.slate, marginTop: 4 }}>
+                מתוכם {data.unattributed_this_month} לידים החודש בלי מקור משויך (מלפני שהשדה היה חובה)
+              </div>
+            )}
           </div>
-        })}
-      </Card>
+          {editingOrgTarget ? (
+            <div style={{ display: "flex", gap: 8 }}>
+              <input type="number" value={orgTargetInput} onChange={e => setOrgTargetInput(e.target.value)} style={{ width: 90, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+              <button onClick={saveOrgTarget} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>שמור</button>
+            </div>
+          ) : (
+            <button onClick={() => setEditingOrgTarget(true)} style={{ background: T.bg, color: T.slate, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13 }}>ערוך יעד כללי</button>
+          )}
+        </div>
+        {data.org_target > 0 && (
+          <div style={{ height: 10, background: T.bg, borderRadius: 5, marginTop: 14 }}>
+            <div style={{ height: "100%", width: `${orgPct}%`, background: colorFor(orgPct), borderRadius: 5 }} />
+          </div>
+        )}
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 600 }}>
+          <thead><tr style={{ background: "#EDF2F8" }}>
+            {["#", "מקור", "החודש", "יעד", "התקדמות", "סה\"כ (כל הזמנים)", "%"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
+          </tr></thead>
+          <tbody>
+            {sorted.map((s: any, i: number) => {
+              const p = pct(s.total_this_month, s.target_leads)
+              const col = colorFor(p)
+              return (
+                <tr key={s.id} style={{ borderTop: `1px solid ${T.bg}` }}>
+                  <td style={{ padding: "10px 14px", fontSize: 16 }}>{MEDAL[i] || i + 1}</td>
+                  <td style={{ padding: "10px 14px", fontWeight: 600 }}>
+                    {s.label}{s.coordinator_id && <span style={{ fontSize: 11, color: T.slate, marginRight: 6 }}>רכז</span>}
+                  </td>
+                  <td style={{ padding: "10px 14px", fontWeight: 700, color: col }}>{s.total_this_month}</td>
+                  <td style={{ padding: "10px 14px" }}>
+                    {editingSource === s.id ? (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <input type="number" value={sourceTargetInput} onChange={e => setSourceTargetInput(e.target.value)} style={{ width: 60, border: `1px solid ${T.border}`, borderRadius: 6, padding: 4 }} />
+                        <button onClick={() => saveSourceTarget(s.id)} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer" }}>✓</button>
+                      </div>
+                    ) : (
+                      <span onClick={() => { setEditingSource(s.id); setSourceTargetInput(String(s.target_leads || 0)) }} style={{ cursor: "pointer", textDecoration: "underline dotted" }}>
+                        {s.target_leads || "—"}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: "10px 14px", minWidth: 120 }}>
+                    {p !== null ? (
+                      <div style={{ height: 8, background: T.bg, borderRadius: 4 }}><div style={{ height: "100%", width: `${p}%`, background: col, borderRadius: 4 }} /></div>
+                    ) : <span style={{ color: T.slate, fontSize: 11 }}>אין יעד</span>}
+                  </td>
+                  <td style={{ padding: "10px 14px", color: T.slate }}>{s.total_all_time}</td>
+                  <td style={{ padding: "10px 14px", fontWeight: 700, color: col }}>{p !== null ? `${p}%` : "—"}</td>
+                </tr>
+              )
+            })}
+            {!sorted.length && <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: T.slate }}>אין עדיין מקורות פעילים — הגדר ב&quot;מקורות ליד&quot;</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
     </div>
-  </div>
+  )
 }
