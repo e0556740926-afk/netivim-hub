@@ -36,6 +36,8 @@ export default function StatisticsPage() {
   const [cost, setCost] = useState<any>(null)
   const [propensity, setPropensity] = useState<any>(null)
   const [anomalies, setAnomalies] = useState<any>(null)
+  const [medianTime, setMedianTime] = useState<any>(null)
+  const [conversionSimple, setConversionSimple] = useState<any>(null)
   const [savedViews, setSavedViews] = useState<any[]>([])
   const [forbidden, setForbidden] = useState(false)
   const [loadError, setLoadError] = useState("")
@@ -122,10 +124,15 @@ export default function StatisticsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, p, a] = await Promise.all([fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies")])
+        const [c, p, a, mt, cs] = await Promise.all([
+          fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies"),
+          fetch("/api/statistics/median-time"), fetch("/api/statistics/conversion-simple"),
+        ])
         if (c.status === 403) { setForbidden(true); setLoading(false); return }
         if (!c.ok || !p.ok || !a.ok) { setLoadError(`שגיאת שרת (${c.status}/${p.status}/${a.status}) — נסה לרענן`); setLoading(false); return }
         setCost(await c.json()); setPropensity(await p.json()); setAnomalies(await a.json())
+        if (mt.ok) setMedianTime(await mt.json())
+        if (cs.ok) setConversionSimple(await cs.json())
       } catch (e) {
         setLoadError("שגיאת רשת או תשובה לא תקינה מהשרת")
       } finally {
@@ -400,6 +407,40 @@ export default function StatisticsPage() {
             )}
           </div>
         )) : <div style={{ color: T.slate, fontSize: 13 }}>אין חריגות משמעותיות כרגע (או שאין מספיק היסטוריה עדיין — {anomalies?.insufficient_data_for?.join(", ") || "אין"})</div>}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 16 }}>
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>זמן חציוני בין שלבים</div>
+          <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>{medianTime?.note}</div>
+          {medianTime?.transitions.length ? medianTime.transitions.map((t: any, i: number) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${T.bg}` }}>
+              <span>{t.from_status} ← {t.to_status}</span>
+              <span style={{ fontWeight: 700 }}>{t.median_days !== null ? `${Number(t.median_days).toFixed(1)} ימים` : "—"} <span style={{ color: T.slate, fontWeight: 400 }}>({t.n})</span></span>
+            </div>
+          )) : <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין מספיק מעברי סטטוס מתועדים</div>}
+        </div>
+
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>המרה לפי מקור</div>
+          <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>אותו נתון כמו &quot;דירוג נטייה&quot; למעלה, בתצוגה חד-ממדית פשוטה יותר</div>
+          {conversionSimple?.by_source.length ? conversionSimple.by_source.map((s: any, i: number) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${T.bg}` }}>
+              <span>{s.label}</span>
+              <span><strong>{s.rate}%</strong> <span style={{ color: T.slate }}>({s.placed}/{s.total})</span></span>
+            </div>
+          )) : <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין לידים משויכים למקור</div>}
+        </div>
+
+        <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 14 }}>המרה לפי רכז</div>
+          {conversionSimple?.by_coordinator.length ? conversionSimple.by_coordinator.map((c: any, i: number) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${T.bg}` }}>
+              <span>{c.coordinator_name}</span>
+              <span><strong>{c.rate}%</strong> <span style={{ color: T.slate }}>({c.placed}/{c.total})</span></span>
+            </div>
+          )) : <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין נתונים</div>}
+        </div>
       </div>
 
       <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />

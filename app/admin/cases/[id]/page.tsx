@@ -66,6 +66,9 @@ export default function CaseDetail() {
   const [inactiveReason, setInactiveReason] = useState("")
   const [triageForm, setTriageForm] = useState({ description: "", urgency: "high", ask: "" })
   const [extended, setExtended] = useState({ education_background: "", army_status: "", family_status: "", aspirations: "", skills: "" })
+  const [parents, setParents] = useState<any[]>([])
+  const [showAddParent, setShowAddParent] = useState(false)
+  const [parentForm, setParentForm] = useState({ name: "", phone: "", email: "", relation: "" })
   const [protectedData, setProtectedData] = useState<any>(null)
   const [protectedOpen, setProtectedOpen] = useState(false)
   const [showExtendedAccordion, setShowExtendedAccordion] = useState(false)
@@ -79,16 +82,28 @@ export default function CaseDetail() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [r, sr] = await Promise.all([fetch(`/api/cases/${id}`), fetch("/api/admin/automation-settings")])
+      const [r, sr, pr] = await Promise.all([fetch(`/api/cases/${id}`), fetch("/api/admin/automation-settings"), fetch(`/api/cases/${id}/parents`)])
       if (!r.ok) throw new Error()
       const d = await r.json()
       setData(d)
       if (d.extended) setExtended(d.extended)
       const s = await sr.json()
       if (s?.settings?.sla_hours) setSlaHours(Number(s.settings.sla_hours))
+      if (pr.ok) setParents((await pr.json()).parents || [])
     } catch { setError(true) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [id])
+
+  async function addParent() {
+    if (!parentForm.name) return
+    await fetch(`/api/cases/${id}/parents`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(parentForm) })
+    setParentForm({ name: "", phone: "", email: "", relation: "" }); setShowAddParent(false)
+    await load()
+  }
+  async function unlinkParent(parentId: number) {
+    await fetch(`/api/cases/${id}/parents`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent_id: parentId }) })
+    await load()
+  }
 
   async function changeStatus(next: string, reason?: string) {
     const r = await fetch("/api/cases", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: Number(id), advisor_status: next, inactive_reason: reason }) })
@@ -246,6 +261,36 @@ export default function CaseDetail() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>הורים ומשפחה</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14 }}>
+                {parents.map((p: any) => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: T.bg, borderRadius: 8, padding: "10px 14px" }}>
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{p.name}</span>
+                      {p.relation && <span style={{ fontSize: 11, color: T.slate, marginRight: 8 }}>{p.relation}</span>}
+                      {p.children_count > 1 && <span style={{ fontSize: 11, color: T.blue, marginRight: 8 }}>מקושר גם ל-{p.children_count - 1} ילדים נוספים</span>}
+                      <div style={{ fontSize: 12, color: T.slate }}>{p.phone} {p.email ? `· ${p.email}` : ""}</div>
+                    </div>
+                    <span onClick={() => unlinkParent(p.id)} style={{ cursor: "pointer", fontSize: 11, color: T.breach }}>ניתוק</span>
+                  </div>
+                ))}
+                {!parents.length && <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין הורים מקושרים לתיק זה</div>}
+              </div>
+              {showAddParent ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8 }}>
+                  <input placeholder="שם ההורה" value={parentForm.name} onChange={e => setParentForm((f: any) => ({ ...f, name: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+                  <select value={parentForm.relation} onChange={e => setParentForm((f: any) => ({ ...f, relation: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }}>
+                    <option value="">קרבה</option><option value="אב">אב</option><option value="אם">אם</option><option value="אפוטרופוס">אפוטרופוס</option>
+                  </select>
+                  <input placeholder="טלפון" value={parentForm.phone} onChange={e => setParentForm((f: any) => ({ ...f, phone: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+                  <input placeholder="דוא&quot;ל" value={parentForm.email} onChange={e => setParentForm((f: any) => ({ ...f, email: e.target.value }))} style={{ border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
+                  <button onClick={addParent} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: 8, fontWeight: 600, cursor: "pointer" }}>שמור</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowAddParent(true)} style={{ background: T.bg, color: T.blue, border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>+ הוספת הורה</button>
               )}
             </div>
             {custom_values?.length > 0 && (
