@@ -19,7 +19,7 @@ const STATUS_COLORS: Record<string,{bg:string,fg:string}> = {
   irrelevant:{bg:"#FEE2E2",fg:"#991B1B"}
 }
 const EMPTY_FORM = {
-  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:""
+  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:"", arrivalChannelId:""
 }
 
 export default function CoordLeads() {
@@ -28,6 +28,7 @@ export default function CoordLeads() {
   const [leads, setLeads] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [leadSources, setLeadSources] = useState<any[]>([])
+  const [arrivalChannels, setArrivalChannels] = useState<any[]>([])
   const [myLeads, setMyLeads] = useState(0)
   const [target, setTarget] = useState(0)
   const [coordId, setCoordId] = useState<number|null>(null)
@@ -65,6 +66,7 @@ export default function CoordLeads() {
         const mine = active.find((s:any)=>s.coordinator_id===coord.id)
         if (mine) setForm(f=>({...f, leadSourceId: String(mine.id)}))
       })
+      fetch("/api/arrival-channels").then(r=>r.json()).then(({arrival_channels})=>setArrivalChannels(arrival_channels||[]))
       const monthStr = String(m).padStart(2,"0")
       setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
       setTarget(targets?.find((t:any)=>t.coordinator_id===coord.id)?.target_leads||0)
@@ -78,6 +80,7 @@ export default function CoordLeads() {
   async function addLead() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
     if (!form.leadSourceId) { setErr("יש לבחור מקור פנייה"); return }
+    if (!form.arrivalChannelId) { setErr("יש לבחור ערוץ הגעה"); return }
     setErr(""); setDupWarning(null); setSaving(true)
     const fullName = `${form.firstName} ${form.lastName}`.trim()
     const res = await fetch("/api/leads",{
@@ -92,6 +95,7 @@ export default function CoordLeads() {
         notes: form.notes,
         event_id: form.eventId || null,
         lead_source_id: +form.leadSourceId,
+        arrival_channel_id: +form.arrivalChannelId,
         source: form.eventId ? "event" : "manual"
       })
     })
@@ -202,6 +206,17 @@ export default function CoordLeads() {
                 style={{fontSize:"16px"}}>
                 <option value="">— בחר מקור —</option>
                 {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
+              </select>
+            </div>
+
+            {/* Arrival channel (mandatory) */}
+            <div>
+              <label className="text-xs font-semibold block mb-1 text-[#374151]">ערוץ הגעה *</label>
+              <select value={form.arrivalChannelId} onChange={e=>setForm(f=>({...f,arrivalChannelId:e.target.value}))}
+                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]"
+                style={{fontSize:"16px"}}>
+                <option value="">— איך הגיע? —</option>
+                {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </div>
 

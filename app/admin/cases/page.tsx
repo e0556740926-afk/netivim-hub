@@ -28,6 +28,8 @@ function relTime(hrs: number) {
   if (hrs < 24) return `לפני ${Math.round(hrs)} שעות`
   return `לפני ${Math.round(hrs / 24)} ימים`
 }
+const SOURCE_LABEL: Record<string, string> = { manual: "הזנה ידנית", link: "קישור אישי", event: "אירוע", info_portal: "פורטל מידע" }
+
 function slaColor(hrs: number | null, slaHours: number) {
   if (hrs === null) return T.slate
   if (hrs >= slaHours) return T.breach
@@ -65,7 +67,7 @@ function CaseCard({ c, onOpen, slaHours }: { c: any; onOpen: () => void; slaHour
   return (
     <div onClick={onOpen} style={{ border: `1px solid ${breach ? T.breach : T.slateBorder}`, background: breach ? T.breachBg : "#fff", borderRadius: 12, padding: 12, cursor: "pointer" }}>
       <div style={{ fontSize: 14, fontWeight: 700 }}>{c.name}{c.age ? `, ${c.age}` : ""}</div>
-      <div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>מקור: {c.source || "לא ידוע"} · {c.city || ""}</div>
+      <div style={{ fontSize: 12, color: T.slate, marginTop: 2 }}>מקור: {SOURCE_LABEL[c.source] || c.source || "לא ידוע"} · {c.city || ""}</div>
       {hrs !== null && (
         <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color, marginTop: 8 }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: color }} />

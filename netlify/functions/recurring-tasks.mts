@@ -36,8 +36,21 @@ const TYPE_LABEL: Record<string, string> = {
 };
 const RECURRENCE_LABEL: Record<string, string> = { daily: "יומית", weekly: "שבועית", monthly: "חודשית" };
 
-function addInterval(dateStr: string, recurrence: string): string {
-  const d = new Date(dateStr + "T00:00:00");
+function addInterval(dateInput: string | Date, recurrence: string): string {
+  // The Neon driver can return a `date` column as either a plain
+  // 'YYYY-MM-DD' string or a JS Date object depending on column type
+  // inference — this was the actual bug behind the duplicate-task
+  // report: when it arrived as a Date, `dateStr + "T00:00:00"` silently
+  // stringified the Date first (via JS's implicit toString), producing
+  // an unparseable string, so `new Date(...)` came back Invalid, and
+  // `.toISOString()` below threw. The throw happened *after* the new
+  // occurrence was already inserted but *before* the master's next_run
+  // was advanced — so the same master matched "due" again the very
+  // next day, forever, spawning one more duplicate each time.
+  const d = dateInput instanceof Date ? new Date(dateInput.getTime()) : new Date(dateInput + "T00:00:00");
+  if (isNaN(d.getTime())) {
+    throw new Error(`addInterval received an unparseable date: ${String(dateInput)}`);
+  }
   if (recurrence === "daily") d.setDate(d.getDate() + 1);
   else if (recurrence === "weekly") d.setDate(d.getDate() + 7);
   else if (recurrence === "monthly") d.setMonth(d.getMonth() + 1);
@@ -99,6 +112,17 @@ export default async () => {
     for (const master of due as any[]) {
       try {
         const seriesId = master.recurrence_series_id || master.id;
+
+        // Idempotency safety net: even if next_run somehow fails to
+        // advance (as it silently did before the fix above), never spawn
+        // a second occurrence for a date the series has already produced.
+        const [already] = await sql`
+          SELECT id FROM tasks WHERE recurrence_series_id=${seriesId} AND due_date=${master.next_run} LIMIT 1`;
+        if (already) {
+          const nextRun = addInterval(master.next_run, master.recurrence);
+          await sql`UPDATE tasks SET next_run=${nextRun} WHERE id=${master.id}`;
+          continue;
+        }
 
         // Create the next occurrence — a plain, non-recurring task.
         const inserted = await sql`

@@ -23,7 +23,7 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
   advanced:{bg:"#EDE9FE",color:"#5B21B6"},
   irrelevant:{bg:"#FEE2E2",color:"#991B1B"}
 }
-const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"", leadSourceId:"" }
+const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"", leadSourceId:"", arrivalChannelId:"" }
 
 export default function AdminLeads() {
   const router = useRouter()
@@ -32,6 +32,7 @@ export default function AdminLeads() {
   const [coords, setCoords] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [leadSources, setLeadSources] = useState<any[]>([])
+  const [arrivalChannels, setArrivalChannels] = useState<any[]>([])
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkTarget, setBulkTarget] = useState("")
@@ -50,18 +51,20 @@ export default function AdminLeads() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [lr, ua, er, lsr] = await Promise.all([
-        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events"), fetch("/api/admin/lead-sources")
+      const [lr, ua, er, lsr, acr] = await Promise.all([
+        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events"), fetch("/api/admin/lead-sources"), fetch("/api/arrival-channels")
       ])
       const { leads } = await lr.json()
       const { coordinators, admins } = await ua.json()
       const { events } = await er.json()
       const { lead_sources } = await lsr.json()
+      const { arrival_channels } = await acr.json()
       setLeads(leads||[])
       setCoords(coordinators||[])
       setEvents((events||[]).filter((e:any)=>["approved","marketing","done"].includes(e.status)))
       setAdminUsers(admins||[])
       setLeadSources((lead_sources||[]).filter((s:any)=>s.active))
+      setArrivalChannels(arrival_channels||[])
     } catch { setError(true) }
     finally { setLoading(false) }
   }
@@ -72,6 +75,7 @@ export default function AdminLeads() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
     if (!form.coordinator_id && !form.owner_name) { setErr("יש לבחור את מי לשייך את הליד"); return }
     if (!form.leadSourceId) { setErr("יש לבחור מקור פנייה"); return }
+    if (!form.arrivalChannelId) { setErr("יש לבחור ערוץ הגעה"); return }
     setErr(""); setDupWarning(null); setSaving(true)
     const fullName = `${form.firstName} ${form.lastName}`.trim()
     const res = await fetch("/api/leads",{
@@ -87,6 +91,7 @@ export default function AdminLeads() {
         notes: form.notes,
         event_id: form.eventId || null,
         lead_source_id: +form.leadSourceId,
+        arrival_channel_id: +form.arrivalChannelId,
         source: form.eventId ? "event" : "manual"
       })
     })
@@ -196,6 +201,13 @@ export default function AdminLeads() {
                 <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))} className={InputClass+" bg-white"}>
                   <option value="">— בחר מקור —</option>
                   {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">ערוץ הגעה *</label>
+                <select value={form.arrivalChannelId} onChange={e=>setForm(f=>({...f,arrivalChannelId:e.target.value}))} className={InputClass+" bg-white"}>
+                  <option value="">— איך הגיע? —</option>
+                  {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
                 </select>
               </div>
               <div className="sm:col-span-2">

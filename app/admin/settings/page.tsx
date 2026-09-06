@@ -133,6 +133,7 @@ export default function SettingsPage() {
         <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
         <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
         <a href="/admin/settings/lead-sources" className="text-sm font-semibold text-[#00488D]">מקורות ליד</a>
+        <a href="/admin/settings/arrival-channels" className="text-sm font-semibold text-[#00488D]">ערוצי הגעה</a>
         <a href="/admin/settings/external-accounts" className="text-sm font-semibold text-[#00488D]">חשבונות חוץ</a>
         <Button onClick={startAdd}>+ משתמש חדש</Button>
       </div>

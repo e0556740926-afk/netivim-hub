@@ -14,6 +14,7 @@ const PUBLIC_API = [
   "/api/calendar.ics",      // secured by its own secret token in the path
   "/api/coord/slug",        // needed by the public lead form to resolve a slug
   "/api/lead-sources/slug", // needed by the public source-distribution link to resolve a slug
+  "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
   "/api/portal",            // external institution/advisee portals — secured by their own token in the URL, not a staff session
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
 ];

@@ -8,6 +8,14 @@ import WhatsAppChat from "@/components/cases/WhatsAppChat"
 
 // Tokens from design-tokens/tokens.css, kept local to this screen (see
 // /admin/cases/page.tsx and DECISIONS_LOG.md for why it isn't global yet).
+// Raw enum values stored in the DB, mapped to Hebrew for display —
+// previously leaked untranslated ("manual", "training") straight into
+// the UI. `interest` in practice is almost always "training" today
+// (the intake forms hardcode it rather than offering a real choice),
+// so this label is a stopgap, not a sign the field is fully built out.
+const SOURCE_LABEL: Record<string, string> = { manual: "הזנה ידנית", link: "קישור אישי", event: "אירוע", info_portal: "פורטל מידע" }
+const INTEREST_LABEL: Record<string, string> = { training: "מסלול הכוון/הכשרה" }
+
 const T = {
   navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8",
   slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC",
@@ -166,7 +174,7 @@ export default function CaseDetail() {
           </div>
           <div style={{ display: "flex", gap: 24, marginTop: 12, fontSize: 13, color: T.slate, flexWrap: "wrap" }}>
             <div>בעלים נוכחי: <span style={{ color: T.navy, fontWeight: 600 }}>{c.owner_name || "טרם שויך"}</span></div>
-            <div>מקור פנייה: <span style={{ color: T.navy, fontWeight: 600 }}>{c.source}</span></div>
+            <div>מקור פנייה: <span style={{ color: T.navy, fontWeight: 600 }}>{SOURCE_LABEL[c.source] || c.source}</span></div>
             {c.coordinator_name && <div>הובאה ע״י: <span style={{ fontSize: 12, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: T.referredBg, color: T.referredFg }}>{c.coordinator_name} · רכז</span></div>}
           </div>
         </div>
@@ -196,7 +204,7 @@ export default function CaseDetail() {
                 <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, marginBottom: 12 }}>פרטי קליטה</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 13 }}>
                   <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: T.slate }}>עיר</span><span style={{ fontWeight: 600 }}>{c.city || "—"}</span></div>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: T.slate }}>תחום עניין</span><span style={{ fontWeight: 600 }}>{c.interest || "—"}</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: T.slate }}>תחום עניין</span><span style={{ fontWeight: 600 }}>{INTEREST_LABEL[c.interest] || c.interest || "—"}</span></div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ color: T.slate }}>מגזר</span><span style={{ fontWeight: 600 }}>{c.sector || "—"}</span></div>
                 </div>
               </div>
@@ -216,7 +224,7 @@ export default function CaseDetail() {
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.slate, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 16 }}>בסיסי</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, fontSize: 14 }}>
-                {[["שם", c.name], ["טלפון", c.phone], ["גיל", c.age], ["עיר", c.city], ["מגזר", c.sector], ["מקור", c.source], ["תחום עניין", c.interest]].map(([label, val]) => (
+                {[["שם", c.name], ["טלפון", c.phone], ["גיל", c.age], ["עיר", c.city], ["מגזר", c.sector], ["מקור", SOURCE_LABEL[c.source] || c.source], ["תחום עניין", INTEREST_LABEL[c.interest] || c.interest]].map(([label, val]) => (
                   <div key={label as string}><div style={{ fontSize: 12, color: T.slate, marginBottom: 4 }}>{label}</div><div style={{ fontWeight: 600 }}>{val || "—"}</div></div>
                 ))}
               </div>
