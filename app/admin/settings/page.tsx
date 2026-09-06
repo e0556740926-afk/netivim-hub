@@ -10,8 +10,8 @@ import Button from "@/components/ui/Button"
 import Modal from "@/components/ui/Modal"
 
 const ROLE_LABEL: Record<string,string> = {
-  admin:"מנהל מערכת", field_manager:"מנהל שטח", recruitment_manager:"מנהל גיוס",
-  advisor:"יועץ", rav:"רב (התייעצות)", marketing_agency:"משרד פרסום",
+  admin:"מנהל מערכת", ceo:"מנכ\"ל", field_manager:"מנהל שטח/קהילות", recruitment_manager:"מנהל צוות ייעוץ/גיוס",
+  advisor:"יועץ", rav:"רב (התייעצות)", secretary:"מזכירות",
   coordinator:"רכז", viewer:"צופה",
 }
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }

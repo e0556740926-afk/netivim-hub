@@ -99,6 +99,13 @@ export async function middleware(req: NextRequest) {
       return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
     }
 
+    // Finding #1: viewer is read-only everywhere, enforced server-side —
+    // not by hiding a button. Applies before the admin-only gate below,
+    // since a viewer must not write even to non-admin-only endpoints.
+    if (user.role === "viewer" && req.method !== "GET") {
+      return NextResponse.json({ error: "משתמש צופה — קריאה בלבד" }, { status: 403 });
+    }
+
     // Role gate
     if (user.role !== "admin") {
       const blocked = ADMIN_ONLY.find(

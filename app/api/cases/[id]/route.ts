@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
+import { canAccessProtectedInfo } from "@/lib/permissions";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -63,6 +64,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   if (d.action === "open_protected") {
+    // Finding #2 from the permissions audit: this used to be gated only
+    // by the blanket "any non-coordinator" admin check, so any of the
+    // newer roles (field_manager, secretary, a plain viewer) could open
+    // sensitive case data. Now gated per-role against the actual matrix.
+    const me3 = await currentUser(req);
+    const ctx = { id: me3?.id || 0, role: me3?.role || "" };
+    if (!canAccessProtectedInfo(ctx)) {
+      return NextResponse.json({ error: "אין הרשאה לצפות במידע מוגן" }, { status: 403 });
+    }
+    if (ctx.role === "rav") {
+      const [caseRow] = await sql`SELECT triage_color FROM leads WHERE id=${caseId}`;
+      if (caseRow?.triage_color !== "red") {
+        return NextResponse.json({ error: "רב רואה מידע מוגן רק בתיקים שסווגו אדום" }, { status: 403 });
+      }
+    }
+    if (ctx.role === "advisor") {
+      const [caseRow] = await sql`SELECT owner_name FROM leads WHERE id=${caseId}`;
+      if (caseRow?.owner_name !== me3?.name) {
+        return NextResponse.json({ error: "יועץ רואה מידע מוגן רק בתיקים שלו" }, { status: 403 });
+      }
+    }
     // Opening protected info is itself a logged, deliberate action (spec §6.1).
     const [row] = await sql`
       INSERT INTO case_protected (case_id, sensitive_data, last_accessed_by, last_accessed_at)
