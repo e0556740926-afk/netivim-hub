@@ -10,6 +10,7 @@ export default function NewsletterAudiences() {
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [count, setCount] = useState<number | null>(null)
   const [recipients, setRecipients] = useState<any[]>([])
+  const [channel, setChannel] = useState<"email" | "whatsapp">("email")
   const [subject, setSubject] = useState("")
   const [html, setHtml] = useState("")
   const [sending, setSending] = useState(false)
@@ -24,9 +25,10 @@ export default function NewsletterAudiences() {
   useEffect(() => { preview() }, [audience, filters])
 
   async function send() {
-    if (!subject || !html || !recipients.length) return
+    if (!html || !recipients.length) return
+    if (channel === "email" && !subject) return
     setSending(true); setResult(null)
-    const r = await fetch("/api/newsletter/audiences/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipients, subject, html }) })
+    const r = await fetch("/api/newsletter/audiences/send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipients, subject, html, channel }) })
     const d = await r.json()
     setResult(d); setSending(false)
   }
@@ -34,6 +36,8 @@ export default function NewsletterAudiences() {
   const fields = audience === "contacts_partners"
     ? [["type", "סוג"], ["owner", "בעלים"]]
     : [["city", "עיר"], ["sector", "מגזר"], ["advisor_status", "סטטוס תיק"], ["owner_name", "יועץ מטפל"], ["source", "מקור פנייה"]]
+
+  const eligibleCount = channel === "whatsapp" ? recipients.filter(r => r.phone).length : recipients.filter(r => r.email).length
 
   return (
     <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
@@ -55,12 +59,22 @@ export default function NewsletterAudiences() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>הודעה</div>
-        <input placeholder="נושא" value={subject} onChange={e => setSubject(e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 8, padding: 10, marginBottom: 8 }} />
-        <textarea placeholder="תוכן (HTML)" rows={6} value={html} onChange={e => setHtml(e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 8, padding: 10, fontFamily: "inherit", marginBottom: 12 }} />
-        <button onClick={send} disabled={sending || !recipients.length} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, cursor: "pointer" }}>{sending ? "שולח..." : `שלח ל-${recipients.filter(r => r.email).length} נמענים עם דוא"ל`}</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>הודעה</div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={() => setChannel("email")} style={{ background: channel === "email" ? T.blue : T.bg, color: channel === "email" ? "#fff" : T.slate, border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>📧 דוא&quot;ל</button>
+            <button onClick={() => setChannel("whatsapp")} style={{ background: channel === "whatsapp" ? "#25D366" : T.bg, color: channel === "whatsapp" ? "#fff" : T.slate, border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>💬 WhatsApp</button>
+          </div>
+        </div>
+        {channel === "email" && (
+          <input placeholder="נושא" value={subject} onChange={e => setSubject(e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 8, padding: 10, marginBottom: 8 }} />
+        )}
+        <textarea placeholder={channel === "whatsapp" ? "תוכן ההודעה (טקסט רגיל — תגי HTML לא רלוונטיים ב-WhatsApp)" : "תוכן (HTML)"} rows={6} value={html} onChange={e => setHtml(e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 8, padding: 10, fontFamily: "inherit", marginBottom: 12 }} />
+        <button onClick={send} disabled={sending || !eligibleCount} style={{ background: channel === "whatsapp" ? "#25D366" : T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, cursor: "pointer" }}>
+          {sending ? "שולח..." : `שלח ל-${eligibleCount} נמענים ${channel === "whatsapp" ? "עם טלפון" : 'עם דוא"ל'}`}
+        </button>
         {result && <div style={{ marginTop: 10, fontSize: 13, color: T.ok }}>נשלח בהצלחה ל-{result.sent} מתוך {result.total}</div>}
-        <div style={{ fontSize: 11, color: T.slate, marginTop: 10 }}>שליחה ישירה, ללא אנליטיקס פתיחה/קליק וללא קישור הסרה — לא דרך צינור הניוזלטר הרגיל (זה נשאר לקהילת ההורים הקיימת).</div>
+        <div style={{ fontSize: 11, color: T.slate, marginTop: 10 }}>שליחה ישירה, ללא אנליטיקס פתיחה/קליק וללא קישור הסרה — לא דרך צינור הניוזלטר הרגיל (זה נשאר לקהילת ההורים הקיימת). הודעות WhatsApp נשלחות דרך אותו חיבור Green API שכבר משמש את המערכת.</div>
       </div>
     </div>
   )
