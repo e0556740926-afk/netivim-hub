@@ -40,17 +40,28 @@ export default function LeadSourcesPage() {
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        {sources.map(s => (
-          <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 18px", borderBottom: `1px solid ${T.bg}` }}>
-            <div>
-              <span style={{ fontWeight: 600 }}>{s.label}</span>
-              {s.coordinator_id && <span style={{ fontSize: 11, color: T.slate, marginRight: 8 }}>רכז</span>}
+        {sources.map(s => {
+          const link = typeof window !== "undefined" && s.slug ? `${window.location.origin}/s/${s.slug}` : ""
+          return (
+            <div key={s.id} style={{ padding: "12px 18px", borderBottom: `1px solid ${T.bg}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: link ? 8 : 0 }}>
+                <div>
+                  <span style={{ fontWeight: 600 }}>{s.label}</span>
+                  {s.coordinator_id && <span style={{ fontSize: 11, color: T.slate, marginRight: 8 }}>רכז</span>}
+                </div>
+                <span onClick={() => toggle(s.id, s.active)} style={{ cursor: "pointer", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: s.active ? "#EAF3EE" : "#FDECEA", color: s.active ? T.ok : "#C0392B" }}>
+                  {s.active ? "פעיל" : "מושבת"}
+                </span>
+              </div>
+              {link && (
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input readOnly value={link} style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 6, padding: 6, fontSize: 12, color: T.slate }} />
+                  <button onClick={() => navigator.clipboard.writeText(link)} style={{ background: T.bg, color: T.slate, border: "none", borderRadius: 6, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>העתק</button>
+                </div>
+              )}
             </div>
-            <span onClick={() => toggle(s.id, s.active)} style={{ cursor: "pointer", fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 6, background: s.active ? "#EAF3EE" : "#FDECEA", color: s.active ? T.ok : "#C0392B" }}>
-              {s.active ? "פעיל" : "מושבת"}
-            </span>
-          </div>
-        ))}
+          )
+        })}
         {!sources.length && <div style={{ padding: 20, textAlign: "center", color: T.slate }}>אין עדיין מקורות</div>}
       </div>
     </div>

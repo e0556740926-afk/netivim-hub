@@ -9,7 +9,11 @@ import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 import Modal from "@/components/ui/Modal"
 
-const ROLE_LABEL: Record<string,string> = { admin:"מנהל מערכת", coordinator:"רכז", rav:"רב (התייעצות)", viewer:"צופה" }
+const ROLE_LABEL: Record<string,string> = {
+  admin:"מנהל מערכת", field_manager:"מנהל שטח", recruitment_manager:"מנהל גיוס",
+  advisor:"יועץ", rav:"רב (התייעצות)", marketing_agency:"משרד פרסום",
+  coordinator:"רכז", viewer:"צופה",
+}
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
 const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
