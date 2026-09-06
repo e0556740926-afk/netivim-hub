@@ -77,6 +77,7 @@ export default function CaseDetail() {
   const [showInteractionForm, setShowInteractionForm] = useState(false)
   const [slaHours, setSlaHours] = useState(DEFAULT_SLA_HOURS)
   const [docForm, setDocForm] = useState({ file_url: "", doc_type: "" })
+  const [uploadingDoc, setUploadingDoc] = useState(false)
   const [ravResponses, setRavResponses] = useState<Record<number, string>>({})
 
   async function load() {
@@ -137,6 +138,17 @@ export default function CaseDetail() {
     if (siblings_to_close?.length) alert(`התקבל! ${siblings_to_close.length} הפניות מקבילות נותרו פתוחות — סגור אותן ידנית עם סיבה.`)
     await load()
   }
+  async function uploadDocument(file: File | undefined) {
+    if (!file) return
+    setUploadingDoc(true)
+    const fd = new FormData()
+    fd.append("file", file)
+    fd.append("doc_type", file.name)
+    await fetch(`/api/cases/${id}/documents/upload`, { method: "POST", body: fd })
+    setUploadingDoc(false)
+    await load()
+  }
+
   async function addDocument() {
     if (!docForm.file_url) return
     await fetch(`/api/cases/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_document", ...docForm }) })
@@ -433,19 +445,24 @@ export default function CaseDetail() {
 
         {tab === "documents" && (
           <div style={{ padding: "24px 32px" }}>
+            <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+              <input type="file" onChange={e => uploadDocument(e.target.files?.[0])} disabled={uploadingDoc} style={{ flex: 1, fontSize: 13 }} />
+              {uploadingDoc && <span style={{ fontSize: 12, color: T.slate }}>מעלה...</span>}
+            </div>
+            <div style={{ fontSize: 11, color: T.slate, marginBottom: 12 }}>העלאה ישירה (עד 4MB) — או קישור למסמך שכבר מאוחסן במקום אחר:</div>
             <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16, marginBottom: 16, display: "flex", gap: 8 }}>
               <input placeholder="קישור למסמך (Google Drive וכו')" value={docForm.file_url} onChange={e => setDocForm(f => ({ ...f, file_url: e.target.value }))} style={{ flex: 2, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
               <input placeholder="סוג מסמך" value={docForm.doc_type} onChange={e => setDocForm(f => ({ ...f, doc_type: e.target.value }))} style={{ flex: 1, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
-              <button onClick={addDocument} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 600, cursor: "pointer" }}>+ צרף</button>
+              <button onClick={addDocument} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", fontWeight: 600, cursor: "pointer" }}>+ צרף קישור</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {documents.map((doc: any) => (
-                <a key={doc.id} href={doc.file_url} target="_blank" rel="noreferrer" style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 10, padding: 14, display: "flex", justifyContent: "space-between", textDecoration: "none", color: T.navy }}>
-                  <span>📎 {doc.doc_type || "מסמך"}</span>
+                <a key={doc.id} href={doc.mime_type ? `/api/cases/${id}/documents/${doc.id}` : doc.file_url} target="_blank" rel="noreferrer" style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 10, padding: 14, display: "flex", justifyContent: "space-between", textDecoration: "none", color: T.navy }}>
+                  <span>{doc.mime_type ? "📄" : "🔗"} {doc.doc_type || doc.file_url || "מסמך"}</span>
                   <span style={{ fontSize: 12, color: T.slate }}>{doc.uploaded_by} · {String(doc.uploaded_at).slice(0, 10)}</span>
                 </a>
               ))}
-              {!documents.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין מסמכים מצורפים. הערה: זה קישור למסמך שכבר מאוחסן (למשל Google Drive) — אין עדיין העלאת קבצים ישירה למערכת.</div>}
+              {!documents.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין מסמכים מצורפים</div>}
             </div>
           </div>
         )}
