@@ -45,6 +45,14 @@ export async function GET(req: NextRequest) {
     const rows = await sql`SELECT * FROM tasks WHERE ${me.name}=ANY(assignees) ORDER BY due_date`;
     return NextResponse.json({ tasks: await withAssignmentNames(rows) });
   }
+  if (me.role === "recruitment_manager" || me.role === "field_manager") {
+    // T-level: their own tasks plus their direct reports' (users.reports_to),
+    // resolved by name since `assignees` stores names, not user ids.
+    const reportNames = await sql`SELECT name FROM users WHERE reports_to=${me.id}`;
+    const names = [me.name, ...(reportNames as any[]).map(r => r.name)];
+    const rows = await sql`SELECT * FROM tasks WHERE assignees && ${names} ORDER BY due_date`;
+    return NextResponse.json({ tasks: await withAssignmentNames(rows), team_scoped: true });
+  }
 
   const name = req.nextUrl.searchParams.get("name");
   const full = req.nextUrl.searchParams.get("full");

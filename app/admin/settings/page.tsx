@@ -46,7 +46,7 @@ export default function SettingsPage() {
     setCalTokens(tokens)
   }
   const [err, setErr] = useState("")
-  const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"" })
+  const [form, setForm] = useState({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"", reports_to:"" })
 
   async function load() {
     setLoading(true); setError(false)
@@ -71,12 +71,12 @@ export default function SettingsPage() {
 
   function startEdit(u: any) {
     setEditUser(u)
-    setForm({ name:u.name, email:u.email, password:"", role:u.role, status:u.status, phone:u.phone||"", area:u.area||"", team:u.team||"" })
+    setForm({ name:u.name, email:u.email, password:"", role:u.role, status:u.status, phone:u.phone||"", area:u.area||"", team:u.team||"", reports_to:u.reports_to?String(u.reports_to):"" })
     setShowForm(true); setErr(""); setActiveCoord(null); setActivity(null)
   }
   function startAdd() {
     setEditUser(null)
-    setForm({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"" })
+    setForm({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"", reports_to:"" })
     setShowForm(true); setErr("")
   }
 
@@ -133,6 +133,7 @@ export default function SettingsPage() {
         <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
         <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
         <a href="/admin/settings/lead-sources" className="text-sm font-semibold text-[#00488D]">מקורות ליד</a>
+        <a href="/admin/settings/external-accounts" className="text-sm font-semibold text-[#00488D]">חשבונות חוץ</a>
         <Button onClick={startAdd}>+ משתמש חדש</Button>
       </div>
     </div>
@@ -155,6 +156,14 @@ export default function SettingsPage() {
               <option value="">מנהל ראשי — רואה הכל</option>
               <option value="advisors">מנהל צוות ייעוץ</option>
               <option value="field">מנהל צוות שטח וקהילה</option>
+            </select></div>
+        )}
+        {(form.role === "advisor" || form.role === "coordinator") && (
+          <div><label className="text-xs font-semibold block mb-1">מנהל ישיר (לצורך הרשאות "הצוות שלו")</label>
+            <select value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+              <option value="">— ללא —</option>
+              {users.filter((u:any)=>form.role==="advisor"?u.role==="recruitment_manager":u.role==="field_manager").map((u:any)=>
+                <option key={u.id} value={u.id}>{u.name}</option>)}
             </select></div>
         )}
         <div><label className="text-xs font-semibold block mb-1">אזור פעילות</label><input value={form.area} onChange={e=>setForm(f=>({...f,area:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>

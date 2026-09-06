@@ -26,6 +26,15 @@ export async function GET(req: NextRequest) {
     cid = String(own.id);
   }
 
+  // Viewer (permissions matrix, "leads" row = R, but per spec §7 the
+  // conservative default for viewer everywhere is aggregate/no-PII —
+  // applied here until the open viewer question is answered otherwise).
+  // No names, no phone numbers — counts by status only.
+  if (me.role === "viewer") {
+    const rows = await sql`SELECT status, count(*)::int AS n FROM leads WHERE deleted_at IS NULL GROUP BY status`;
+    return NextResponse.json({ leads: [], aggregate: rows, status_only: true });
+  }
+
   const [soft, hasOwner] = await Promise.all([
     hasColumn("leads", "deleted_at"),
     hasColumn("leads", "owner_name"),
