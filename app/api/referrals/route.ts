@@ -3,12 +3,34 @@ import sql from "@/lib/db";
 import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
 
+/**
+ * Same access rule as /api/cases: only admin/recruitment_manager (full)
+ * and advisor (own cases only) may create or change a referral — a
+ * referral is case content, and every other role that has any access to
+ * cases at all (coordinator/field_manager/viewer/ceo/rav) is read-only
+ * or status-only there per the matrix, so none of them can write here.
+ */
+async function assertCanWriteReferral(req: NextRequest, caseId: number): Promise<NextResponse | null> {
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+  if (me.role === "admin" || me.role === "recruitment_manager") return null;
+  if (me.role === "advisor") {
+    const [caseRow] = await sql`SELECT owner_name FROM leads WHERE id=${caseId}`;
+    if (caseRow && caseRow.owner_name === me.name) return null;
+    return NextResponse.json({ error: "אין הרשאה — תיק זה אינו שלך" }, { status: 403 });
+  }
+  return NextResponse.json({ error: "אין הרשאת כתיבה להפניות" }, { status: 403 });
+}
+
 /** Creates a referral. Enforces the "up to 3 concurrent" rule from spec §7.1. */
 export async function POST(req: NextRequest) {
   const d = await req.json();
   if (!d.case_id || !d.organization_id) {
     return NextResponse.json({ error: "missing case_id/organization_id" }, { status: 400 });
   }
+  const denied = await assertCanWriteReferral(req, d.case_id);
+  if (denied) return denied;
+
   const [{ count }] = await sql`
     SELECT count(*)::int FROM referrals
     WHERE case_id=${d.case_id} AND status NOT IN ('לא התקבל','נשר','הסתיים')` as any[];
@@ -50,6 +72,11 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
   if (!d.id || !d.status) return NextResponse.json({ error: "missing id/status" }, { status: 400 });
+
+  const [existingRef] = await sql`SELECT case_id FROM referrals WHERE id=${d.id}`;
+  if (!existingRef) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const denied = await assertCanWriteReferral(req, existingRef.case_id);
+  if (denied) return denied;
 
   const me = await currentUser(req);
   await sql`
