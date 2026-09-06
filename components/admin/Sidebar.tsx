@@ -46,7 +46,6 @@ const GROUPS: Group[] = [
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
       { label: "תקציב ורכש", path: "/admin/budget", dot: "#FBBF24" },
-      { label: "הזנת הוצאה (טופס)", path: "/admin/finance", dot: "#FBBF24" },
       { label: "הגדרות", path: "/admin/settings", dot: "#94A3B8" },
     ],
   },
