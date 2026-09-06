@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
 import { exportToCsv } from "@/lib/csv-export"
 import { FunnelSankey } from "@/components/dashboards/FunnelSankey"
+import { GeoBubbleMap } from "@/components/dashboards/GeoBubbleMap"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
 const DIM_LABEL: Record<string, string> = { age_bucket: "גיל", city: "עיר", sector: "מגזר", source: "מקור", advisor_status: "סטטוס", category: "קטגוריית שיבוץ" }
@@ -39,6 +40,7 @@ export default function StatisticsPage() {
   const [medianTime, setMedianTime] = useState<any>(null)
   const [conversionSimple, setConversionSimple] = useState<any>(null)
   const [outcomeMetrics, setOutcomeMetrics] = useState<any>(null)
+  const [geo, setGeo] = useState<any>(null)
   const [savedViews, setSavedViews] = useState<any[]>([])
   const [forbidden, setForbidden] = useState(false)
   const [loadError, setLoadError] = useState("")
@@ -125,9 +127,10 @@ export default function StatisticsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, p, a, mt, cs, om] = await Promise.all([
+        const [c, p, a, mt, cs, om, geoR] = await Promise.all([
           fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies"),
           fetch("/api/statistics/median-time"), fetch("/api/statistics/conversion-simple"), fetch("/api/statistics/outcome-metrics"),
+          fetch("/api/statistics/geo"),
         ])
         if (c.status === 403) { setForbidden(true); setLoading(false); return }
         if (!c.ok || !p.ok || !a.ok) { setLoadError(`שגיאת שרת (${c.status}/${p.status}/${a.status}) — נסה לרענן`); setLoading(false); return }
@@ -135,6 +138,7 @@ export default function StatisticsPage() {
         if (mt.ok) setMedianTime(await mt.json())
         if (cs.ok) setConversionSimple(await cs.json())
         if (om.ok) setOutcomeMetrics(await om.json())
+        if (geoR.ok) setGeo(await geoR.json())
       } catch (e) {
         setLoadError("שגיאת רשת או תשובה לא תקינה מהשרת")
       } finally {
@@ -465,6 +469,20 @@ export default function StatisticsPage() {
             ))}
           </>
         ) : <div style={{ color: T.slate, fontSize: 13 }}>עדיין לא נשלחה אף בקשת משוב (נשלח אוטומטית כשתיק ראשון עובר ל&quot;שובץ במסגרת&quot;)</div>}
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginTop: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>פרישה גיאוגרפית</div>
+        <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>{geo?.note}</div>
+        {geo?.cities.length ? (
+          <div style={{ display: "flex", justifyContent: "center" }}><GeoBubbleMap cities={geo.cities} /></div>
+        ) : (
+          <div style={{ color: T.slate, fontSize: 13, textAlign: "center", padding: 20 }}>
+            {geo?.unknown_city_count > 0
+              ? `אין עדיין מפה — ${geo.unknown_city_count} מתוך הלידים בלי שדה עיר ממולא בכלל. זה בדיוק הפער שכבר תועד: עיר לא נאסף בפועל בקליטה הטלפונית.`
+              : "אין עדיין נתוני עיר"}
+          </div>
+        )}
       </div>
 
       <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
