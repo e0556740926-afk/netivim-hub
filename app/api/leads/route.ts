@@ -78,9 +78,13 @@ function scoreLead(d: any): number {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
-  // Check for duplicate phone
-  if (d.phone) {
-    const dup = await sql`SELECT id, name FROM leads WHERE phone = ${d.phone} LIMIT 1`;
+  // Duplicate check — phone or id_number (upgrade proposal §2.1 extends
+  // this from phone-only to also match id_number, matching the
+  // reference system's "ת.ז + טלפון" combined check).
+  if (d.phone || d.id_number) {
+    const dup = d.id_number
+      ? await sql`SELECT id, name FROM leads WHERE phone = ${d.phone || ''} OR id_number = ${d.id_number} LIMIT 1`
+      : await sql`SELECT id, name FROM leads WHERE phone = ${d.phone} LIMIT 1`;
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
@@ -100,7 +104,24 @@ export async function POST(req: NextRequest) {
   const vals: any[] = [d.coordinator_id||null, d.name, d.phone, d.city||'', d.age||null,
                        d.interest||'training', d.source||'manual', 'new', d.event_id||null, d.notes||''];
   if (hasId)       { cols.push("id_number");  vals.push(d.id_number||''); }
-  if (hasOwnerCol) { cols.push("owner_name"); vals.push(d.owner_name||''); }
+  if (hasOwnerCol) {
+    // Rule-based automation (upgrade proposal §2.2): if no owner was
+    // explicitly given, auto-assign to the least-loaded available
+    // advisor rather than leaving "owner: not yet assigned" — this was
+    // flagged in the system audit as a real, frequent gap. Uses the same
+    // active-case load count already shown in ניהול יועצים, not a
+    // separate metric, and only ever picks from users.available=true.
+    let ownerName = d.owner_name || "";
+    if (!ownerName) {
+      const [leastLoaded] = await sql`
+        SELECT u.name FROM users u
+        WHERE u.role='advisor' AND u.available=true AND u.status='active'
+        ORDER BY (SELECT count(*)::int FROM leads l2 WHERE l2.owner_name=u.name AND l2.advisor_status NOT IN ('לא פעיל','הסתיים בהצלחה')) ASC
+        LIMIT 1`;
+      if (leastLoaded) ownerName = leastLoaded.name;
+    }
+    cols.push("owner_name"); vals.push(ownerName);
+  }
   if (hasScore)    { cols.push("score");      vals.push(score); }
   if (hasEmail)    { cols.push("email");      vals.push(d.email||''); }
   if (hasIsParent) { cols.push("is_parent");  vals.push(!!d.is_parent); }
@@ -112,6 +133,15 @@ export async function POST(req: NextRequest) {
   const rows = await sql.query(text, vals);
   const me = await currentUser(req);
   logAudit({ entityType:"lead", entityId:rows[0].id, action:"create", actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
+
+  // Rule-based automation (upgrade proposal §2.2): every new lead gets a
+  // real follow-up task due within 24 hours — not just a UI suggestion,
+  // an actual row in `tasks` assigned to whoever now owns it.
+  if (rows[0].owner_name) {
+    await sql`
+      INSERT INTO tasks (contact_id, case_id, title, details, type, assignees, due_date, status, priority)
+      VALUES (${null}, ${rows[0].id}, ${`ליצור קשר: ${rows[0].name}`}, 'נפתח אוטומטית עם קליטת הפנייה — יעד: מגע ראשון תוך 24 שעות', 'call', ${[rows[0].owner_name]}, ${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}, 'todo', 'normal')`;
+  }
   // Notify whoever owns the public link the lead came through —
   // a coordinator (via coordinator_id) or, now that managers have
   // personal links too, an admin (via owner_name).

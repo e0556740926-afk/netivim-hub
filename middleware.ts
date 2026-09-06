@@ -94,10 +94,32 @@ function isPublicApi(pathname: string) {
   return PUBLIC_API.some(p => pathname === p || pathname.startsWith(p + "/"));
 }
 
+const VIEW_AS_COOKIE = "netivim_view_as";
+
+/**
+ * "View as..." preview override, mirrored from lib/auth-server.ts (kept
+ * as a local copy here for the same edge-runtime-safety reason as the
+ * permission matrix above — this file avoids any import that could drag
+ * in a DB client). Only ever applies on top of a genuine chief-admin
+ * session; the cookie's own content is never trusted on its own.
+ */
+function applyViewAsOverride(req: NextRequest, real: any) {
+  if (real.role !== "admin" || real.team) return real;
+  const raw = req.cookies.get(VIEW_AS_COOKIE)?.value;
+  if (!raw) return real;
+  try {
+    const { role, team } = JSON.parse(raw);
+    if (!role) return real;
+    return { ...real, role, team: team || undefined };
+  } catch {
+    return real;
+  }
+}
+
 async function getUser(req: NextRequest) {
   // 1) our own signed cookie
   const own = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (own) return own;
+  if (own) return applyViewAsOverride(req, own);
 
   // 2) NextAuth (Google) — verified JWT, carries the role
   try {
@@ -106,13 +128,14 @@ async function getUser(req: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET,
     });
     if (token?.email) {
-      return {
+      const real = {
         id: Number((token as any).id) || 0,
         name: String((token as any).dbName || token.name || ""),
         email: String(token.email),
         role: String((token as any).role || "coordinator"),
         area: String((token as any).area || ""),
       };
+      return applyViewAsOverride(req, real);
     }
   } catch { /* fall through */ }
 
@@ -140,6 +163,13 @@ export async function middleware(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
     }
+
+    // The "view as" preview endpoint must always be reachable, including
+    // while a preview is already active — otherwise a chief admin
+    // previewing e.g. "coordinator" would see the overridden role here
+    // too and get locked out of the very endpoint that ends the preview.
+    // The route itself re-checks the *real* session before doing anything.
+    if (pathname === "/api/admin/view-as") return NextResponse.next();
 
     // Finding #1: viewer is read-only everywhere, enforced server-side —
     // not by hiding a button. Applies before the module gate below,

@@ -1,5 +1,6 @@
 "use client"
 import Sidebar from "@/components/admin/Sidebar"
+import { ViewAsBanner } from "@/components/admin/ViewAsControl"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
@@ -55,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </button>
           </div>
         </div>
+        <ViewAsBanner/>
         <div className="flex-1 overflow-y-auto">{children}</div>
       </main>
     </div>

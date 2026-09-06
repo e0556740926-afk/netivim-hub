@@ -44,6 +44,7 @@ export default function AdminLeads() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState("")
   const [dupWarning, setDupWarning] = useState<any>(null)
+  const [liveDupMatches, setLiveDupMatches] = useState<any[]>([])
   const [filterCoord, setFilterCoord] = useUrlState("coord")
   const [filterStatus, setFilterStatus] = useUrlState("status")
   const [q, setQ] = useUrlState("q")
@@ -70,6 +71,22 @@ export default function AdminLeads() {
   }
 
   useEffect(()=>{ load() },[])
+
+  // Real-time duplicate warning (upgrade proposal §2.1) — non-blocking,
+  // fires while typing so a person notices before even trying to save,
+  // separate from the hard block already enforced server-side on submit.
+  useEffect(() => {
+    const phoneReady = form.phone.replace(/\D/g,"").length >= 9
+    const idReady = form.idNumber.length === 9
+    if (!phoneReady && !idReady) { setLiveDupMatches([]); return }
+    const t = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (phoneReady) params.set("phone", form.phone)
+      if (idReady) params.set("id_number", form.idNumber)
+      fetch(`/api/leads/check-duplicate?${params}`).then(r=>r.json()).then(d=>setLiveDupMatches(d.matches||[]))
+    }, 500)
+    return () => clearTimeout(t)
+  }, [form.phone, form.idNumber])
 
   async function addLead() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
@@ -226,6 +243,11 @@ export default function AdminLeads() {
             {dupWarning && (
               <div className="bg-[#FEF3C7] text-[#B45309] rounded-[9px] px-3 py-2.5 text-xs font-semibold mb-3">
                 ⚠️ מספר זה כבר קיים — {dupWarning.name}. הליד לא נוצר.
+              </div>
+            )}
+            {!dupWarning && liveDupMatches.length > 0 && (
+              <div className="bg-[#FEF3C7] text-[#B45309] rounded-[9px] px-3 py-2.5 text-xs font-semibold mb-3">
+                ⚠️ נמצאה התאמה אפשרית: {liveDupMatches.map((m:any)=>m.name).join(", ")} — בדוק שזה לא אותו אדם לפני שמירה
               </div>
             )}
             {err && <div className="text-xs text-[#960010] mb-3 font-semibold">{err}</div>}

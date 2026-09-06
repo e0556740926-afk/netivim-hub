@@ -6,6 +6,7 @@ import Image from "next/image"
 import GlobalSearch from "./GlobalSearch"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 import PersonalLinkPopup from "./PersonalLinkPopup"
+import ViewAsControl from "./ViewAsControl"
 
 type Item = { label: string; path: string; dot: string; badgeKey?: string; missing?: boolean; ceoOnly?: boolean }
 type Group = { key: "advisors" | "field" | "exec"; label: string; dot: string; items: Item[] }
@@ -142,6 +143,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       </nav>
 
       <div className="p-3 border-t border-white/10 space-y-2">
+        <ViewAsControl/>
         <PersonalLinkPopup/>
         <PushNotificationToggle/>
         <div className="flex items-center gap-2.5 p-2.5 bg-white/8 rounded-[10px]">
