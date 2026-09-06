@@ -32,6 +32,20 @@ async function withAssignmentNames(rows: any[]) {
 }
 
 export async function GET(req: NextRequest) {
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
+  // Row-level scoping (permissions matrix, "tasks" row): O-level roles
+  // (rav/advisor/coordinator/secretary) are hard-scoped server-side to
+  // their own name in `assignees` — the client-supplied name/coordinator_id
+  // params below are for admin/ceo/T-level use only and are ignored
+  // entirely for an O-level caller, same fix as the leads/cases modules.
+  const OWN_ONLY_ROLES = ["rav", "advisor", "coordinator", "secretary"];
+  if (OWN_ONLY_ROLES.includes(me.role)) {
+    const rows = await sql`SELECT * FROM tasks WHERE ${me.name}=ANY(assignees) ORDER BY due_date`;
+    return NextResponse.json({ tasks: await withAssignmentNames(rows) });
+  }
+
   const name = req.nextUrl.searchParams.get("name");
   const full = req.nextUrl.searchParams.get("full");
   const cid = req.nextUrl.searchParams.get("coordinator_id");
@@ -188,6 +202,17 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
 
+  // Row-level scoping: O-only roles may only touch a task they're
+  // actually assigned to — checked once here, before any of the update
+  // branches below, so it can't be bypassed via a specific payload shape.
+  const meCheck = await currentUser(req);
+  if (meCheck && ["rav", "advisor", "coordinator", "secretary"].includes(meCheck.role)) {
+    const [task] = await sql`SELECT assignees FROM tasks WHERE id=${d.id}`;
+    if (!task || !(task.assignees || []).includes(meCheck.name)) {
+      return NextResponse.json({ error: "אין הרשאה — משימה זו אינה משויכת אליך" }, { status: 403 });
+    }
+  }
+
   // Status-only update (kanban drag/quick buttons) — never touches
   // other fields, so a partial payload can't wipe title/assignees.
   if (d.status_only || (d.title === undefined && d.due_date === undefined)) {
@@ -259,6 +284,12 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
   const me = await currentUser(req);
+  if (me && ["rav", "advisor", "coordinator", "secretary"].includes(me.role)) {
+    const [task] = await sql`SELECT assignees FROM tasks WHERE id=${id}`;
+    if (!task || !(task.assignees || []).includes(me.name)) {
+      return NextResponse.json({ error: "אין הרשאה — משימה זו אינה משויכת אליך" }, { status: 403 });
+    }
+  }
   await sql`DELETE FROM tasks WHERE id=${id}`;
   logAudit({ entityType:"task", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
