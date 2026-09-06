@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import ReferralWizard from "@/components/cases/ReferralWizard"
+import WhatsAppChat from "@/components/cases/WhatsAppChat"
 
 // Tokens from design-tokens/tokens.css, kept local to this screen (see
 // /admin/cases/page.tsx and DECISIONS_LOG.md for why it isn't global yet).
@@ -14,8 +15,8 @@ const T = {
   referredFg: "#6B4E9E", referredBg: "#f2eef8",
 }
 const DEFAULT_SLA_HOURS = 24 // overridden at runtime by /api/admin/automation-settings
-const TABS = ["overview", "intake", "protected", "log", "referrals", "tasks", "documents", "rav"] as const
-const TAB_LABEL: Record<string, string> = { overview: "סקירה", intake: "שאלון קליטה", protected: "מידע מוגן 🔒", log: "יומן קשר", referrals: "הפניות", tasks: "משימות", documents: "מסמכים", rav: "התייעצות רב" }
+const TABS = ["overview", "intake", "protected", "log", "referrals", "tasks", "documents", "rav", "whatsapp"] as const
+const TAB_LABEL: Record<string, string> = { overview: "סקירה", intake: "שאלון קליטה", protected: "מידע מוגן 🔒", log: "יומן קשר", referrals: "הפניות", tasks: "משימות", documents: "מסמכים", rav: "התייעצות רב", whatsapp: "וואטסאפ" }
 const INACTIVE_REASONS = ["אין מענה", "לא מעוניין", "לא רלוונטי", "פעילות קהילתית"]
 const TRANSITIONS: Record<string, string[]> = {
   "פנייה חדשה": ["בתהליך ייעוץ", "לא פעיל"],
@@ -417,6 +418,12 @@ export default function CaseDetail() {
               </div>
             ))}
             {!consultations.length && <div style={{ textAlign: "center", color: T.slate, padding: 20 }}>אין עדיין פניות לרב אוברמייסטר — אלה נפתחות אוטומטית כשתיק מסווג &quot;אדום&quot;.</div>}
+          </div>
+        )}
+
+        {tab === "whatsapp" && (
+          <div style={{ padding: "24px 32px" }}>
+            <WhatsAppChat caseId={Number(id)} caseName={c.name} />
           </div>
         )}
       </div>

@@ -20,6 +20,12 @@ export function toChatId(phone?: string | null): string | null {
   return p + "@c.us";
 }
 
+/** Canonical "972XXXXXXXXX" digits-only key, for matching a phone regardless of how it was originally formatted (local, +972, with dashes, etc). */
+export function normalizePhoneKey(phone?: string | null): string | null {
+  const chatId = toChatId(phone);
+  return chatId ? chatId.replace("@c.us", "") : null;
+}
+
 export async function sendWhatsApp(phone: string | null | undefined, message: string) {
   if (!ID_INSTANCE || !API_TOKEN) {
     console.log("[wa] GreenAPI not configured — skipping");
