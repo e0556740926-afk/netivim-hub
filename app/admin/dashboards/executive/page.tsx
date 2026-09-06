@@ -94,6 +94,9 @@ export default function ExecutiveDashboard() {
             <div style={{ display: "flex", justifyContent: "space-between" }}><span dir="ltr">15–16</span><span style={{ fontWeight: 700 }}>{data.demographics.age_15_16}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span dir="ltr">17–18</span><span style={{ fontWeight: 700 }}>{data.demographics.age_17_18}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span dir="ltr">19+</span><span style={{ fontWeight: 700 }}>{data.demographics.age_19_plus}</span></div>
+            {data.demographics.age_unknown > 0 && (
+              <div style={{ display: "flex", justifyContent: "space-between", color: T.warn }}><span>גיל לא תקין/חסר</span><span style={{ fontWeight: 700 }}>{data.demographics.age_unknown}</span></div>
+            )}
           </div>
         </div>
       </div>

@@ -84,7 +84,8 @@ export async function GET(req: NextRequest) {
       SELECT
         count(*) FILTER (WHERE age BETWEEN 15 AND 16)::int AS age_15_16,
         count(*) FILTER (WHERE age BETWEEN 17 AND 18)::int AS age_17_18,
-        count(*) FILTER (WHERE age >= 19)::int AS age_19_plus
+        count(*) FILTER (WHERE age >= 19 AND age < 120)::int AS age_19_plus,
+        count(*) FILTER (WHERE age IS NULL OR age < 15 OR age >= 120)::int AS age_unknown
       FROM leads WHERE deleted_at IS NULL`,
     sql`
       SELECT COALESCE(op.category, o.category, 'לא סווג') AS category, count(*)::int AS n
