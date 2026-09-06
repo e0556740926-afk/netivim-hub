@@ -105,6 +105,23 @@ export async function PATCH(req: NextRequest) {
     INSERT INTO case_status_history (case_id, from_status, to_status, changed_by, reason)
     VALUES (${d.id}, ${from}, ${d.advisor_status}, ${me?.name || null}, ${d.reason || d.inactive_reason || null})`;
 
+  // Outcome/impact feedback (upgrade proposal §3.3): the moment a case
+  // is placed, send a short feedback request — reusing the existing
+  // WhatsApp integration, not a new channel. Default trigger point:
+  // "שובץ במסגרת" is when the advisee has actually experienced the
+  // placement, so their feedback is meaningful (asking right at
+  // referral/acceptance would be premature).
+  if (d.advisor_status === "שובץ במסגרת") {
+    const [caseRow] = await sql`SELECT name, phone, owner_name FROM leads WHERE id=${d.id}`;
+    if (caseRow?.phone) {
+      const token = require("crypto").randomBytes(16).toString("base64url");
+      await sql`INSERT INTO feedback_responses (case_id, owner_name, token) VALUES (${d.id}, ${caseRow.owner_name || null}, ${token})`;
+      const { sendWhatsApp } = await import("@/lib/whatsapp");
+      const origin = req.nextUrl.origin;
+      await sendWhatsApp(caseRow.phone, `נתיבים: שמחים שהשתבצת! נשמח למשוב קצר (2 דקות) כדי להשתפר: ${origin}/f/${token}`);
+    }
+  }
+
   logAudit({ entityType: "case", entityId: d.id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `סטטוס ייעוץ: ${from} → ${d.advisor_status}` });
   return NextResponse.json({ ok: true });
 }

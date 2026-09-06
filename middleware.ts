@@ -15,6 +15,7 @@ const PUBLIC_API = [
   "/api/coord/slug",        // needed by the public lead form to resolve a slug
   "/api/lead-sources/slug", // needed by the public source-distribution link to resolve a slug
   "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
+  "/api/feedback",          // public outcome-feedback form, secured by its own token
   "/api/portal",            // external institution/advisee portals — secured by their own token in the URL, not a staff session
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
 ];

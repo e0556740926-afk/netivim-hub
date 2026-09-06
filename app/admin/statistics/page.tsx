@@ -38,6 +38,7 @@ export default function StatisticsPage() {
   const [anomalies, setAnomalies] = useState<any>(null)
   const [medianTime, setMedianTime] = useState<any>(null)
   const [conversionSimple, setConversionSimple] = useState<any>(null)
+  const [outcomeMetrics, setOutcomeMetrics] = useState<any>(null)
   const [savedViews, setSavedViews] = useState<any[]>([])
   const [forbidden, setForbidden] = useState(false)
   const [loadError, setLoadError] = useState("")
@@ -124,15 +125,16 @@ export default function StatisticsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, p, a, mt, cs] = await Promise.all([
+        const [c, p, a, mt, cs, om] = await Promise.all([
           fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies"),
-          fetch("/api/statistics/median-time"), fetch("/api/statistics/conversion-simple"),
+          fetch("/api/statistics/median-time"), fetch("/api/statistics/conversion-simple"), fetch("/api/statistics/outcome-metrics"),
         ])
         if (c.status === 403) { setForbidden(true); setLoading(false); return }
         if (!c.ok || !p.ok || !a.ok) { setLoadError(`שגיאת שרת (${c.status}/${p.status}/${a.status}) — נסה לרענן`); setLoading(false); return }
         setCost(await c.json()); setPropensity(await p.json()); setAnomalies(await a.json())
         if (mt.ok) setMedianTime(await mt.json())
         if (cs.ok) setConversionSimple(await cs.json())
+        if (om.ok) setOutcomeMetrics(await om.json())
       } catch (e) {
         setLoadError("שגיאת רשת או תשובה לא תקינה מהשרת")
       } finally {
@@ -441,6 +443,28 @@ export default function StatisticsPage() {
             </div>
           )) : <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין נתונים</div>}
         </div>
+      </div>
+
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginTop: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>מדדי השפעה (Outcome)</div>
+        <div style={{ fontSize: 11, color: T.slate, marginBottom: 14 }}>
+          נאסף אוטומטית: כשתיק עובר ל&quot;שובץ במסגרת&quot; נשלחת בקשת משוב קצרה ב-WhatsApp לנועץ.
+        </div>
+        {outcomeMetrics?.overall?.sent > 0 ? (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14, marginBottom: 16 }}>
+              <div><div style={{ fontSize: 12, color: T.slate }}>שיעור מענה</div><div style={{ fontSize: 22, fontWeight: 700 }}>{Math.round((outcomeMetrics.overall.responded / outcomeMetrics.overall.sent) * 100)}%</div></div>
+              <div><div style={{ fontSize: 12, color: T.slate }}>מענה מותאם (ממוצע)</div><div style={{ fontSize: 22, fontWeight: 700 }}>{outcomeMetrics.overall.avg_personalized ? Number(outcomeMetrics.overall.avg_personalized).toFixed(1) : "—"}/5</div></div>
+              <div><div style={{ fontSize: 12, color: T.slate }}>NPS ממוצע</div><div style={{ fontSize: 22, fontWeight: 700 }}>{outcomeMetrics.overall.avg_nps ? Number(outcomeMetrics.overall.avg_nps).toFixed(1) : "—"}/10</div></div>
+            </div>
+            {outcomeMetrics.by_advisor.map((a: any, i: number) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderTop: `1px solid ${T.bg}` }}>
+                <span>{a.owner_name}</span>
+                <span>{a.responded}/{a.sent} · מותאם {a.avg_personalized ?? "—"} · NPS {a.avg_nps ?? "—"}</span>
+              </div>
+            ))}
+          </>
+        ) : <div style={{ color: T.slate, fontSize: 13 }}>עדיין לא נשלחה אף בקשת משוב (נשלח אוטומטית כשתיק ראשון עובר ל&quot;שובץ במסגרת&quot;)</div>}
       </div>
 
       <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
