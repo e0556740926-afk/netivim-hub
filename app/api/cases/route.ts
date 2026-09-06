@@ -9,9 +9,56 @@ import { logAudit } from "@/lib/audit";
  * (the 7-stage enum from spec §6.3) rather than the coordinator's own
  * `status` field (new/contacted/advanced/irrelevant) — the two describe
  * different workflows for different roles and never overlap.
+ *
+ * Row-level scoping (permissions matrix §4, "cases" row): admin/ceo/
+ * recruitment_manager see everything; advisor sees only cases they own
+ * (owner_name match); rav sees only red-flagged cases or ones they have
+ * an open consultation on; coordinator/field_manager/viewer get
+ * status-only columns, never the full case content — this is a column
+ * restriction, not just a row filter, per the matrix's footnote.
  */
 export async function GET(req: NextRequest) {
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
   const status = req.nextUrl.searchParams.get("advisor_status");
+
+  if (me.role === "advisor") {
+    const rows = status
+      ? await sql`SELECT * FROM leads WHERE advisor_status=${status} AND deleted_at IS NULL AND owner_name=${me.name} ORDER BY created_at DESC`
+      : await sql`SELECT * FROM leads WHERE deleted_at IS NULL AND owner_name=${me.name} ORDER BY created_at DESC`;
+    return NextResponse.json({ cases: rows });
+  }
+
+  if (me.role === "rav") {
+    const rows = status
+      ? await sql`
+          SELECT * FROM leads WHERE deleted_at IS NULL AND advisor_status=${status}
+            AND (triage_color = 'red' OR id IN (SELECT case_id FROM consultations_rav))
+          ORDER BY created_at DESC`
+      : await sql`
+          SELECT * FROM leads WHERE deleted_at IS NULL
+            AND (triage_color = 'red' OR id IN (SELECT case_id FROM consultations_rav))
+          ORDER BY created_at DESC`;
+    return NextResponse.json({ cases: rows });
+  }
+
+  if (me.role === "coordinator") {
+    const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me.id}`;
+    if (!own) return NextResponse.json({ cases: [], status_only: true });
+    const rows = await sql`
+      SELECT id, name, age, city, advisor_status, triage_color, created_at FROM leads
+      WHERE deleted_at IS NULL AND coordinator_id=${own.id} ORDER BY created_at DESC`;
+    return NextResponse.json({ cases: rows, status_only: true });
+  }
+
+  if (me.role === "field_manager" || me.role === "viewer") {
+    const rows = await sql`
+      SELECT id, name, age, city, advisor_status, triage_color, created_at FROM leads
+      WHERE deleted_at IS NULL ORDER BY created_at DESC`;
+    return NextResponse.json({ cases: rows, status_only: true });
+  }
+
+  // admin, ceo, recruitment_manager: full access, all cases.
   const rows = status
     ? await sql`SELECT * FROM leads WHERE advisor_status=${status} AND deleted_at IS NULL ORDER BY created_at DESC`
     : await sql`SELECT * FROM leads WHERE deleted_at IS NULL ORDER BY created_at DESC`;

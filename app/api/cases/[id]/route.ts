@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/auth-server";
 import { logAudit } from "@/lib/audit";
 import { canAccessProtectedInfo } from "@/lib/permissions";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const caseId = Number(id);
   const [caseRow] = await sql`
@@ -12,6 +12,31 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     FROM leads l LEFT JOIN coordinators c ON c.id = l.coordinator_id
     WHERE l.id=${caseId}`;
   if (!caseRow) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  // Row-level scoping matching /api/cases (list): status-only roles
+  // never reach the full Case File — the matrix's note that they see
+  // "status only, not the full case content" applies to the detail
+  // screen too, not only the list. Advisor/rav get the full case but
+  // only within their own scope (own cases / red-flagged & assigned).
+  const me0 = await currentUser(req);
+  if (!me0) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+  if (me0.role === "coordinator" || me0.role === "field_manager" || me0.role === "viewer") {
+    if (me0.role === "coordinator") {
+      const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me0.id}`;
+      if (!own || caseRow.coordinator_id !== own.id) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+    }
+    return NextResponse.json({
+      status_only: true,
+      case: { id: caseRow.id, name: caseRow.name, age: caseRow.age, city: caseRow.city, advisor_status: caseRow.advisor_status, triage_color: caseRow.triage_color },
+    });
+  }
+  if (me0.role === "advisor" && caseRow.owner_name !== me0.name) {
+    return NextResponse.json({ error: "אין הרשאה — תיק זה אינו שלך" }, { status: 403 });
+  }
+  if (me0.role === "rav" && caseRow.triage_color !== "red") {
+    const [assigned] = await sql`SELECT id FROM consultations_rav WHERE case_id=${caseId}`;
+    if (!assigned) return NextResponse.json({ error: "אין הרשאה — תיק זה לא הופנה אליך" }, { status: 403 });
+  }
 
   const [extended, protectedInfo, referrals, history, customValues, interactions, caseTasks, documents, consultations] = await Promise.all([
     sql`SELECT * FROM case_extended WHERE case_id=${caseId}`,
@@ -52,6 +77,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const caseId = Number(id);
   const d = await req.json();
   const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
+  // Status-only roles never write to a case at all (coordinator/field_manager/
+  // viewer) — even "own" cases, since they only ever see status fields.
+  // Advisor may only write to their own cases.
+  if (["coordinator", "field_manager", "viewer"].includes(me.role)) {
+    return NextResponse.json({ error: "אין הרשאת כתיבה לתיק" }, { status: 403 });
+  }
+  if (me.role === "advisor") {
+    const [caseRow] = await sql`SELECT owner_name FROM leads WHERE id=${caseId}`;
+    if (!caseRow || caseRow.owner_name !== me.name) {
+      return NextResponse.json({ error: "אין הרשאה — תיק זה אינו שלך" }, { status: 403 });
+    }
+  }
 
   if (d.action === "update_extended") {
     await sql`

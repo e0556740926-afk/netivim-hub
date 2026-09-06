@@ -49,6 +49,7 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/tasks/series", "settings_users"],
   ["/api/task-templates", "settings_users"],
   ["/api/leads", "leads"],
+  ["/api/cases", "cases"],
   ["/api/contacts", "contacts"],
   ["/api/events", "events"],
   ["/api/tasks", "tasks"],
@@ -86,9 +87,9 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/dashboards" },
   { path: "/api/admin" },
   // Row-level "own case" scoping for coordinator/advisor/rav isn't built
-  // for these two yet (unlike leads) — kept strictly admin-only rather
-  // than letting the matrix's "O" level through with no filtering behind it.
-  { path: "/api/cases" },
+  // for referrals yet (unlike cases, which now has it in the route
+  // itself) — kept strictly admin-only rather than letting the matrix's
+  // "O" level through with no filtering behind it.
   { path: "/api/referrals" },
 ];
 
