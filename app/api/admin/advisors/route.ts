@@ -1,21 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { currentUser } from "@/lib/auth-server";
 
 const CATEGORIES = ["קרבי", "טכנולוגי", "הסדר", "מכינה", 'תומכ"ל', "תיכונית"];
 
-export async function GET() {
-  const advisors = await sql`SELECT id, name, specializations, available, role FROM users WHERE status='active' ORDER BY name`;
+export async function GET(req: NextRequest) {
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
+  // Row-level scoping (permissions matrix, "advisor_management" row):
+  // advisor is "R (על עצמו)" — read-only, and only their own row, not
+  // the whole team's specializations/load/weights.
+  const isOwnAdvisor = me.role === "advisor";
+  const advisors = isOwnAdvisor
+    ? await sql`SELECT id, name, specializations, available, role FROM users WHERE status='active' AND id=${me.id} ORDER BY name`
+    : await sql`SELECT id, name, specializations, available, role FROM users WHERE status='active' ORDER BY name`;
 
   // Live load per advisor: active cases owned + open tasks assigned + items
   // currently sitting in their follow-up/support columns. No known-good
   // threshold exists yet (per spec §4.3) — this is a display-only weighted
   // count, it never blocks assignment.
-  const load = await sql`
-    SELECT u.name,
-      (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status NOT IN ('לא פעיל','הסתיים בהצלחה')) AS active_cases,
-      (SELECT count(*)::int FROM tasks t WHERE t.assigned_to = u.id AND t.status != 'done') AS open_tasks,
-      (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status = 'לא פעיל') AS followup_items
-    FROM users u WHERE u.status='active'`;
+  const load = isOwnAdvisor
+    ? await sql`
+        SELECT u.name,
+          (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status NOT IN ('לא פעיל','הסתיים בהצלחה')) AS active_cases,
+          (SELECT count(*)::int FROM tasks t WHERE t.assigned_to = u.id AND t.status != 'done') AS open_tasks,
+          (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status = 'לא פעיל') AS followup_items
+        FROM users u WHERE u.status='active' AND u.id=${me.id}`
+    : await sql`
+        SELECT u.name,
+          (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status NOT IN ('לא פעיל','הסתיים בהצלחה')) AS active_cases,
+          (SELECT count(*)::int FROM tasks t WHERE t.assigned_to = u.id AND t.status != 'done') AS open_tasks,
+          (SELECT count(*)::int FROM leads l WHERE l.owner_name = u.name AND l.advisor_status = 'לא פעיל') AS followup_items
+        FROM users u WHERE u.status='active'`;
 
   const weightRows = await sql`SELECT key, value FROM app_settings WHERE key LIKE 'assign_weight_%'`;
   const weightMap = new Map((weightRows as any[]).map(r => [r.key, Number(r.value)]));
@@ -35,6 +52,11 @@ export async function GET() {
 
 /** { user_id, specializations?: string[], available?: boolean } */
 export async function PATCH(req: NextRequest) {
+  const me = await currentUser(req);
+  // Matrix says advisor is read-only here, even on their own row —
+  // editing specialization/availability is recruitment_manager/admin
+  // territory, not self-service.
+  if (me?.role === "advisor") return NextResponse.json({ error: "אין הרשאת כתיבה" }, { status: 403 });
   const d = await req.json();
   if (!d.user_id) return NextResponse.json({ error: "missing user_id" }, { status: 400 });
   if (d.specializations !== undefined) await sql`UPDATE users SET specializations=${d.specializations} WHERE id=${d.user_id}`;
@@ -44,6 +66,8 @@ export async function PATCH(req: NextRequest) {
 
 /** { weight_specialization?, weight_availability?, weight_load? } — each 0-1 */
 export async function POST(req: NextRequest) {
+  const me = await currentUser(req);
+  if (me?.role === "advisor") return NextResponse.json({ error: "אין הרשאת כתיבה" }, { status: 403 });
   const d = await req.json();
   const keys = { weight_specialization: "assign_weight_specialization", weight_availability: "assign_weight_availability", weight_load: "assign_weight_load" };
   for (const [k, dbKey] of Object.entries(keys)) {

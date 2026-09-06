@@ -29,10 +29,28 @@ export async function POST(req: NextRequest) {
   }
 
   // action === "run" (default)
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
   const filters: Record<string, string> = d.filters || {};
   const clauses: string[] = ["deleted_at IS NULL"];
   const values: any[] = [];
   let i = 1;
+
+  // Row-level scoping (permissions matrix, "reports" row): advisor and
+  // coordinator get "O" — their own leads/cases only, forced server-side
+  // and not overridable by the filters payload, same pattern as the
+  // leads/cases/tasks modules.
+  if (entity === "leads") {
+    if (me.role === "advisor") {
+      clauses.push(`owner_name = $${i++}`); values.push(me.name);
+    } else if (me.role === "coordinator") {
+      const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me.id}`;
+      if (!own) return NextResponse.json({ rows: [], count: 0, fields: allowedFields });
+      clauses.push(`coordinator_id = $${i++}`); values.push(own.id);
+    }
+  }
+
   for (const [key, val] of Object.entries(filters)) {
     if (!allowedFields.includes(key) || !val) continue;
     clauses.push(`${key} = $${i++}`);
