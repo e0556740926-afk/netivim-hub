@@ -18,34 +18,78 @@ const PUBLIC_API = [
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
 ];
 
-/** Admin-only endpoints — a coordinator must not reach these. */
+/**
+ * Central permission matrix, mirrored from lib/permissions.ts. Duplicated
+ * here (not imported) on purpose: middleware runs on the Edge runtime,
+ * and lib/permissions.ts pulls in the Neon DB client transitively via
+ * lib/db.ts — importing it here risks an edge-bundling failure. This
+ * copy covers path-level gating only (module NONE / read-only-can't-write);
+ * row-level "own item" filtering (O/T) still happens inside the route
+ * handlers themselves, which run in the Node.js runtime where DB access
+ * is safe.
+ */
+type Role = "admin" | "ceo" | "rav" | "recruitment_manager" | "advisor" | "field_manager" | "coordinator" | "secretary" | "viewer";
+const MODULE_MATRIX: Record<string, Partial<Record<Role, string>>> = {
+  leads: { admin: "M", ceo: "R", recruitment_manager: "M", advisor: "O", field_manager: "R", coordinator: "O", secretary: "E", viewer: "R" },
+  cases: { admin: "M", ceo: "R", rav: "R", recruitment_manager: "M", advisor: "O", field_manager: "R", coordinator: "O", secretary: "E", viewer: "R" },
+  contacts: { admin: "M", ceo: "R", rav: "R", recruitment_manager: "M", advisor: "E", field_manager: "M", coordinator: "E", secretary: "E", viewer: "R" },
+  events: { admin: "M", ceo: "R", recruitment_manager: "R", field_manager: "M", coordinator: "E", secretary: "R", viewer: "R" },
+  tasks: { admin: "M", ceo: "R", rav: "O", recruitment_manager: "T", advisor: "O", field_manager: "T", coordinator: "O", secretary: "O", viewer: "R" },
+  newsletters: { admin: "M", ceo: "M", recruitment_manager: "E", field_manager: "M", coordinator: "R", secretary: "E" },
+  budget_main: { admin: "M", ceo: "M", recruitment_manager: "R", field_manager: "E", secretary: "E", viewer: "A" },
+  budget_field: { admin: "M", ceo: "R", field_manager: "M", coordinator: "E" },
+  reports: { admin: "M", ceo: "M", rav: "R", recruitment_manager: "T", advisor: "O", field_manager: "M", coordinator: "O", secretary: "R", viewer: "A" },
+  advisor_management: { admin: "M", ceo: "R", recruitment_manager: "M", advisor: "R" },
+  audit_log: { admin: "M", ceo: "R", recruitment_manager: "T" },
+  settings_users: { admin: "M" },
+};
+/** Path prefix -> module name. Order matters: first match wins, so put more specific paths first. */
+const PATH_TO_MODULE: [string, string][] = [
+  ["/api/tasks/bulk", "settings_users"],   // manager-only tooling — keep admin-only regardless of the tasks row
+  ["/api/tasks/series", "settings_users"],
+  ["/api/task-templates", "settings_users"],
+  ["/api/leads", "leads"],
+  ["/api/contacts", "contacts"],
+  ["/api/events", "events"],
+  ["/api/tasks", "tasks"],
+  ["/api/newsletter/audiences", "newsletters"],
+  ["/api/expenses", "budget_main"],
+  ["/api/budget-sources", "budget_main"],
+  ["/api/budget", "budget_main"],
+  ["/api/field-budget", "budget_field"],
+  ["/api/admin/report-builder", "reports"],
+  ["/api/admin/report-schedules", "reports"],
+  ["/api/admin/advisors", "advisor_management"],
+  ["/api/admin/call-qa", "advisor_management"],
+  ["/api/audit-log", "audit_log"],
+  ["/api/users", "settings_users"],
+];
+function moduleFor(pathname: string): string | null {
+  for (const [prefix, mod] of PATH_TO_MODULE) {
+    if (pathname === prefix || pathname.startsWith(prefix + "/")) return mod;
+  }
+  return null;
+}
+function levelFor(role: string, mod: string): string {
+  return MODULE_MATRIX[mod]?.[role as Role] || "NONE";
+}
+function levelAllowsWrite(level: string): boolean {
+  return level === "M" || level === "E" || level === "O" || level === "T";
+}
+
+/** Admin-only endpoints — a coordinator must not reach these. Fallback for anything not yet mapped to a module above. */
 const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
-  { path: "/api/users" },
-  { path: "/api/expenses" },
-  { path: "/api/budget-sources" },
   { path: "/api/meetings" },
   { path: "/api/targets", methods: ["POST", "PATCH", "DELETE"] },
   { path: "/api/export" },
-  // Manager-only task tooling: bulk actions across other people's
-  // tasks, manual templates, and the recurring-series manager. A
-  // coordinator keeps full access to /api/tasks itself (their own
-  // tasks) plus comments/checklist on any task they can see.
-  { path: "/api/tasks/bulk" },
-  { path: "/api/tasks/series" },
-  { path: "/api/task-templates" },
-  // New Netivim CRM foundation layer (2026-09-05): case/referral/budget
-  // management is advisor & manager territory, not a coordinator screen.
-  // Organizations stays readable by coordinators (contacts screen needs
-  // it) but writes are admin-only.
-  { path: "/api/organizations", methods: ["POST", "PATCH"] },
-  { path: "/api/cases" },
-  { path: "/api/referrals" },
-  { path: "/api/budget" },
-  { path: "/api/field-budget" },
-  { path: "/api/newsletter/audiences" },
   { path: "/api/statistics" },
   { path: "/api/dashboards" },
   { path: "/api/admin" },
+  // Row-level "own case" scoping for coordinator/advisor/rav isn't built
+  // for these two yet (unlike leads) — kept strictly admin-only rather
+  // than letting the matrix's "O" level through with no filtering behind it.
+  { path: "/api/cases" },
+  { path: "/api/referrals" },
 ];
 
 function isPublicApi(pathname: string) {
@@ -100,14 +144,33 @@ export async function middleware(req: NextRequest) {
     }
 
     // Finding #1: viewer is read-only everywhere, enforced server-side —
-    // not by hiding a button. Applies before the admin-only gate below,
+    // not by hiding a button. Applies before the module gate below,
     // since a viewer must not write even to non-admin-only endpoints.
     if (user.role === "viewer" && req.method !== "GET") {
       return NextResponse.json({ error: "משתמש צופה — קריאה בלבד" }, { status: 403 });
     }
 
-    // Role gate
-    if (user.role !== "admin") {
+    // Module-matrix gate (finding #5): a path mapped to a module is
+    // checked against the real per-role level, not the old blanket
+    // "not coordinator = full access" rule. NONE blocks entirely; a
+    // read-only level (R/A) blocks any non-GET method. Row-level "own
+    // item" scoping (O/T) still happens inside the route handler.
+    const mod = moduleFor(pathname);
+    if (mod && user.role !== "admin") {
+      const level = levelFor(user.role, mod);
+      if (level === "NONE") {
+        return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+      }
+      if (req.method !== "GET" && !levelAllowsWrite(level)) {
+        return NextResponse.json({ error: "אין הרשאת כתיבה" }, { status: 403 });
+      }
+    }
+
+    // Legacy admin-only fallback for paths not yet mapped to a module
+    // above (e.g. organizations writes, which deliberately stay
+    // admin-only regardless of the contacts matrix row — see comment
+    // in PATH_TO_MODULE).
+    if (!mod && user.role !== "admin") {
       const blocked = ADMIN_ONLY.find(
         r =>
           (pathname === r.path || pathname.startsWith(r.path + "/")) &&
@@ -116,6 +179,10 @@ export async function middleware(req: NextRequest) {
       if (blocked) {
         return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
       }
+    }
+    if (user.role !== "admin" && (pathname === "/api/organizations" || pathname.startsWith("/api/organizations/"))
+      && ["POST", "PATCH"].includes(req.method)) {
+      return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
     }
 
     return NextResponse.next();
