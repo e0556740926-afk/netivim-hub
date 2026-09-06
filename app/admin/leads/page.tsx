@@ -4,6 +4,7 @@ import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
 import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { fd } from "@/lib/utils"
 import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
@@ -22,13 +23,15 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
   advanced:{bg:"#EDE9FE",color:"#5B21B6"},
   irrelevant:{bg:"#FEE2E2",color:"#991B1B"}
 }
-const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"" }
+const EMPTY_FORM = { firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"", leadSourceId:"" }
 
 export default function AdminLeads() {
+  const router = useRouter()
   const { success, undoable } = useToast()
   const [leads, setLeads] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
+  const [leadSources, setLeadSources] = useState<any[]>([])
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkTarget, setBulkTarget] = useState("")
@@ -47,16 +50,18 @@ export default function AdminLeads() {
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [lr, ua, er] = await Promise.all([
-        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events")
+      const [lr, ua, er, lsr] = await Promise.all([
+        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events"), fetch("/api/admin/lead-sources")
       ])
       const { leads } = await lr.json()
       const { coordinators, admins } = await ua.json()
       const { events } = await er.json()
+      const { lead_sources } = await lsr.json()
       setLeads(leads||[])
       setCoords(coordinators||[])
       setEvents((events||[]).filter((e:any)=>["approved","marketing","done"].includes(e.status)))
       setAdminUsers(admins||[])
+      setLeadSources((lead_sources||[]).filter((s:any)=>s.active))
     } catch { setError(true) }
     finally { setLoading(false) }
   }
@@ -66,6 +71,7 @@ export default function AdminLeads() {
   async function addLead() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
     if (!form.coordinator_id && !form.owner_name) { setErr("יש לבחור את מי לשייך את הליד"); return }
+    if (!form.leadSourceId) { setErr("יש לבחור מקור פנייה"); return }
     setErr(""); setDupWarning(null); setSaving(true)
     const fullName = `${form.firstName} ${form.lastName}`.trim()
     const res = await fetch("/api/leads",{
@@ -80,6 +86,7 @@ export default function AdminLeads() {
         id_number: form.idNumber,
         notes: form.notes,
         event_id: form.eventId || null,
+        lead_source_id: +form.leadSourceId,
         source: form.eventId ? "event" : "manual"
       })
     })
@@ -183,6 +190,13 @@ export default function AdminLeads() {
                 <label className="text-xs font-semibold block mb-1">ת.ז</label>
                 <input value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))}
                   placeholder="000000000" maxLength={9} className={InputClass}/>
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">מקור פנייה *</label>
+                <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))} className={InputClass+" bg-white"}>
+                  <option value="">— בחר מקור —</option>
+                  {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
+                </select>
               </div>
               <div className="sm:col-span-2">
                 <label className="text-xs font-semibold block mb-1">נאסף באירוע (לא חובה)</label>
@@ -316,7 +330,7 @@ export default function AdminLeads() {
                           className="accent-[#00488D] w-3.5 h-3.5"/>
                       </td>
                       <td className="px-3 py-2.5">
-                        <div className="font-semibold text-[#0D2744]">{l.name}</div>
+                        <div onClick={() => router.push(`/admin/cases/${l.id}`)} className="font-semibold text-[#0D2744] cursor-pointer hover:underline hover:text-[#00488D]">{l.name}</div>
                       </td>
                       <td className="px-3 py-2.5 text-[#475569]">
                         <a href={`https://wa.me/972${l.phone?.replace(/^0/,"").replace(/-/g,"")}`} target="_blank"

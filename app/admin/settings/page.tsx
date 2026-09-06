@@ -9,7 +9,7 @@ import Card from "@/components/ui/Card"
 import Button from "@/components/ui/Button"
 import Modal from "@/components/ui/Modal"
 
-const ROLE_LABEL: Record<string,string> = { admin:"מנהל מערכת", coordinator:"רכז", viewer:"צופה" }
+const ROLE_LABEL: Record<string,string> = { admin:"מנהל מערכת", coordinator:"רכז", rav:"רב (התייעצות)", viewer:"צופה" }
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
 const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
@@ -128,6 +128,7 @@ export default function SettingsPage() {
         <a href="/admin/settings/fields" className="text-sm font-semibold text-[#00488D]">בונה שדות מותאמים</a>
         <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
         <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
+        <a href="/admin/settings/lead-sources" className="text-sm font-semibold text-[#00488D]">מקורות ליד</a>
         <Button onClick={startAdd}>+ משתמש חדש</Button>
       </div>
     </div>

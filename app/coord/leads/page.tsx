@@ -19,7 +19,7 @@ const STATUS_COLORS: Record<string,{bg:string,fg:string}> = {
   irrelevant:{bg:"#FEE2E2",fg:"#991B1B"}
 }
 const EMPTY_FORM = {
-  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:""
+  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:""
 }
 
 export default function CoordLeads() {
@@ -27,6 +27,7 @@ export default function CoordLeads() {
   const { user } = useAuth()
   const [leads, setLeads] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
+  const [leadSources, setLeadSources] = useState<any[]>([])
   const [myLeads, setMyLeads] = useState(0)
   const [target, setTarget] = useState(0)
   const [coordId, setCoordId] = useState<number|null>(null)
@@ -58,6 +59,12 @@ export default function CoordLeads() {
       const { events } = await eRes.json()
       setEvents((events||[]).filter((e:any)=>["approved","marketing","done"].includes(e.status)))
       setLeads(leads||[])
+      fetch("/api/lead-sources").then(r=>r.json()).then(({lead_sources})=>{
+        const active = (lead_sources||[]).filter((s:any)=>s.active)
+        setLeadSources(active)
+        const mine = active.find((s:any)=>s.coordinator_id===coord.id)
+        if (mine) setForm(f=>({...f, leadSourceId: String(mine.id)}))
+      })
       const monthStr = String(m).padStart(2,"0")
       setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
       setTarget(targets?.find((t:any)=>t.coordinator_id===coord.id)?.target_leads||0)
@@ -70,6 +77,7 @@ export default function CoordLeads() {
 
   async function addLead() {
     if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
+    if (!form.leadSourceId) { setErr("יש לבחור מקור פנייה"); return }
     setErr(""); setDupWarning(null); setSaving(true)
     const fullName = `${form.firstName} ${form.lastName}`.trim()
     const res = await fetch("/api/leads",{
@@ -83,6 +91,7 @@ export default function CoordLeads() {
         id_number: form.idNumber,
         notes: form.notes,
         event_id: form.eventId || null,
+        lead_source_id: +form.leadSourceId,
         source: form.eventId ? "event" : "manual"
       })
     })
@@ -183,6 +192,17 @@ export default function CoordLeads() {
                 placeholder="מידע נוסף על הבחור..." rows={2}
                 className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm resize-none focus:outline-none focus:border-[#166534]"
                 style={{fontSize:"16px"}}/>
+            </div>
+
+            {/* Lead source (mandatory) */}
+            <div>
+              <label className="text-xs font-semibold block mb-1 text-[#374151]">מקור פנייה *</label>
+              <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))}
+                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]"
+                style={{fontSize:"16px"}}>
+                <option value="">— בחר מקור —</option>
+                {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
+              </select>
             </div>
 
             {/* Event attribution */}
