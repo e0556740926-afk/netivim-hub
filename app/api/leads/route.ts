@@ -9,7 +9,23 @@ import { currentUser } from "@/lib/auth-server";
 import { sendToSilfrus } from "@/lib/silfrus";
 
 export async function GET(req: NextRequest) {
-  const cid = req.nextUrl.searchParams.get("coordinator_id");
+  const me = await currentUser(req);
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
+  // Finding #4 from the permissions audit: coordinator_id used to come
+  // straight from the query string, so a coordinator could request any
+  // other coordinator's leads (or omit it entirely to get everyone's).
+  // A coordinator is now hard-scoped server-side to their own record —
+  // the client-supplied coordinator_id is ignored entirely for them, not
+  // merely validated, so there is no way to widen the result by asking
+  // differently.
+  let cid = req.nextUrl.searchParams.get("coordinator_id");
+  if (me.role === "coordinator") {
+    const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me.id}`;
+    if (!own) return NextResponse.json({ leads: [] }); // no coordinator record linked — see nothing, not everything
+    cid = String(own.id);
+  }
+
   const [soft, hasOwner] = await Promise.all([
     hasColumn("leads", "deleted_at"),
     hasColumn("leads", "owner_name"),
@@ -139,8 +155,15 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const { id, status } = await req.json();
-  await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
   const me2 = await currentUser(req);
+  if (me2?.role === "coordinator") {
+    const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me2.id}`;
+    const [lead] = await sql`SELECT coordinator_id FROM leads WHERE id=${id}`;
+    if (!own || !lead || lead.coordinator_id !== own.id) {
+      return NextResponse.json({ error: "אין הרשאה לערוך ליד זה" }, { status: 403 });
+    }
+  }
+  await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
   logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: status?`סטטוס: ${status}`:"עודכן" });
   return NextResponse.json({ ok: true });
 }
@@ -149,6 +172,13 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const { id } = await req.json();
   const me = await currentUser(req);
+  if (me?.role === "coordinator") {
+    const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me.id}`;
+    const [lead] = await sql`SELECT coordinator_id FROM leads WHERE id=${id}`;
+    if (!own || !lead || lead.coordinator_id !== own.id) {
+      return NextResponse.json({ error: "אין הרשאה למחוק ליד זה" }, { status: 403 });
+    }
+  }
   if (await hasColumn("leads", "deleted_at")) {
     await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
     logAudit({ entityType:"lead", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
