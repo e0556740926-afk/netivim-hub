@@ -127,18 +127,13 @@ export default function StatisticsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [c, p, a, mt, cs, om, geoR] = await Promise.all([
-          fetch("/api/statistics/cost"), fetch("/api/statistics/propensity"), fetch("/api/statistics/anomalies"),
-          fetch("/api/statistics/median-time"), fetch("/api/statistics/conversion-simple"), fetch("/api/statistics/outcome-metrics"),
-          fetch("/api/statistics/geo"),
-        ])
-        if (c.status === 403) { setForbidden(true); setLoading(false); return }
-        if (!c.ok || !p.ok || !a.ok) { setLoadError(`שגיאת שרת (${c.status}/${p.status}/${a.status}) — נסה לרענן`); setLoading(false); return }
-        setCost(await c.json()); setPropensity(await p.json()); setAnomalies(await a.json())
-        if (mt.ok) setMedianTime(await mt.json())
-        if (cs.ok) setConversionSimple(await cs.json())
-        if (om.ok) setOutcomeMetrics(await om.json())
-        if (geoR.ok) setGeo(await geoR.json())
+        const r = await fetch("/api/statistics/overview")
+        if (r.status === 403) { setForbidden(true); setLoading(false); return }
+        if (!r.ok) { setLoadError(`שגיאת שרת (${r.status}) — נסה לרענן`); setLoading(false); return }
+        const d = await r.json()
+        setCost(d.cost); setPropensity(d.propensity); setAnomalies(d.anomalies)
+        setMedianTime(d.median_time); setConversionSimple(d.conversion_simple)
+        setOutcomeMetrics(d.outcome_metrics); setGeo(d.geo)
       } catch (e) {
         setLoadError("שגיאת רשת או תשובה לא תקינה מהשרת")
       } finally {
