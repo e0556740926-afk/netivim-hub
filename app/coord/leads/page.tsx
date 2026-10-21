@@ -2,8 +2,12 @@
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { fd, pct, leadColor } from "@/lib/utils"
-import Speedometer from "@/components/ui/Speedometer"
+import { pct } from "@/lib/utils"
+import { useUrlState } from "@/lib/use-url-state"
+import { useQuickAction } from "@/lib/quick-action"
+import Sheet from "@/components/shell/Sheet"
+import { Icon } from "@/components/shell/icons"
+import "@/components/shell/screens.css"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import SfStatusBadge from "@/components/ui/SfStatusBadge"
 
@@ -40,6 +44,8 @@ export default function CoordLeads() {
   const [dupWarning, setDupWarning] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [q, setQ] = useUrlState("q")
+  const [view, setView] = useUrlState("view", "month")
   const m = new Date().getMonth()+1
   const y = new Date().getFullYear()
 
@@ -111,6 +117,10 @@ export default function CoordLeads() {
     setForm({...EMPTY_FORM}); setShowForm(false); load()
   }
 
+  function openForm() { setErr(""); setDupWarning(null); setShowForm(true) }
+  // "+ הוספה" → ליד חדש opens this same form (waits until the coordinator is resolved).
+  useQuickAction(["lead"], openForm, !loading && !!coordId)
+
   async function cycleStatus(id:number, cur:string) {
     const next = STATUS_CYCLE[cur]||"new"
     await fetch("/api/leads",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status:next})})
@@ -118,206 +128,140 @@ export default function CoordLeads() {
   }
 
   const p = pct(myLeads,target)
-  const monthLeads = leads.filter(l=>l.created_at?.slice(5,7)===String(m).padStart(2,"0"))
+  const monthKey = String(m).padStart(2,"0")
+  const needle = q.trim().toLowerCase()
+  const VIEWS: [string,string,(l:any)=>boolean][] = [
+    ["month","החודש",l=>l.created_at?.slice(5,7)===monthKey && l.created_at?.slice(0,4)===String(y)],
+    ["open","בטיפול",l=>l.status==="new"||l.status==="contacted"],
+    ["advanced","הועברו",l=>l.status==="advanced"],
+    ["all","הכל",()=>true],
+  ]
+  const viewFn = (VIEWS.find(v=>v[0]===view)||VIEWS[0])[2]
+  const shown = leads.filter(l=>viewFn(l) && (!needle || [l.name,l.phone,l.city,l.id_number].join(" ").toLowerCase().includes(needle)))
+  const field = (label:string, node:React.ReactNode, hint?:string) => <label className="ws-field">{label}{node}{hint&&<small>{hint}</small>}</label>
 
-  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
+  if (error) return <div className="ws"><ErrorState retry={load}/></div>
 
   return (
-    <div className="p-4 max-w-2xl mx-auto fade-up">
-      <div className="text-xl font-extrabold mb-3">הלידים שלי</div>
+    <div className="ws">
+      <div className="ws-head">
+        <div>
+          <h1>הלידים שלי</h1>
+          <div className="ws-sub">כל פנייה מקבלת המשך ברור</div>
+        </div>
+        <button type="button" className="shell-iconbtn" onClick={openForm} aria-label="ליד חדש" disabled={loading||!coordId}><Icon name="plus"/></button>
+      </div>
 
-      {loading ? <SkeletonCard rows={5}/> : <>
-        {/* Speedometer */}
-        <div className="bg-white border border-[#E2E8F0] rounded-[18px] p-4 text-center mb-3">
-          <div className="flex justify-center mb-3"><Speedometer actual={myLeads} target={target} size={150}/></div>
-          <div className="h-2 bg-[#F0F4F8] rounded-full overflow-hidden mb-2">
-            <div style={{width:`${p}%`,background:leadColor(p)}} className="h-full rounded-full transition-all"/>
+      {loading ? <SkeletonCard rows={5}/> : !coordId ? <div className="ws-card ws-empty">המשתמש שלך עדיין לא מקושר לרכז. פנו למנהל המערכת.</div> : <>
+        {/* Compact monthly goal */}
+        <div className="ws-card">
+          <div className="ws-goal-top">
+            <strong>החודש</strong>
+            <span>{myLeads} לידים{target ? ` · יעד ${target}` : ""}</span>
           </div>
-          <div className="text-xs text-[#64748B]">
-            {myLeads} לידים החודש · נותרו {new Date(y,m,0).getDate()-new Date().getDate()} ימים
-          </div>
+          {target ? <div className="ws-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p} aria-label="התקדמות ליעד החודשי"><i style={{width:`${Math.min(100,p)}%`}}/></div> : null}
+          <div className="ws-goal-foot">{target ? `${p}% מהיעד · ` : "טרם הוגדר יעד · "}נותרו {new Date(y,m,0).getDate()-new Date().getDate()} ימים</div>
         </div>
 
-        {/* Add button */}
-        <button onClick={()=>{setShowForm(v=>!v);setErr("");setDupWarning(null)}}
-          className={`w-full py-2.5 mb-3 rounded-[14px] text-sm font-bold transition-colors ${showForm?"bg-[#E2E8F0] text-[#374151]":"bg-[#166634] text-white"}`}>
-          {showForm ? "✕ סגור" : "+ הוסף ליד"}
-        </button>
-
-        {/* Add form */}
-        {showForm && (
-          <div className="bg-white border-2 border-[#166534] rounded-[16px] p-4 mb-4 fade-up space-y-3">
-            <div className="text-sm font-bold text-[#166534] mb-1">ליד חדש</div>
-
-            {/* Name row */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">שם פרטי *</label>
-                <input value={form.firstName} onChange={e=>setForm(f=>({...f,firstName:e.target.value}))}
-                  placeholder="ישראל"
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm focus:outline-none focus:border-[#166534]"
-                  style={{fontSize:"16px"}}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">שם משפחה</label>
-                <input value={form.lastName} onChange={e=>setForm(f=>({...f,lastName:e.target.value}))}
-                  placeholder="ישראלי"
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm focus:outline-none focus:border-[#166534]"
-                  style={{fontSize:"16px"}}/>
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="text-xs font-semibold block mb-1 text-[#374151]">טלפון *</label>
-              <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))}
-                placeholder="050-0000000" type="tel"
-                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm focus:outline-none focus:border-[#166534]"
-                style={{fontSize:"16px"}}/>
-            </div>
-
-            {/* Age + ID */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">גיל</label>
-                <input value={form.age} onChange={e=>setForm(f=>({...f,age:e.target.value}))}
-                  placeholder="18" type="number"
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm focus:outline-none focus:border-[#166534]"
-                  style={{fontSize:"16px"}}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">ת.ז</label>
-                <input value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))}
-                  placeholder="000000000" type="text" inputMode="numeric" maxLength={9}
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm focus:outline-none focus:border-[#166534]"
-                  style={{fontSize:"16px"}}/>
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="text-xs font-semibold block mb-1 text-[#374151]">הערות</label>
-              <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
-                placeholder="מידע נוסף על הבחור..." rows={2}
-                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm resize-none focus:outline-none focus:border-[#166534]"
-                style={{fontSize:"16px"}}/>
-            </div>
-
-            {/* Lead source (mandatory) */}
-            <div>
-              <label className="text-xs font-semibold block mb-1 text-[#374151]">מקור פנייה *</label>
-              <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))}
-                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]"
-                style={{fontSize:"16px"}}>
-                <option value="">— בחר מקור —</option>
-                {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
-              </select>
-            </div>
-
-            {/* Arrival channel (mandatory) */}
-            <div>
-              <label className="text-xs font-semibold block mb-1 text-[#374151]">ערוץ הגעה *</label>
-              <select value={form.arrivalChannelId} onChange={e=>setForm(f=>({...f,arrivalChannelId:e.target.value}))}
-                className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]"
-                style={{fontSize:"16px"}}>
-                <option value="">— איך הגיע? —</option>
-                {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
-            </div>
-
-            {/* Event attribution */}
-            {events.length > 0 && (
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">נאסף באירוע (לא חובה)</label>
-                <select value={form.eventId} onChange={e=>setForm(f=>({...f,eventId:e.target.value}))}
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]">
-                  <option value="">— לא באירוע —</option>
-                  {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
-                </select>
-              </div>
-            )}
-
-            {/* Referring contact / partner */}
-            {contacts.length > 0 && (
-              <div>
-                <label className="text-xs font-semibold block mb-1 text-[#374151]">הופנה על ידי — איש קשר / שותף (לא חובה)</label>
-                <select value={form.contactId} onChange={e=>setForm(f=>({...f,contactId:e.target.value}))}
-                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]">
-                  <option value="">— ללא —</option>
-                  {contacts.map((c:any)=><option key={c.id} value={c.id}>{c.name}{c.org?` · ${c.org}`:""}</option>)}
-                </select>
-              </div>
-            )}
-
-            {/* Duplicate warning */}
-            {dupWarning && (
-              <div className="bg-[#FEF3C7] text-[#B45309] rounded-[10px] px-3 py-2.5 text-xs font-semibold">
-                ⚠️ מספר זה כבר קיים — {dupWarning.name}
-                <div className="font-normal mt-0.5">הליד לא נוצר כדי למנוע כפילות.</div>
-              </div>
-            )}
-
-            {err && <div className="text-xs text-[#960010] font-semibold">{err}</div>}
-
-            <div className="flex gap-2 pt-1">
-              <button onClick={addLead} disabled={saving}
-                className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50 hover:bg-[#00488D] transition-colors">
-                {saving ? "שומר..." : "הוסף ליד"}
-              </button>
-              <button onClick={()=>{setShowForm(false);setErr("");setDupWarning(null)}}
-                className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm text-[#64748B] hover:bg-[#F8FAFC]">
-                ביטול
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Leads list */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-bold">החודש ({monthLeads.length})</div>
-          <div className="text-xs text-[#94A3B8]">לחץ על סטטוס לשינוי</div>
+        <label className="ws-search">
+          <Icon name="search" size={18}/>
+          <input type="search" value={q} onChange={e=>setQ(e.target.value)} placeholder="חיפוש ליד לפי שם או טלפון" aria-label="חיפוש ליד לפי שם או טלפון"/>
+        </label>
+        <div className="ws-chips" role="group" aria-label="סינון לידים">
+          {VIEWS.map(([k,label])=>(
+            <button key={k} type="button" aria-pressed={(view||"month")===k} onClick={()=>setView(k==="month"?"":k)}>{label}</button>
+          ))}
         </div>
 
-        <div className="space-y-2">
-          {monthLeads.map(l=>{
+        <div className="ws-section" style={{marginTop:6}}>
+          <h2>{(VIEWS.find(v=>v[0]===view)||VIEWS[0])[1]} <span className="ws-count">{shown.length}</span></h2>
+          <span className="ws-sub">הקשה על הסטטוס מעדכנת אותו</span>
+        </div>
+        <div className="ws-list">
+          {shown.map(l=>{
             const c=STATUS_COLORS[l.status]||{bg:"#F3F4F6",fg:"#374151"}
+            const wa=`https://wa.me/972${String(l.phone||"").replace(/^0/,"").replace(/[^0-9]/g,"")}`
             return (
-              <div key={l.id} className="bg-white border border-[#E2E8F0] rounded-[12px] p-3">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {(l.name||"").split(" ").map((w:string)=>w[0]).join("").slice(0,2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold">{l.name}</div>
-                    <div className="text-xs text-[#64748B] flex gap-2 flex-wrap">
-                      <span>{l.phone}</span>
-                      {l.age&&<span>גיל {l.age}</span>}
-                      {l.id_number&&<span>ת.ז {l.id_number}</span>}
-                      {l.score!=null&&<span style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>★ {l.score}</span>}
-                    </div>
-                    {l.notes&&<div className="text-xs text-[#94A3B8] mt-0.5 truncate">{l.notes}</div>}
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <span onClick={()=>cycleStatus(l.id,l.status)}
-                      style={{background:c.bg,color:c.fg}}
-                      className="px-2 py-0.5 rounded-full text-xs font-bold cursor-pointer whitespace-nowrap">
-                      {STATUS_LABEL[l.status]||l.status}
-                    </span>
-                    <SfStatusBadge lead={l}/>
-                    <a href={`https://wa.me/972${l.phone?.replace(/^0/,"").replace(/-/g,"")}`} target="_blank"
-                      className="text-[10px] text-[#166534] font-semibold">↗ וואטסאפ</a>
-                  </div>
+              <div key={l.id} className="ws-item" style={{alignItems:"flex-start"}}>
+                <span className="ws-avatar">{(l.name||"").split(" ").map((w:string)=>w[0]).join("").slice(0,2)}</span>
+                <div className="ws-main">
+                  <strong>{l.name}</strong>
+                  <small>
+                    {l.phone && <a href={`tel:${l.phone}`} style={{color:"inherit"}}>{l.phone}</a>}
+                    {l.age&&<> · גיל {l.age}</>}
+                    {l.id_number&&<> · ת.ז {l.id_number}</>}
+                    {l.score!=null&&<> · <span style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>★ {l.score}</span></>}
+                  </small>
+                  {l.notes&&<small style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{l.notes}</small>}
+                  <div style={{marginTop:6}}><SfStatusBadge lead={l}/></div>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
+                  <button type="button" onClick={()=>cycleStatus(l.id,l.status)} aria-label={`סטטוס: ${STATUS_LABEL[l.status]||l.status}. הקשה לשינוי`}
+                    style={{background:c.bg,color:c.fg,border:0,borderRadius:8,padding:"6px 9px",fontSize:12,fontWeight:700,minHeight:32,cursor:"pointer",whiteSpace:"nowrap"}}>
+                    {STATUS_LABEL[l.status]||l.status}
+                  </button>
+                  {l.phone && <a href={wa} target="_blank" rel="noopener noreferrer" className="ws-link" style={{padding:"4px 0"}}>וואטסאפ ↗</a>}
                 </div>
               </div>
             )
           })}
-          {monthLeads.length===0 && (
-            <div className="text-sm text-[#94A3B8] text-center py-6 bg-white border border-[#E2E8F0] rounded-[12px]">
-              אין לידים החודש עדיין
+          {shown.length===0 && (
+            <div className="ws-empty">
+              {needle ? "לא נמצאו לידים מתאימים לחיפוש." : view && view!=="month" ? "אין לידים בתצוגה הזו." : "אין לידים החודש עדיין."}
+              {!needle && <><br/><button type="button" className="ws-link" onClick={openForm}>+ ליד חדש</button></>}
             </div>
           )}
         </div>
       </>}
+
+      {/* Lead form — same fields, validation and duplicate check as before; input is kept on error */}
+      <Sheet open={showForm} onClose={()=>{setShowForm(false);setErr("");setDupWarning(null)}} title="ליד חדש" subtitle="הליד ישויך אליך ויישלח לסנכרון כרגיל" labelledBy="lead-form-title"
+        footer={<>
+          <button type="button" className="ws-btn ws-btn-primary" onClick={addLead} disabled={saving}>{saving ? "שומר…" : "שמירת ליד"}</button>
+          <button type="button" className="ws-btn" onClick={()=>{setShowForm(false);setErr("");setDupWarning(null)}}>ביטול</button>
+        </>}>
+        <form className="ws-form" onSubmit={e=>{e.preventDefault();addLead()}} noValidate>
+          {dupWarning && (
+            <div className="ws-warn" role="alert"><b>מספר זה כבר קיים — {dupWarning.name}.</b><br/>הליד לא נוצר כדי למנוע כפילות.</div>
+          )}
+          {err && <div className="ws-error" role="alert">{err}</div>}
+          <fieldset className="ws-fieldset">
+            <legend>פרטי זיהוי</legend>
+            <div className="ws-grid2">
+              {field("שם פרטי *", <input value={form.firstName} onChange={e=>setForm(f=>({...f,firstName:e.target.value}))} placeholder="ישראל" autoComplete="off" required/>)}
+              {field("שם משפחה", <input value={form.lastName} onChange={e=>setForm(f=>({...f,lastName:e.target.value}))} placeholder="ישראלי" autoComplete="off"/>)}
+            </div>
+            {field("טלפון *", <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="050-0000000" type="tel" inputMode="tel" required/>)}
+          </fieldset>
+          <fieldset className="ws-fieldset">
+            <legend>מקור והגעה</legend>
+            {field("מקור פנייה *", <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))} required>
+              <option value="">— בחר מקור —</option>
+              {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
+            </select>)}
+            {field("ערוץ הגעה *", <select value={form.arrivalChannelId} onChange={e=>setForm(f=>({...f,arrivalChannelId:e.target.value}))} required>
+              <option value="">— איך הגיע? —</option>
+              {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>)}
+            {events.length > 0 && field("נאסף באירוע (לא חובה)", <select value={form.eventId} onChange={e=>setForm(f=>({...f,eventId:e.target.value}))}>
+              <option value="">— לא באירוע —</option>
+              {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
+            </select>)}
+            {contacts.length > 0 && field("הופנה על ידי — איש קשר / שותף (לא חובה)", <select value={form.contactId} onChange={e=>setForm(f=>({...f,contactId:e.target.value}))}>
+              <option value="">— ללא —</option>
+              {contacts.map((c:any)=><option key={c.id} value={c.id}>{c.name}{c.org?` · ${c.org}`:""}</option>)}
+            </select>)}
+          </fieldset>
+          <fieldset className="ws-fieldset">
+            <legend>פרטים נוספים</legend>
+            <div className="ws-grid2">
+              {field("גיל", <input value={form.age} onChange={e=>setForm(f=>({...f,age:e.target.value}))} placeholder="18" type="number" inputMode="numeric"/>)}
+              {field("ת.ז", <input value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))} placeholder="000000000" type="text" inputMode="numeric" maxLength={9}/>)}
+            </div>
+            {field("הערות", <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="מידע נוסף על הבחור..." rows={2}/>)}
+          </fieldset>
+        </form>
+      </Sheet>
     </div>
   )
 }

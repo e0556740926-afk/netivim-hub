@@ -1,5 +1,6 @@
 "use client"
 import { useUrlState } from "@/lib/use-url-state"
+import { useQuickAction } from "@/lib/quick-action"
 import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
 import Button from "@/components/ui/Button"
@@ -74,6 +75,8 @@ export default function EventsPage() {
 
   function openEdit(e: any) { setEditId(e.id); setForm(formFromEvent(e)); setShowNew(false); setResultsId(null) }
   function duplicateEvent(e: any) { setEditId(null); setForm(duplicateForm(e)); setShowNew(true); setResultsId(null) }
+  // "+ הוספה" → אירוע חדש opens the same event form.
+  useQuickAction(["event"], () => { setShowNew(true); setEditId(null); setResultsId(null); setForm({...EMPTY_FORM}) })
   function openResults(e: any) { setResultsId(e.id); setResults(resultsFromEvent(e)); setEditId(null); setShowNew(false) }
 
   async function saveEdit() {

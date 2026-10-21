@@ -1,5 +1,6 @@
 "use client"
 import EmptyState from "@/components/ui/EmptyState"
+import { useQuickAction } from "@/lib/quick-action"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useToast } from "@/components/ui/Toast"
@@ -79,6 +80,8 @@ export default function CoordEvents() {
   function openNew() { setEditId(null); setResultsId(null); setForm({...EMPTY_FORM, status:"pending_approval"}); setShowNew(true) }
   function openEdit(e: any) { setEditId(e.id); setForm(formFromEvent(e)); setShowNew(false); setResultsId(null) }
   function duplicateEvent(e: any) { setEditId(null); setForm({...duplicateForm(e), status:"pending_approval"}); setShowNew(true); setResultsId(null) }
+  // "+ הוספה" → הצעת אירוע opens the same proposal form.
+  useQuickAction(["event"], openNew, !loading)
   function openResults(e: any) { setResultsId(e.id); setResults(resultsFromEvent(e)); setEditId(null); setShowNew(false) }
 
   async function saveEdit() {

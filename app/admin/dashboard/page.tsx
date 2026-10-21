@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import "@/components/dashboard/premium.css"
+import "@/components/shell/screens.css"
+import { Icon } from "@/components/shell/icons"
 import { useToast } from "@/components/ui/Toast"
 import { fd, MONTH_HE } from "@/lib/utils"
 import { SkeletonCard } from "@/components/ui/Skeleton"
@@ -73,8 +75,65 @@ export default function FieldDashboard() {
   const visibleTasks = taskList.slice(safeTaskPage * 5, safeTaskPage * 5 + 5)
   const sourceMax = Math.max(1, ...(d.leads.by_source as any[]).map(s => s.count))
 
+  const pendingEvents = (d.events.pending || []).length
+  const attention = [
+    pendingEvents > 0 && { label: "אירועים לאישור", sub: `${pendingEvents} אירועים ממתינים לבדיקה`, href: "/admin/events?status=pending_approval", tone: "warn" },
+    k.reports_missing_this_week > 0 && { label: "השלמת דיווחים", sub: `${k.reports_missing_this_week} רכזים טרם דיווחו השבוע`, href: "/admin/reports", tone: "warn" },
+    k.tasks_overdue > 0 && { label: "משימות באיחור", sub: `${k.tasks_overdue} משימות עברו את המועד`, href: "/admin/tasks?due=overdue", tone: "red" },
+  ].filter(Boolean) as { label: string; sub: string; href: string; tone: string }[]
+
   return (
     <div className="dashboard-ws p-4 md:p-6 lg:p-8">
+      {/* Phone: team snapshot first — the full dashboard follows below */}
+      <section className="md:hidden" aria-label="תמונת מצב של הצוות" style={{ margin: "2px 0 22px" }}>
+        <div className="ws-head" style={{ marginBottom: 14 }}>
+          <div>
+            <h1 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700, letterSpacing: "-.6px", color: "var(--sh-ink)" }}>תמונת מצב</h1>
+            <div className="ws-sub">{new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Jerusalem" })} · צוות השטח</div>
+          </div>
+        </div>
+        <div className="ws-kpis">
+          <button type="button" className="ws-card" onClick={() => router.push("/admin/leads")}>
+            <small>לידים החודש</small>
+            <b>{k.leads_this_month}</b>
+            <span>{leadsPct !== null ? `${leadsPct}% מיעד הארגון` : "טרם הוגדר יעד ארגוני"}</span>
+          </button>
+          <button type="button" className="ws-card" onClick={() => router.push("/admin/tasks?due=today")}>
+            <small>משימות להיום</small>
+            <b>{(d.tasks.today || []).length}</b>
+            <span>{k.tasks_overdue ? `${k.tasks_overdue} באיחור` : "אין משימות באיחור"}</span>
+          </button>
+        </div>
+        <div className="ws-section"><h2>דורש תשומת לב</h2></div>
+        <div className="ws-list">
+          {attention.map(a => (
+            <div className="ws-item" key={a.label}>
+              <button type="button" className="ws-open" onClick={() => router.push(a.href)}>
+                <span className="ws-main"><strong>{a.label}</strong><small>{a.sub}</small></span>
+                <span className={`ws-badge ${a.tone}`}>לטיפול</span>
+                <Icon name="arrow" size={18} className="chev" />
+              </button>
+            </div>
+          ))}
+          {!attention.length && <div className="ws-empty">אין כרגע פריטים שממתינים לטיפול.</div>}
+        </div>
+        <div className="ws-section">
+          <h2>משימות הצוות להיום</h2>
+          <button type="button" className="ws-link" onClick={() => router.push("/admin/tasks")}>לכל המשימות</button>
+        </div>
+        <div className="ws-list">
+          {(d.tasks.today || []).filter((t: any) => !gone.has(t.id)).slice(0, 3).map((t: any) => (
+            <div className="ws-item" key={t.id}>
+              <button type="button" className="ws-open" onClick={() => router.push(`/admin/tasks?open=${t.id}`)}>
+                <span className="ws-main"><strong>{t.title}</strong><small>{(t.assignees || []).join(", ") || "ללא שיוך"}</small></span>
+                <Icon name="arrow" size={18} className="chev" />
+              </button>
+            </div>
+          ))}
+          {!(d.tasks.today || []).length && <div className="ws-empty">אין משימות שמועדן היום.</div>}
+        </div>
+        <div className="ws-sub" style={{ marginTop: 18, textAlign: "center" }}>פירוט מלא של הדשבורד ↓</div>
+      </section>
       <div className="dash-heading">
         <div>
           <span className="dash-eyebrow">סביבת העבודה / תמונת מצב</span><h1 className="text-2xl font-extrabold text-[#0D2744]">דשבורד שטח</h1>

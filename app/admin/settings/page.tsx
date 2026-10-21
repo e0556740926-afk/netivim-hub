@@ -1,5 +1,6 @@
 "use client"
 import { SkeletonCard } from "@/components/ui/Skeleton"
+import { useQuickAction } from "@/lib/quick-action"
 import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
@@ -78,6 +79,8 @@ export default function SettingsPage() {
     setForm({ name:"", email:"", password:"", role:"coordinator", status:"active", phone:"", area:"", team:"", reports_to:"" })
     setShowForm(true); setErr("")
   }
+  // "+ הוספה" → משתמש חדש opens the existing user form (admin-only; the API enforces it).
+  useQuickAction(["user"], () => { startAdd(); setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50) }, !loading)
 
   async function save() {
     if (!form.name || !form.email) { setErr("שם ודואל חובה"); return }

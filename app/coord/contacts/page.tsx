@@ -7,6 +7,10 @@ import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { fd, ds } from "@/lib/utils"
+import { useUrlState } from "@/lib/use-url-state"
+import { useQuickAction } from "@/lib/quick-action"
+import Sheet from "@/components/shell/Sheet"
+import ReferralLink from "@/components/partners/ReferralLink"
 
 const TYPE_LABEL: Record<string,string> = { partner:"שותף אסטרטגי", authority:"גורם רשות", vendor:"ספק חיצוני", lead:"ליד" }
 const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
@@ -28,13 +32,17 @@ export default function CoordContacts() {
   const [error, setError] = useState(false)
   const { user } = useAuth()
   const {success,error:toastError}=useToast()
-  const [view,setView]=useState("contacts")
+  // View + filters live in the URL so opening a card, another tab or a reload keeps them.
+  const [view,setView]=useUrlState("view","contacts")
   const [organizations,setOrganizations]=useState<any[]>([]),[registryReady,setRegistryReady]=useState(false)
   const [contacts, setContacts] = useState<any[]>([])
-  const [q, setQ] = useState("")
-  const [fStatus, setFStatus] = useState("")
-  const [fType, setFType] = useState("")
-  const [fOwner, setFOwner] = useState("")
+  const [q, setQ] = useUrlState("q")
+  const [fStatus, setFStatus] = useUrlState("status")
+  const [fType, setFType] = useUrlState("type")
+  const [fOwner, setFOwner] = useUrlState("owner")
+  const [pickForInteraction, setPickForInteraction] = useState(false)
+  const [newOrgSignal, setNewOrgSignal] = useState(0)
+  const [linkFor, setLinkFor] = useState<any>(null)
   const [openId, setOpenId] = useState<number|null>(null)
   const [detail, setDetail] = useState<any>(null)
   const [showForm, setShowForm] = useState(false)
@@ -77,11 +85,20 @@ export default function CoordContacts() {
     const res = await fetch("/api/contacts/"+id)
     setDetail(await res.json())
   }
-  async function openDetail(id: number) {
-    if (openId===id) { setOpenId(null); setDetail(null); return }
-    setOpenId(id); setShowInt(false); setShowTask(false)
+  async function openDetail(id: number, withInteraction = false) {
+    if (openId===id && !withInteraction) { setOpenId(null); setDetail(null); return }
+    setOpenId(id); setShowInt(withInteraction); setShowTask(false)
+    if (withInteraction) setIntForm({...EMPTY_INT, date:new Date().toISOString().slice(0,10)})
     await loadDetail(id)
   }
+  function closeDetail() { setOpenId(null); setDetail(null); setShowInt(false); setShowTask(false) }
+
+  // "+ הוספה" quick actions open these same forms.
+  useQuickAction(["partner","organization","interaction"], t => {
+    if (t === "partner") startAdd()
+    else if (t === "organization") { setShowForm(false); setView("organizations"); setNewOrgSignal(n => n + 1) }
+    else { setView("contacts"); setPickForInteraction(true) }
+  }, !loading)
 
   function startTask() {
     const name = detail?.contact?.name || ""
@@ -149,13 +166,13 @@ export default function CoordContacts() {
   if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
   return <div className="partners-ws partner-coordinator-page">
-    <div className="flex items-center justify-between mb-3">
-      <div className="text-lg font-extrabold">אנשי קשר</div>
-      <button onClick={startAdd} className="px-3 py-1.5 bg-[#0D2744] text-white rounded-[9px] text-sm font-semibold">+ הוסף</button>
+    <div className="flex items-start justify-between gap-3 mb-4">
+      <div><h1 className="text-[26px] font-bold leading-tight tracking-[-.6px] m-0 mb-1.5">הקשרים שלי</h1><div className="text-[13px] text-[#62756E]">אנשים וארגונים שמקדמים יחד</div></div>
+      <button onClick={startAdd} aria-label="איש קשר חדש" className="w-11 h-11 flex-shrink-0 grid place-items-center rounded-[12px] border border-[#E1E8E3] bg-white text-xl text-[#183D32]">+</button>
     </div>
 
     <div className="partner-view-tabs partner-coord-tabs"><button aria-pressed={view==='contacts'} onClick={()=>setView('contacts')}>אנשי קשר <span>{contacts.length}</span></button><button aria-pressed={view==='organizations'} onClick={()=>{setShowForm(false);setView('organizations')}}>עמותות ומוסדות <span>{organizations.length}</span></button></div>
-    {view==='organizations'?<OrganizationDirectory organizations={organizations} contacts={contacts} available={registryReady} onChanged={load} onAddContact={o=>{startAdd();setForm(f=>({...f,org:o.name,partner_organization_id:o.id}))}} onOpenContact={id=>{setView('contacts');openDetail(id)}}/>:<>
+    {view==='organizations'?<OrganizationDirectory createSignal={newOrgSignal} organizations={organizations} contacts={contacts} available={registryReady} onChanged={load} onAddContact={o=>{startAdd();setForm(f=>({...f,org:o.name,partner_organization_id:o.id}))}} onOpenContact={id=>{setView('contacts');openDetail(id)}}/>:<>
     {/* Filters */}
     <div className="flex gap-2 mb-2">
       <div className="flex-1 flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[10px] px-3 py-2">
@@ -181,8 +198,7 @@ export default function CoordContacts() {
     </div>
 
     {/* Add/Edit form */}
-    {showForm&&<div className="bg-white border-2 border-[#00488D] rounded-[14px] p-4 mb-3 fade-up">
-      <div className="text-sm font-bold text-[#00488D] mb-3">{editId?"עריכת איש קשר":"איש קשר חדש"}</div>
+    <Sheet open={showForm} onClose={()=>setShowForm(false)} title={editId?"עריכת איש קשר":"איש קשר חדש"} subtitle="שיוך לעמותה או מוסד קיימים מהמאגר" labelledBy="coord-contact-form">
       <div className="space-y-2">
         <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="שם מלא *" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
         <div className="grid grid-cols-2 gap-2">
@@ -203,10 +219,11 @@ export default function CoordContacts() {
         <button onClick={()=>save()} disabled={saving} className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">{saving?"שומר...":"שמור"}</button>
         <button onClick={()=>setShowForm(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">ביטול</button>
       </div>
-    </div>}
+    </Sheet>
 
     {/* Detail panel */}
-    {openId&&detail?.contact&&<div className="bg-white border-2 border-[#00488D] rounded-[14px] p-4 mb-3 fade-up">
+    <Sheet open={!!openId} onClose={closeDetail} title={detail?.contact?.name||"פרטי איש קשר"} subtitle={detail?.contact?[detail.contact.role,detail.contact.org].filter(Boolean).join(" · "):undefined} labelledBy="coord-contact-detail">
+    {!detail?.contact?<div className="text-sm text-[#62756E] text-center py-8">טוען…</div>:<div>
       <div className="flex items-start gap-3 pb-3 border-b border-[#E2E8F0] mb-3">
         <div className="w-11 h-11 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">
           {(detail.contact.name||"").split(" ").map((w:string)=>w[0]).join("")}
@@ -224,11 +241,16 @@ export default function CoordContacts() {
         </div>
         <div className="flex gap-1.5">
           <button onClick={()=>startEdit(detail.contact)} className="px-2 py-1 rounded-[7px] border border-[#E2E8F0] text-xs hover:bg-[#F0F7FF]">✎</button>
-          <button onClick={()=>{setOpenId(null);setDetail(null)}} className="px-2 py-1 rounded-[7px] border border-[#E2E8F0] text-xs">✕</button>
+          
         </div>
       </div>
 
-      {/* Quick actions */}
+      {/* Contact actions */}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        {detail.contact.phone?<a href={`tel:${detail.contact.phone}`} className="py-2.5 rounded-[10px] text-xs font-bold border border-[#E2E8F0] text-center">חיוג</a>:<span/>}
+        {detail.contact.phone?<a href={`https://wa.me/972${String(detail.contact.phone).replace(/^0/,"").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer" className="py-2.5 rounded-[10px] text-xs font-bold border border-[#E2E8F0] text-center">WhatsApp</a>:<span/>}
+      </div>
+      {Number(detail.contact.coordinator_id)===Number(coordId)&&<button onClick={()=>setLinkFor(detail.contact)} className="w-full py-2.5 mb-2 rounded-[10px] text-xs font-bold border border-[#21634F] text-[#21634F]">↗ לינק אישי דרך השותף</button>}
       <div className="grid grid-cols-2 gap-2 mb-3">
         <button onClick={()=>{setShowInt(v=>!v);setShowTask(false)}} className={`py-2 rounded-[10px] text-xs font-bold border ${showInt?"bg-[#0D2744] text-white border-[#0D2744]":"bg-white text-[#0D2744] border-[#CBD5E1]"}`}>📝 תעד אינטראקציה</button>
         <button onClick={()=>showTask?setShowTask(false):startTask()} className={`py-2 rounded-[10px] text-xs font-bold border ${showTask?"bg-[#00488D] text-white border-[#00488D]":"bg-white text-[#00488D] border-[#BFDBFE]"}`}>✅ הוסף משימה</button>
@@ -312,14 +334,16 @@ export default function CoordContacts() {
         </div>
       </div>
     </div>}
+    </Sheet>
 
     {/* List */}
+    {pickForInteraction&&<div className="partner-notice" role="status" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:12}}><span>תיעוד קשר: בחרו את איש הקשר, וטופס התיעוד ייפתח בכרטיס שלו.</span><button className="partner-btn" onClick={()=>setPickForInteraction(false)}>ביטול</button></div>}
     <div className="space-y-2">
       {filtered.length===0&&<EmptyState icon="👥" title={hasFilters?"לא נמצאו תוצאות":"אין עדיין אנשי קשר"} hint={hasFilters?"נסה לשנות את הסינון או החיפוש":"כאן מופיעים כל אנשי הקשר של הארגון"} actionLabel={hasFilters?undefined:"+ הוסף איש קשר"} onAction={startAdd} onClearFilters={hasFilters?clearFilters:undefined}/>}
       {filtered.map(c=>{
         const d=ds(c.last_contact); const isOpen=openId===c.id
         const sc=STATUS_COLORS[c.status]||{bg:"#F3F4F6",color:"#374151"}
-        return <div key={c.id} onClick={()=>openDetail(c.id)}
+        return <div key={c.id} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail(c.id,pickForInteraction);setPickForInteraction(false)}}} onClick={()=>{openDetail(c.id,pickForInteraction);setPickForInteraction(false)}}
           className={`bg-white border rounded-[12px] p-3 flex items-center gap-3 cursor-pointer transition-colors ${isOpen?"border-[#00488D] bg-[#F0F7FF]":d>=30?"border-[#FECACA] bg-[#FFF8F8]":"border-[#E2E8F0]"}`}>
           <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">
             {(c.name||"").split(" ").map((w:string)=>w[0]).join("")}
@@ -337,5 +361,6 @@ export default function CoordContacts() {
       })}
     </div>
     </>}
+    {linkFor&&<ReferralLink coords={coordId?[{id:coordId,name:user?.name,area:(user as any)?.area}]:[]} contacts={contacts.filter(c=>Number(c.coordinator_id)===Number(coordId))} initialContact={{...linkFor,coordinator_id:coordId}} onClose={()=>setLinkFor(null)}/>}
   </div>
 }

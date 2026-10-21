@@ -1,0 +1,80 @@
+/* Screen building blocks for the phone redesign (home, leads, snapshot). */
+.ws{max-width:680px;margin:0 auto;padding:22px 16px 8px;color:var(--sh-ink)}
+@media(max-width:360px){.ws{padding-inline:12px}}
+.ws-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:18px}
+.ws-head h1{margin:0 0 6px;font-size:26px;line-height:1.25;letter-spacing:-.6px;font-weight:700}
+.ws-sub{font-size:13px;color:var(--sh-muted);line-height:1.6}
+.ws-sub b{color:var(--sh-ink)}
+.ws-sub .late{color:var(--sh-red);font-weight:700}
+.ws-card{background:#fff;border:1px solid var(--sh-line);border-radius:18px;padding:16px;margin-bottom:14px}
+.ws-goal-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;margin-bottom:10px}
+.ws-goal-top strong{font-size:14px}
+.ws-goal-top span{color:var(--sh-muted);white-space:nowrap}
+.ws-bar{height:6px;border-radius:9px;background:#edf2ed;overflow:hidden}
+.ws-bar i{display:block;height:100%;border-radius:9px;background:#5f9473;transition:width .4s ease}
+.ws-goal-foot{font-size:12px;color:var(--sh-muted);margin-top:8px}
+.ws-quick{display:flex;gap:8px;margin:14px 0 4px}
+.ws-quick>button{flex:1;min-width:0;font-size:13px;padding:10px 4px}
+.ws-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;border-radius:12px;border:1px solid var(--sh-line);background:#fff;color:var(--sh-ink);font:inherit;font-size:14px;padding:10px 14px;cursor:pointer;white-space:nowrap}
+.ws-btn-primary{background:var(--sh-green);border-color:var(--sh-green);color:#fff;font-weight:700}
+.ws-btn-primary:hover{background:var(--sh-green-dark)}
+.ws-btn:disabled{opacity:.55;cursor:default}
+.ws-btn:focus-visible,.ws-link:focus-visible,.ws-chips button:focus-visible,.ws-check:focus-visible,.ws-open:focus-visible{outline:3px solid #b9832a;outline-offset:2px}
+.ws-section{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:22px 0 10px}
+.ws-section h2{margin:0;font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.ws-section h2.late{color:var(--sh-red)}
+.ws-link{border:0;background:none;color:var(--sh-green);font:inherit;font-size:12.5px;font-weight:700;padding:10px 0;cursor:pointer;white-space:nowrap}
+.ws-count{display:inline-block;padding:3px 8px;border-radius:7px;background:var(--sh-tint);color:var(--sh-green);font-size:11px;font-weight:700}
+.ws-list{background:#fff;border:1px solid var(--sh-line);border-radius:18px;padding:2px 14px}
+.ws-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #eef1ee;min-height:58px}
+.ws-item:last-child{border-bottom:0}
+.ws-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;text-align:start;font:inherit;color:inherit;padding:0;cursor:pointer;min-height:44px}
+.ws-open .chev{color:#9aaaa2;flex-shrink:0}
+.ws-main{flex:1;min-width:0}
+.ws-main strong{display:block;font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+.ws-main small{display:block;font-size:12px;color:var(--sh-muted);line-height:1.6;overflow-wrap:anywhere}
+.ws-main small .late{color:var(--sh-red);font-weight:700}
+.ws-check{width:28px;height:28px;flex-shrink:0;border-radius:50%;border:1.6px solid #c4d3c9;background:#fff;display:grid;place-items:center;cursor:pointer;color:#fff;padding:0}
+.ws-check.late{border-color:#d9a6a2}
+.ws-check:hover{border-color:var(--sh-green)}
+.ws-check[aria-pressed=true]{background:var(--sh-green);border-color:var(--sh-green)}
+.ws-avatar{width:36px;height:36px;flex-shrink:0;border-radius:11px;display:grid;place-items:center;background:var(--sh-tint);color:var(--sh-green);font-size:12px;font-weight:700}
+.ws-date{width:44px;flex-shrink:0;text-align:center;line-height:1.2}
+.ws-date b{display:block;font-size:18px}
+.ws-date span{font-size:11px;color:var(--sh-muted)}
+.ws-badge{display:inline-block;padding:4px 8px;border-radius:7px;background:var(--sh-tint);color:var(--sh-green);font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.ws-badge.warn{background:#faf1e3;color:var(--sh-amber)}
+.ws-badge.red{background:#faeeed;color:var(--sh-red)}
+.ws-badge.gray{background:#f0f2f1;color:#6b7a74}
+.ws-badge.blue{background:#e8f0f7;color:#2f5f86}
+.ws-badge.purple{background:#efedf8;color:#5b4b8a}
+.ws-empty{text-align:center;color:var(--sh-muted);font-size:13px;line-height:1.7;padding:18px 8px}
+.ws-empty button{margin-top:6px}
+.ws-linkcard{display:flex;align-items:center;gap:12px;background:var(--sh-navy);color:#fff;border-radius:18px;padding:14px 16px;margin:14px 0}
+.ws-linkcard .ws-main small{color:#c9d8d0}
+.ws-linkcard .ws-btn{background:#ffffff1a;border-color:#ffffff33;color:#fff;font-size:13px;min-height:40px}
+.ws-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--sh-line);border-radius:12px;padding:0 12px;min-height:46px;color:var(--sh-muted);margin-bottom:12px}
+.ws-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px;color:var(--sh-ink);padding:10px 0}
+.ws-search:focus-within{border-color:var(--sh-green);box-shadow:0 0 0 3px #21634f1f}
+.ws-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.ws-chips button{border:1px solid var(--sh-line);background:#fff;border-radius:20px;padding:8px 13px;font:inherit;font-size:12.5px;min-height:40px;cursor:pointer;color:var(--sh-ink)}
+.ws-chips button[aria-pressed=true]{background:var(--sh-green);border-color:var(--sh-green);color:#fff;font-weight:700}
+.ws-kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.ws-kpis .ws-card{margin:0;display:flex;flex-direction:column;align-items:flex-start;text-align:start;font:inherit;color:inherit;cursor:pointer}
+.ws-kpis small{font-size:12px;color:var(--sh-muted)}
+.ws-kpis b{font-size:28px;line-height:1.1;margin:8px 0 4px}
+.ws-kpis span{font-size:11.5px;color:var(--sh-muted)}
+.ws-error{background:#faeeed;color:var(--sh-red);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;margin-bottom:12px}
+.ws-warn{background:#faf1e3;color:var(--sh-amber);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;margin-bottom:12px}
+
+/* Form fields inside shell sheets */
+.ws-form{display:grid;gap:14px}
+.ws-fieldset{border:0;padding:0;margin:0;display:grid;gap:12px}
+.ws-fieldset>legend{font-size:12px;font-weight:700;color:var(--sh-muted);margin-bottom:10px;padding:0}
+.ws-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:340px){.ws-grid2{grid-template-columns:1fr}}
+.ws-field{display:block;font-size:13px;font-weight:700;color:var(--sh-ink);min-width:0}
+.ws-field input,.ws-field select,.ws-field textarea{display:block;width:100%;min-width:0;margin-top:6px;border:1px solid #d6e0d8;border-radius:10px;background:#fff;padding:11px 12px;min-height:46px;font:inherit;font-size:16px;font-weight:400;color:var(--sh-ink)}
+.ws-field textarea{min-height:76px;resize:vertical}
+.ws-field input:focus,.ws-field select:focus,.ws-field textarea:focus{outline:0;border-color:var(--sh-green);box-shadow:0 0 0 3px #21634f1f}
+.ws-field small{display:block;font-weight:400;font-size:11.5px;color:var(--sh-muted);margin-top:5px}

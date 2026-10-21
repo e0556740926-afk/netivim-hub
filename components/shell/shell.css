@@ -1,0 +1,77 @@
+/* Phone shell — navy brand header, green actions, quiet light surface.
+   Shared by the coordinator and manager layouts. */
+:root{
+  --sh-navy:#102d43;--sh-green:#21634f;--sh-green-dark:#184c3c;--sh-ink:#183d32;--sh-muted:#62756e;
+  --sh-line:#e1e8e3;--sh-bg:#f4f7f4;--sh-tint:#edf4ee;--sh-red:#a03c36;--sh-amber:#946014;
+  --sh-nav-h:64px;--sh-safe:env(safe-area-inset-bottom,0px);
+}
+.shell-icon{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* Header */
+.shell-header{position:sticky;top:0;z-index:40;background:var(--sh-navy);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));min-height:60px}
+.shell-logo{filter:brightness(0) invert(1);width:104px;height:auto}
+.shell-identity{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:0;color:#fff;min-width:44px;min-height:44px;padding:0;cursor:pointer}
+.shell-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#ffffff1f;font-size:12px;font-weight:700}
+.shell-role{font-size:10px;color:#d4e5db;line-height:1}
+
+/* Bottom navigation */
+.shell-bottom{position:fixed;inset-inline:0;bottom:0;z-index:50;background:#fff;border-top:1px solid var(--sh-line);padding:6px 6px calc(8px + var(--sh-safe));box-shadow:0 -6px 18px #10302412}
+.shell-bottom-inner{display:flex;gap:2px;max-width:640px;margin:0 auto}
+.shell-tab{flex:1 1 0;min-width:0;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:52px;padding:6px 0 4px;border-radius:12px;color:#6f8079;font-size:11px;line-height:1.1;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.shell-tab>span:last-child{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-inline:2px}
+.shell-tab[aria-current=page]{color:var(--sh-green);background:var(--sh-tint);font-weight:700}
+.shell-tab-icon{position:relative;display:grid;place-items:center}
+.shell-tab-badge{position:absolute;top:-6px;inset-inline-end:-10px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--sh-red);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;border:2px solid #fff}
+.shell-tab:focus-visible,.shell-fab:focus-visible,.shell-row:focus-visible,.shell-quick-grid button:focus-visible,.shell-iconbtn:focus-visible,.shell-identity:focus-visible{outline:3px solid #b9832a;outline-offset:2px}
+
+/* Floating add button */
+.shell-fab{position:fixed;z-index:51;inset-inline-end:16px;bottom:calc(var(--sh-nav-h) + var(--sh-safe) + 14px);display:flex;align-items:center;gap:8px;min-height:50px;padding:10px 18px;border-radius:17px;border:1px solid #ffffff70;background:var(--sh-green);color:#fff;font-size:15px;font-weight:700;box-shadow:0 6px 18px #173b3147;cursor:pointer}
+.shell-fab:active{transform:scale(.97)}
+@media(min-width:1100px){.shell-fab{inset-inline-end:calc(50% - 300px)}}
+
+/* Space so the last row of every screen clears the nav + add button */
+.shell-pad{padding-bottom:calc(var(--sh-nav-h) + var(--sh-safe) + 76px)}
+@media(min-width:768px){.admin-main.shell-pad{padding-bottom:0}}
+
+/* Sheets */
+.shell-sheet-back{position:fixed;inset:0;z-index:90;background:#0b271d66;display:flex;align-items:flex-end;justify-content:center}
+.shell-sheet{background:var(--sh-bg);width:100%;max-width:640px;max-height:92dvh;display:flex;flex-direction:column;border-radius:24px 24px 0 0;overflow:hidden;box-shadow:0 -8px 40px #16382626;outline:none;color:var(--sh-ink)}
+.shell-sheet-wide{max-width:760px}
+@media(min-width:768px){.shell-sheet-back{align-items:center;padding:24px}.shell-sheet{border-radius:22px;max-height:86dvh}}
+@media(prefers-reduced-motion:no-preference){.shell-sheet{animation:shell-in .18s ease-out}@keyframes shell-in{from{transform:translateY(22px);opacity:.5}to{transform:none;opacity:1}}}
+.shell-sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px;background:#fff;border-bottom:1px solid var(--sh-line);flex-shrink:0}
+.shell-sheet-head h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.3px}
+.shell-sheet-head p{margin:4px 0 0;font-size:12px;color:var(--sh-muted);line-height:1.5}
+.shell-sheet-body{overflow:auto;overscroll-behavior:contain;padding:16px 18px 20px;min-height:0;flex:1}
+.shell-sheet-foot{flex-shrink:0;display:flex;gap:8px;padding:12px 18px calc(12px + var(--sh-safe));background:#fff;border-top:1px solid var(--sh-line)}
+.shell-sheet-foot>*{flex:1}
+.shell-iconbtn{width:44px;height:44px;flex-shrink:0;display:grid;place-items:center;border-radius:12px;border:1px solid var(--sh-line);background:#fff;color:var(--sh-ink);cursor:pointer}
+
+/* Shared pieces */
+.shell-card{background:#fff;border:1px solid var(--sh-line);border-radius:18px;padding:4px 16px;margin-bottom:14px}
+.shell-circle{width:36px;height:36px;flex-shrink:0;border-radius:11px;display:grid;place-items:center;background:var(--sh-tint);color:var(--sh-green);font-size:12px;font-weight:700}
+.shell-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 0;min-height:56px;border:0;border-bottom:1px solid #eef1ee;background:none;text-align:start;color:inherit;cursor:pointer;font:inherit}
+.shell-row:last-child{border-bottom:0}
+.shell-row-static{cursor:default}
+.shell-row[aria-current=page] strong{color:var(--sh-green)}
+.shell-grow{flex:1;min-width:0}
+.shell-grow strong{display:block;font-size:14px;line-height:1.5}
+.shell-grow small{display:block;font-size:12px;color:var(--sh-muted);line-height:1.6;overflow-wrap:anywhere}
+.shell-chev{color:#9aaaa2}
+.shell-menu-title{font-size:12px;color:var(--sh-muted);font-weight:700;margin:18px 2px 8px}
+.shell-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--sh-line);border-radius:12px;padding:0 12px;min-height:46px;color:var(--sh-muted)}
+.shell-search input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:16px;color:var(--sh-ink);padding:10px 0}
+.shell-search:focus-within{border-color:var(--sh-green);box-shadow:0 0 0 3px #21634f1f}
+.shell-note{font-size:12px;line-height:1.8;color:var(--sh-muted);margin:6px 2px 0}
+.shell-empty{text-align:center;padding:26px 8px;color:var(--sh-muted);font-size:13px}
+.shell-tools{background:var(--sh-navy);border-radius:16px;padding:10px;display:grid;gap:8px;margin-bottom:12px}
+
+.shell-quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:4px 0 12px}
+.shell-quick-grid button{display:flex;flex-direction:column;align-items:flex-start;text-align:start;background:#fff;border:1px solid var(--sh-line);border-radius:16px;padding:14px 12px;min-height:110px;cursor:pointer;color:var(--sh-ink);font:inherit}
+.shell-quick-grid button:active{background:var(--sh-tint)}
+.shell-quick-grid .shell-circle{margin-bottom:12px}
+.shell-quick-grid strong{font-size:14px}
+.shell-quick-grid small{font-size:11.5px;color:var(--sh-muted);line-height:1.5;margin-top:4px}
+
+/* Admin: the phone chrome is phone-only; desktop keeps the sidebar */
+@media(min-width:768px){.shell-phone-only{display:none!important}}

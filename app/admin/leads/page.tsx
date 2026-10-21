@@ -3,6 +3,7 @@ import SfStatusBadge from "@/components/ui/SfStatusBadge"
 import Pagination, { usePagination } from "@/components/ui/Pagination"
 import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
+import { useQuickAction } from "@/lib/quick-action"
 import EmptyState from "@/components/ui/EmptyState"
 import { useEffect, useState } from "react"
 import { fd } from "@/lib/utils"
@@ -55,6 +56,11 @@ export default function AdminLeads() {
   const [bulkStatus, setBulkStatus] = useState("")
   const [bulkBusy, setBulkBusy] = useState(false)
   const [loading, setLoading] = useState(true)
+  // "+ הוספה" → ליד חדש opens the existing add form and brings it into view.
+  useQuickAction(["lead"], () => {
+    setErr(""); setDupWarning(null); setShowForm(true)
+    setTimeout(() => document.getElementById("lead-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
+  })
   const [error, setError] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({...EMPTY_FORM})
@@ -285,7 +291,7 @@ export default function AdminLeads() {
 
       {/* Add form */}
       {showForm && (
-        <Card className="mb-5 border-2 border-[#00488D]">
+        <div id="lead-form" className="scroll-mt-20"><Card className="mb-5 border-2 border-[#00488D]">
           <div className="p-5">
             <div className="text-sm font-bold text-[#00488D] mb-4">הוספת ליד חדש</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -372,7 +378,7 @@ export default function AdminLeads() {
               <Button variant="secondary" onClick={()=>setShowForm(false)}>ביטול</Button>
             </div>
           </div>
-        </Card>
+        </Card></div>
       )}
 
       {/* Filters */}

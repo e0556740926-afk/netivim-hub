@@ -4,6 +4,7 @@ import ErrorState from "@/components/ui/ErrorState"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import { useQuickAction } from "@/lib/quick-action"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 
 export default function CoordProfile() {
@@ -83,6 +84,16 @@ export default function CoordProfile() {
     })
     setSent(true)
   }
+
+  // "+ הוספה" → עדכון לדוח brings the weekly report form into view.
+  useQuickAction(["report"], () => {
+    setSent(false)
+    setTimeout(() => {
+      const el = document.getElementById("weekly-report")
+      el?.scrollIntoView({ behavior: "smooth", block: "start" })
+      el?.querySelector<HTMLTextAreaElement>("textarea")?.focus({ preventScroll: true })
+    }, 80)
+  }, !loading)
 
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
   if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={3}/>)}</div>
@@ -165,6 +176,7 @@ export default function CoordProfile() {
       </div>
 
       {/* Weekly report */}
+      <div id="weekly-report" className="scroll-mt-20">
       {sent
         ? <div className="bg-[#DCFCE7] rounded-[16px] p-6 text-center">
             <div className="text-4xl mb-2">✓</div>
@@ -202,6 +214,7 @@ export default function CoordProfile() {
             </div>
           </div>
       }
+      </div>
     </div>
   )
 }

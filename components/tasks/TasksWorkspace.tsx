@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/components/ui/Toast"
 import { useUrlState } from "@/lib/use-url-state"
+import { useQuickAction } from "@/lib/quick-action"
 import ErrorState from "@/components/ui/ErrorState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import { ds } from "@/lib/utils"
@@ -173,6 +174,21 @@ export default function TasksWorkspace({ mode }: Props) {
     setPanel({ kind: "task", task: t })
   }
   const closePanel = useCallback(() => setPanel(null), [])
+
+  // "+ הוספה" → משימה חדשה opens this same editor (no separate form).
+  useQuickAction(["task"], () => openNew(), !loading)
+  // ?open=<id> from the home screen opens that task's details in place.
+  useEffect(() => {
+    if (loading) return
+    const url = new URL(window.location.href)
+    const id = Number(url.searchParams.get("open"))
+    if (!id) return
+    url.searchParams.delete("open")
+    window.history.replaceState(window.history.state, "", url.pathname + url.search)
+    const t = tasks.find(x => Number(x.id) === id)
+    if (t) openTask(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   const save = useCallback(async () => {
     if (!form.title.trim() || panel?.kind !== "task") return

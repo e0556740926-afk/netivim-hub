@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react'
 import {useSearchParams,useRouter,usePathname} from 'next/navigation'
 import {useUrlState} from '@/lib/use-url-state'
+import {useQuickAction} from '@/lib/quick-action'
 import {fd,ds} from '@/lib/utils'
 import {useToast} from '@/components/ui/Toast'
 import AuditHistory from '@/components/ui/AuditHistory'
@@ -65,6 +66,15 @@ export default function ContactsWorkspace(){
   function startInteraction(i?:any){setIntId(i?.id||null);setIntForm(i?{date:i.date?.slice(0,10)||today(),type:i.type||'call',summary:i.summary||'',next_step:i.next_step||''}:{...emptyInteraction,date:today()});setFormError('');setIntOpen(true)}
   function startTask(){setTaskForm({...emptyTask,title:`מעקב — ${detail?.contact?.name||''}`,due_date:new Date(Date.now()+7*86400000).toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'}),assignees:detail?.contact?.owner?[detail.contact.owner]:[]});setFormError('');setTaskOpen(true)}
   function openLink(c?:any){setLinkContact(c||null);setLinkOpen(true)}
+  // "+ הוספה": partner → the regular contact form; organization → the shared registry editor;
+  // interaction → pick a person first, then the regular interaction form opens on their card.
+  const [pickForInteraction,setPickForInteraction]=useState(false)
+  useQuickAction(['partner','organization','interaction'],t=>{
+    if(t==='partner')startContact()
+    else if(t==='organization'){setMode('organizations');setOrgPanel({organization:null})}
+    else{setMode('contacts');setPickForInteraction(true)}
+  },!loading)
+  useEffect(()=>{if(pickForInteraction&&openId&&detail?.contact&&Number(detail.contact.id)===openId){setPickForInteraction(false);startInteraction()}},[pickForInteraction,openId,detail])
   async function saveContact(force=false){
     if(!form.name.trim()){setFormError('יש להזין שם איש קשר');return}
     if(!registryReady||!orgRecords.some(o=>Number(o.id)===Number(form.partner_organization_id))){setFormError('יש לבחור עמותה או מוסד קיימים מהמאגר');return}
@@ -90,6 +100,7 @@ export default function ContactsWorkspace(){
   const age=(c:any)=>!c.last_contact?'טרם תועד קשר':ds(c.last_contact)<=0?'היום':ds(c.last_contact)===1?'אתמול':`לפני ${ds(c.last_contact)} ימים`
   const formFooter=(save:()=>void)=><><button className="partner-btn partner-primary" disabled={busy} onClick={save}>{busy?'שומר…':'שמירת פרטים'}</button><span className="partner-muted">השינויים יישמרו ברשומה</span></>
   return <div className="partners-ws" dir="rtl">
+    {pickForInteraction&&<div className="partner-notice" role="status" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:16}}><span>תיעוד קשר: בחרו את איש הקשר מהרשימה, וטופס התיעוד ייפתח בכרטיס שלו.</span><button className="partner-btn" onClick={()=>setPickForInteraction(false)}>ביטול</button></div>}
     <header className="partners-heading"><div><span className="partner-eyebrow">שטח וקהילה / קשרים שמקדמים עשייה</span><h1>אנשי קשר ושותפים<span>.</span></h1><p>כל האנשים, הארגונים וההזדמנויות. במקום אחד.</p></div><div className="partners-heading-actions"><ExportButton type="contacts"/><button className="partner-btn" onClick={()=>openLink()}>↗ לינק אישי לרכז</button><button className="partner-btn partner-primary" onClick={()=>startContact()}>＋ איש קשר חדש</button></div></header>
     <div className="partner-kpis" aria-label="תמונת מצב של השותפויות">
       <button onClick={()=>{clearFilters({view:'contacts'})}}><span>אנשי קשר</span><strong>{contacts.length}</strong><small>ברשת הקשרים שלך</small></button>

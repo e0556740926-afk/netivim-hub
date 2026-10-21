@@ -1,11 +1,13 @@
 "use client"
-import {useState} from 'react'
+import {useEffect,useState} from 'react'
 import OrganizationEditor from './OrganizationEditor'
 import './partners.css'
 
 /** The coordinator uses the same master records and editor as the admin. */
-export default function OrganizationDirectory({organizations,contacts,available,onChanged,onAddContact,onOpenContact}:{organizations:any[];contacts:any[];available:boolean;onChanged:()=>Promise<void>;onAddContact:(organization:any)=>void;onOpenContact:(id:number)=>void}){
+export default function OrganizationDirectory({organizations,contacts,available,onChanged,onAddContact,onOpenContact,createSignal=0}:{createSignal?:number;organizations:any[];contacts:any[];available:boolean;onChanged:()=>Promise<void>;onAddContact:(organization:any)=>void;onOpenContact:(id:number)=>void}){
   const [panel,setPanel]=useState<{organization:any}|null>(null),[query,setQuery]=useState('')
+  // Quick-add "עמותה או מוסד" from the shell opens the same editor used by the toolbar button.
+  useEffect(()=>{if(createSignal>0&&available)setPanel({organization:null})},[createSignal,available])
   const visible=organizations.filter(o=>[o.name,o.city,o.registration_number].join(' ').toLowerCase().includes(query.trim().toLowerCase()))
   return <section className="partner-coord-organizations"><div className="partner-organizations-toolbar"><div><h2>עמותות ומוסדות</h2><p>מאגר משותף. כאן מוסיפים ארגון ומעדכנים את פרטיו.</p></div><button className="partner-btn partner-primary" disabled={!available} onClick={()=>setPanel({organization:null})}>＋ עמותה / מוסד</button></div>{!available&&<p className="partner-notice">המאגר ממתין להפעלת עדכון מסד הנתונים.</p>}<label className="partner-search"><span>⌕</span><input aria-label="חיפוש עמותות ומוסדות" value={query} onChange={e=>setQuery(e.target.value)} placeholder="שם עמותה / מוסד, עיר או מספר רישום…"/></label><div className="partner-org-grid">{visible.map(o=>{const members=contacts.filter(c=>Number(c.partner_organization_id)===Number(o.id));return <article className="partner-org-card" key={o.id}><div className="partner-org-card-head"><span className="partner-org-icon">▥</span><span>{members.length} אנשי קשר</span></div><h3><button onClick={()=>setPanel({organization:o})}>{o.name}</button></h3><p>{o.city||'טרם הוזנה עיר'}</p><div className="partner-org-card-details"><span>{o.phone||'טרם הוזן טלפון'}</span><span>{o.address||'את הפרטים מעדכנים בכרטיס הארגון'}</span></div><footer><button onClick={()=>setPanel({organization:o})}>פרטים ועריכה ←</button><button onClick={()=>onAddContact(o)}>＋ איש קשר</button></footer></article>})}{!visible.length&&<div className="partner-empty">{query?'לא נמצאו ארגונים מתאימים.':'הוסיפו עמותה או מוסד למאגר.'}</div>}</div>{panel&&<OrganizationEditor key={panel.organization?.id||'new'} organization={panel.organization} members={contacts.filter(c=>Number(c.partner_organization_id)===Number(panel.organization?.id))} onClose={()=>setPanel(null)} onSaved={async()=>{setPanel(null);await onChanged()}} onAddContact={o=>{setPanel(null);onAddContact(o)}} onOpenContact={id=>{setPanel(null);onOpenContact(id)}}/>}</section>
 }

@@ -27,6 +27,8 @@ export function useUrlState(key: string, initial = ""): [string, (v: string) => 
   const update = useCallback((v: string) => {
     setValue(v)
     const next = new URLSearchParams(Array.from(params.entries()))
+    // "?new=<type>" is a one-shot quick-add request (lib/quick-action) — never carry it forward.
+    next.delete("new")
     if (v) next.set(key, v)
     else next.delete(key)
     const qs = next.toString()
