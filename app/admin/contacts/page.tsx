@@ -27,6 +27,7 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
 const INT_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", whatsapp:"וואטסאפ", email:"דואל", other:"אחר" }
 const TASK_TYPE: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
+const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
 
 const EMPTY_CONTACT = { name:"", org:"", role:"", phone:"", email:"", type:"partner", status:"cold", potential:1, owner:"", last_contact:"", notes:"" }
 const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summary:"", next_step:"" }
@@ -413,6 +414,33 @@ export default function ContactsPage() {
             </div>
           </div>
         </div>
+
+        {/* LINKED LEADS — referred by this contact, or collected at an event they partnered on */}
+        <div className="pt-4 border-t border-[#E2E8F0] mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-[#374151] uppercase tracking-wide">לידים משויכים ({(detail.leads||[]).length})</div>
+            <a href="/admin/leads" className="text-xs font-semibold text-[#00488D]">כל הלידים ←</a>
+          </div>
+          {(detail.leads||[]).length===0 && <div className="text-xs text-[#94A3B8] text-center py-3">אין לידים משויכים לאיש קשר זה</div>}
+          {(detail.leads||[]).length>0 && <div className="divide-y divide-[#F1F5F9]">
+            {(detail.leads||[]).map((l:any)=>(
+              <div key={l.id} className="flex items-center gap-3 py-2">
+                <div className="w-7 h-7 rounded-full bg-[#DCFCE7] text-[#166534] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                  {(l.name||"").split(" ").map((w:string)=>w[0]).join("").slice(0,2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold truncate">{l.name}{l.city&&<span className="text-[#94A3B8] font-normal"> · {l.city}</span>}</div>
+                  <div className="text-[11px] text-[#64748B]">
+                    {fd(l.created_at?.slice(0,10))}
+                    {l.via==="event" ? ` · דרך אירוע${l.event_name?`: ${l.event_name}`:""}` : " · הופנה ישירות"}
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#374151] font-semibold flex-shrink-0">{LEAD_STATUS[l.status]||l.status}</span>
+              </div>
+            ))}
+          </div>}
+        </div>
+
         <div className="pt-4 border-t border-[#E2E8F0]">
           <div className="text-xs font-bold text-[#374151] uppercase tracking-wide mb-2">היסטוריית שינויים</div>
           <AuditHistory entityType="contact" entityId={openId!}/>

@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
   const score = scoreLead(d);
-  const [hasScore, hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel] = await Promise.all([
+  const [hasScore, hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel, hasContact] = await Promise.all([
     hasColumn("leads", "score"),
     hasColumn("leads", "id_number"),
     hasColumn("leads", "owner_name"),
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     hasColumn("leads", "is_parent"),
     hasColumn("leads", "lead_source_id"),
     hasColumn("leads", "arrival_channel_id"),
+    hasColumn("leads", "contact_id"),
   ]);
 
   // Build the insert from whichever optional columns actually exist,
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
   if (hasIsParent) { cols.push("is_parent");  vals.push(!!d.is_parent); }
   if (hasLeadSource && d.lead_source_id) { cols.push("lead_source_id"); vals.push(d.lead_source_id); }
   if (hasArrivalChannel && d.arrival_channel_id) { cols.push("arrival_channel_id"); vals.push(d.arrival_channel_id); }
+  // Referring contact/partner (optional) — surfaces under that contact's card as "לידים משויכים".
+  if (hasContact && d.contact_id) { cols.push("contact_id"); vals.push(Number(d.contact_id)); }
 
   const placeholders = vals.map((_, i) => `$${i + 1}`).join(", ");
   const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;
@@ -173,7 +176,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const { id, status } = await req.json();
+  const body = await req.json();
+  const { id, status } = body;
   const me2 = await currentUser(req);
   if (me2?.role === "coordinator") {
     const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me2.id}`;
@@ -182,7 +186,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "אין הרשאה לערוך ליד זה" }, { status: 403 });
     }
   }
-  await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
+  if (status !== undefined) await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
+  // Optional referring contact — only when the column exists (migration may not have run yet).
+  if (body.contact_id !== undefined && await hasColumn("leads", "contact_id")) {
+    await sql`UPDATE leads SET contact_id = ${body.contact_id ? Number(body.contact_id) : null} WHERE id = ${id}`;
+  }
   logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: status?`סטטוס: ${status}`:"עודכן" });
   return NextResponse.json({ ok: true });
 }

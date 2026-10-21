@@ -17,6 +17,9 @@ const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:
 
 const EMPTY_FORM = { name:"", org:"", role:"", phone:"", email:"", type:"partner", status:"cold", potential:1, owner:"", last_contact:new Date().toISOString().slice(0,10), notes:"" }
 const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summary:"", next_step:"" }
+const TASK_TYPE: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
+const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
+const EMPTY_TASK = { title:"", type:"call", due_date:"", details:"" }
 
 export default function CoordContacts() {
   const [loading, setLoading] = useState(true)
@@ -34,7 +37,11 @@ export default function CoordContacts() {
   const [showInt, setShowInt] = useState(false)
   const [form, setForm] = useState({...EMPTY_FORM})
   const [intForm, setIntForm] = useState({...EMPTY_INT})
+  const [showTask, setShowTask] = useState(false)
+  const [taskForm, setTaskForm] = useState({...EMPTY_TASK})
+  const [coordId, setCoordId] = useState<number|null>(null)
   const [saving, setSaving] = useState(false)
+  const today = new Date().toISOString().slice(0,10)
 
   async function load() {
     setLoading(true); setError(false)
@@ -46,12 +53,40 @@ export default function CoordContacts() {
     finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
+  // Own coordinator row — tasks created from a contact card are scoped to it.
+  useEffect(() => {
+    if (!user) return
+    fetch(`/api/coord?user_id=${user.id}`).then(r=>r.json()).then(d=>setCoordId(d.coord?.id||null)).catch(()=>{})
+  }, [user])
 
-  async function openDetail(id: number) {
-    if (openId===id) { setOpenId(null); setDetail(null); return }
-    setOpenId(id); setShowInt(false)
+  async function loadDetail(id: number) {
     const res = await fetch("/api/contacts/"+id)
     setDetail(await res.json())
+  }
+  async function openDetail(id: number) {
+    if (openId===id) { setOpenId(null); setDetail(null); return }
+    setOpenId(id); setShowInt(false); setShowTask(false)
+    await loadDetail(id)
+  }
+
+  function startTask() {
+    const name = detail?.contact?.name || ""
+    const due = new Date(Date.now()+7*24*60*60*1000).toISOString().slice(0,10)
+    setTaskForm({ title: name ? `מעקב — ${name}` : "מעקב", type:"call", due_date:due, details:"" })
+    setShowTask(true); setShowInt(false)
+  }
+  async function saveTask() {
+    if (!taskForm.title.trim()||!openId||!user) return
+    setSaving(true)
+    // Assigned to the coordinator themselves (tasks are matched by name in `assignees`).
+    await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({...taskForm, status:"todo", contact_id:openId, coordinator_id:coordId, assignees:[user.name]})})
+    setSaving(false); setShowTask(false); setTaskForm({...EMPTY_TASK})
+    await loadDetail(openId)
+  }
+  async function doneTask(id: number) {
+    await fetch("/api/tasks",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,status:"done",status_only:true})})
+    if (openId) await loadDetail(openId)
   }
 
   function startAdd() {
@@ -89,7 +124,7 @@ export default function CoordContacts() {
     setSaving(true)
     await fetch("/api/interactions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...intForm,contact_id:openId})})
     setSaving(false); setShowInt(false); setIntForm({...EMPTY_INT})
-    const res=await fetch("/api/contacts/"+openId); setDetail(await res.json()); load()
+    await loadDetail(openId); load()
   }
 
   const owners = Array.from(new Set(contacts.map(c=>c.owner).filter(Boolean))).sort()
@@ -175,7 +210,9 @@ export default function CoordContacts() {
             {STATUS_COLORS[detail.contact.status]&&<span style={STATUS_COLORS[detail.contact.status]} className="px-2 py-0.5 rounded-full text-xs font-semibold">{STATUS_LABEL[detail.contact.status]}</span>}
             <span className="text-[#f59e0b] text-xs">{"★".repeat(detail.contact.potential||1)}</span>
           </div>
-          {detail.contact.phone&&<div className="text-xs text-[#64748B] mt-1">📞 {detail.contact.phone}</div>}
+          {detail.contact.phone&&<div className="text-xs text-[#64748B] mt-1">📞 <a href={`tel:${detail.contact.phone}`} className="underline">{detail.contact.phone}</a></div>}
+          {detail.contact.email&&<div className="text-xs text-[#64748B] mt-0.5">✉️ {detail.contact.email}</div>}
+          {detail.contact.notes&&<div className="text-xs text-[#475569] mt-1.5 bg-[#F9FAFB] rounded p-1.5">{detail.contact.notes}</div>}
         </div>
         <div className="flex gap-1.5">
           <button onClick={()=>startEdit(detail.contact)} className="px-2 py-1 rounded-[7px] border border-[#E2E8F0] text-xs hover:bg-[#F0F7FF]">✎</button>
@@ -183,9 +220,46 @@ export default function CoordContacts() {
         </div>
       </div>
 
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button onClick={()=>{setShowInt(v=>!v);setShowTask(false)}} className={`py-2 rounded-[10px] text-xs font-bold border ${showInt?"bg-[#0D2744] text-white border-[#0D2744]":"bg-white text-[#0D2744] border-[#CBD5E1]"}`}>📝 תעד אינטראקציה</button>
+        <button onClick={()=>showTask?setShowTask(false):startTask()} className={`py-2 rounded-[10px] text-xs font-bold border ${showTask?"bg-[#00488D] text-white border-[#00488D]":"bg-white text-[#00488D] border-[#BFDBFE]"}`}>✅ הוסף משימה</button>
+      </div>
+
+      {/* Task form */}
+      {showTask&&<div className="bg-[#EFF6FF] rounded-[10px] p-3 mb-3 space-y-2">
+        <input value={taskForm.title} onChange={e=>setTaskForm(f=>({...f,title:e.target.value}))} placeholder="כותרת המשימה *" className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded-[8px] text-xs focus:outline-none focus:border-[#00488D]"/>
+        <div className="grid grid-cols-2 gap-2">
+          <select value={taskForm.type} onChange={e=>setTaskForm(f=>({...f,type:e.target.value}))} className="px-2 py-1.5 border border-[#CBD5E1] rounded-[8px] text-xs bg-white">
+            {Object.entries(TASK_TYPE).map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+          <input type="date" value={taskForm.due_date} onChange={e=>setTaskForm(f=>({...f,due_date:e.target.value}))} className="px-2 py-1.5 border border-[#CBD5E1] rounded-[8px] text-xs focus:outline-none focus:border-[#00488D]"/>
+        </div>
+        <textarea value={taskForm.details} onChange={e=>setTaskForm(f=>({...f,details:e.target.value}))} rows={2} placeholder="פרטים" className="w-full px-2 py-1.5 border border-[#CBD5E1] rounded-[8px] text-xs resize-none focus:outline-none focus:border-[#00488D]"/>
+        <div className="flex gap-2">
+          <button onClick={saveTask} disabled={saving} className="flex-1 py-1.5 bg-[#00488D] text-white text-xs font-bold rounded-[8px] disabled:opacity-50">{saving?"שומר...":"צור משימה"}</button>
+          <button onClick={()=>setShowTask(false)} className="px-3 py-1.5 border border-[#E2E8F0] text-xs rounded-[8px]">ביטול</button>
+        </div>
+      </div>}
+
+      {/* Open tasks */}
+      {(detail.tasks||[]).length>0&&<div className="mb-3">
+        <div className="text-xs font-bold text-[#374151] mb-1.5">משימות פתוחות ({detail.tasks.length})</div>
+        <div className="space-y-1.5">
+          {detail.tasks.map((t:any)=>{
+            const late=t.due_date&&t.due_date.slice(0,10)<today
+            const accent=late?"#960010":"#00488D"
+            return <div key={t.id} style={{borderRight:`3px solid ${accent}`}} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-2 flex items-center gap-2">
+              <div onClick={()=>doneTask(t.id)} style={{borderColor:accent,color:accent}} className="w-5 h-5 flex-shrink-0 rounded-[6px] border-2 cursor-pointer flex items-center justify-center text-[10px] font-bold">✓</div>
+              <div className="flex-1 min-w-0"><div className="text-xs font-semibold truncate">{t.title}</div>
+                <div style={{color:accent}} className="text-[11px] font-semibold">{TASK_TYPE[t.type]||t.type} · {late?"⚠ ":""}{fd(t.due_date?.slice(0,10))}</div></div>
+            </div>
+          })}
+        </div>
+      </div>}
+
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs font-bold text-[#374151]">אינטראקציות ({(detail.interactions||[]).length})</div>
-        <button onClick={()=>setShowInt(v=>!v)} className="text-xs font-bold text-[#00488D]">+ תעד</button>
       </div>
       {showInt&&<div className="bg-[#F0F7FF] rounded-[10px] p-3 mb-3 space-y-2">
         <div className="grid grid-cols-2 gap-2">
@@ -210,6 +284,24 @@ export default function CoordContacts() {
             {i.next_step&&<div className="text-xs text-[#00488D] mt-0.5">← {i.next_step}</div>}
           </div>
         </div>)}
+      </div>
+
+      {/* Linked leads — referred by this contact, or from an event they partnered on */}
+      <div className="mt-3 pt-3 border-t border-[#E2E8F0]">
+        <div className="text-xs font-bold text-[#374151] mb-1.5">לידים משויכים ({(detail.leads||[]).length})</div>
+        {(detail.leads||[]).length===0&&<div className="text-xs text-[#94A3B8] text-center py-2">אין לידים משויכים — אפשר לשייך ליד לאיש קשר בטופס הזנת ליד</div>}
+        <div className="space-y-1.5 max-h-48 overflow-y-auto">
+          {(detail.leads||[]).map((l:any)=><div key={l.id} className="flex items-center gap-2 bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-2">
+            <div className="w-7 h-7 rounded-full bg-[#DCFCE7] text-[#166534] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+              {(l.name||"").split(" ").map((w:string)=>w[0]).join("").slice(0,2)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold truncate">{l.name}{l.city&&<span className="text-[#94A3B8] font-normal"> · {l.city}</span>}</div>
+              <div className="text-[11px] text-[#64748B]">{fd(l.created_at?.slice(0,10))}{l.via==="event"?` · דרך אירוע${l.event_name?`: ${l.event_name}`:""}`:" · הופנה ישירות"}</div>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#374151] font-semibold flex-shrink-0">{LEAD_STATUS[l.status]||l.status}</span>
+          </div>)}
+        </div>
       </div>
     </div>}
 

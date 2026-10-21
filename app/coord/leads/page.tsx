@@ -19,7 +19,7 @@ const STATUS_COLORS: Record<string,{bg:string,fg:string}> = {
   irrelevant:{bg:"#FEE2E2",fg:"#991B1B"}
 }
 const EMPTY_FORM = {
-  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:"", arrivalChannelId:""
+  firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:"", arrivalChannelId:"", contactId:""
 }
 
 export default function CoordLeads() {
@@ -29,6 +29,7 @@ export default function CoordLeads() {
   const [events, setEvents] = useState<any[]>([])
   const [leadSources, setLeadSources] = useState<any[]>([])
   const [arrivalChannels, setArrivalChannels] = useState<any[]>([])
+  const [contacts, setContacts] = useState<any[]>([])
   const [myLeads, setMyLeads] = useState(0)
   const [target, setTarget] = useState(0)
   const [coordId, setCoordId] = useState<number|null>(null)
@@ -67,6 +68,8 @@ export default function CoordLeads() {
         if (mine) setForm(f=>({...f, leadSourceId: String(mine.id)}))
       })
       fetch("/api/arrival-channels").then(r=>r.json()).then(({arrival_channels})=>setArrivalChannels(arrival_channels||[]))
+      // Contacts/partners — optional "referred by" picker on the lead form.
+      fetch("/api/contacts").then(r=>r.json()).then(({contacts})=>setContacts(contacts||[])).catch(()=>{})
       const monthStr = String(m).padStart(2,"0")
       setMyLeads((leads||[]).filter((l:any)=>l.created_at?.slice(5,7)===monthStr).length)
       setTarget(targets?.find((t:any)=>t.coordinator_id===coord.id)?.target_leads||0)
@@ -96,6 +99,7 @@ export default function CoordLeads() {
         event_id: form.eventId || null,
         lead_source_id: +form.leadSourceId,
         arrival_channel_id: +form.arrivalChannelId,
+        contact_id: form.contactId ? +form.contactId : null,
         source: form.eventId ? "event" : "manual"
       })
     })
@@ -228,6 +232,18 @@ export default function CoordLeads() {
                   className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]">
                   <option value="">— לא באירוע —</option>
                   {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Referring contact / partner */}
+            {contacts.length > 0 && (
+              <div>
+                <label className="text-xs font-semibold block mb-1 text-[#374151]">הופנה על ידי — איש קשר / שותף (לא חובה)</label>
+                <select value={form.contactId} onChange={e=>setForm(f=>({...f,contactId:e.target.value}))}
+                  className="w-full px-3 py-2.5 border border-[#CBD5E1] rounded-[10px] text-sm bg-white focus:outline-none focus:border-[#166534]">
+                  <option value="">— ללא —</option>
+                  {contacts.map((c:any)=><option key={c.id} value={c.id}>{c.name}{c.org?` · ${c.org}`:""}</option>)}
                 </select>
               </div>
             )}

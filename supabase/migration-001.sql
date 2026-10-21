@@ -581,3 +581,7 @@ CREATE TABLE IF NOT EXISTS invoices (
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS funding_source_id bigint REFERENCES funding_sources(id);
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS campaign_tag text;
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS region_tag text;
+
+-- 2026-10-21: link a lead to the contact/partner who referred it (field-only system).
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_id integer REFERENCES contacts(id);
+CREATE INDEX IF NOT EXISTS leads_contact_id_idx ON leads(contact_id);
