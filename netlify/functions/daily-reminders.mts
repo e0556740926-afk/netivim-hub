@@ -16,6 +16,8 @@ import { neon } from "@neondatabase/serverless";
  *   1. Coordinators who haven't submitted a weekly report by Thursday
  *   2. Tasks overdue by 1+ days, to whoever is assigned
  *   3. Events that happened but still have no results recorded
+ *   4. Routines (manager rituals): morning-of reminder to participants,
+ *      and a next-day nudge to managers for undocumented occurrences
  */
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -76,7 +78,7 @@ function wrap(title: string, bodyHtml: string) {
 }
 
 export default async () => {
-  const results = { missingReports: 0, dueTodayTasks: 0, overdueTasks: 0, undebriefed: 0, upcomingEvents: 0, errors: [] as string[] };
+  const results = { missingReports: 0, dueTodayTasks: 0, overdueTasks: 0, undebriefed: 0, upcomingEvents: 0, routinesToday: 0, routinesUndocumented: 0, errors: [] as string[] };
   // Collected in parallel with the per-person reminders below, so managers
   // get one end-of-run digest instead of a separate flood of per-item mail.
   const digest = {
@@ -267,6 +269,88 @@ export default async () => {
     }
   } catch (e: any) {
     results.errors.push(`upcomingEvents: ${e.message}`);
+  }
+
+  // ── 3.7. Routines — morning-of reminder to participants, and a nudge
+  //      to managers for yesterday's occurrences that still need
+  //      documentation. No-op until the routines tables exist. ──
+  try {
+    const [{ exists }] = await sql`SELECT to_regclass('routines') IS NOT NULL AS exists`;
+    if (exists) {
+      const todayStr = today.toISOString().slice(0, 10);
+      const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+      const yStr = yesterday.toISOString().slice(0, 10);
+      const dayName = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"][today.getDay()];
+
+      // Occurrences are normally materialised by the app; make sure today's
+      // exist even if nobody opened the page this week (weekly/daily only —
+      // monthly ones are created by the app's own range generator).
+      const dueToday = await sql`
+        SELECT r.id FROM routines r WHERE r.active = true AND (
+          (r.frequency = 'weekly' AND r.weekday = ${today.getDay()}) OR
+          (r.frequency = 'daily' AND ${today.getDay()} NOT IN (5, 6)) OR
+          (r.frequency = 'monthly' AND r.day_of_month = ${today.getDate()})
+        )`;
+      for (const r of dueToday as any[]) {
+        await sql`INSERT INTO routine_occurrences (routine_id, due_date) VALUES (${r.id}, ${todayStr}) ON CONFLICT (routine_id, due_date) DO NOTHING`;
+      }
+
+      // 3.7a — today's routines → participants (coordinators) + managers
+      const todays = await sql`
+        SELECT o.id, r.name, r.time, r.participants, r.linked_type, r.agenda_template
+        FROM routine_occurrences o JOIN routines r ON r.id = o.routine_id
+        WHERE o.due_date = ${todayStr} AND o.status = 'planned' AND r.active = true`;
+      for (const o of todays as any[]) {
+        const parts: number[] = o.participants || [];
+        const coords = parts.length
+          ? await sql`SELECT c.name, u.email, COALESCE(c.phone, u.phone) AS phone FROM coordinators c LEFT JOIN users u ON u.id = c.user_id WHERE c.id = ANY(${parts})`
+          : await sql`SELECT c.name, u.email, COALESCE(c.phone, u.phone) AS phone FROM coordinators c LEFT JOIN users u ON u.id = c.user_id`;
+        const when = o.time ? ` בשעה ${o.time}` : "";
+        const isReport = o.linked_type === "weekly_report";
+        const line = isReport
+          ? `היום (${dayName}) הוא המועד להגשת הדיווח השבועי במערכת.`
+          : `היום (${dayName})${when}: ${o.name}.`;
+        const link = isReport ? `${APP_URL}/coord/profile` : `${APP_URL}/coord/home`;
+        for (const c of coords as any[]) {
+          if (isReport) {
+            // Skip anyone who already submitted this week's report.
+            const monday = new Date(today); const dow = monday.getDay(); monday.setDate(monday.getDate() - (dow === 0 ? 6 : dow - 1));
+            const [{ n }] = await sql`SELECT count(*)::int AS n FROM weekly_reports wr JOIN coordinators cc ON cc.id = wr.coordinator_id WHERE cc.name = ${c.name} AND wr.week_start = ${monday.toISOString().slice(0, 10)}`;
+            if (n > 0) continue;
+          }
+          const html = wrap(`🔁 ${o.name}`, `<div style="font-size:14px;color:#374151;">שלום ${c.name}, ${line}</div>${o.agenda_template ? `<pre style="font-size:13px;color:#475569;white-space:pre-wrap;font-family:inherit;margin-top:10px;">${o.agenda_template}</pre>` : ""}
+            <a href="${link}" style="display:inline-block;margin-top:16px;background:#0D2744;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">למערכת</a>`);
+          if (c.email) await sendEmail(c.email, `תזכורת: ${o.name}`, html);
+          if (c.phone) await sendWhatsApp(c.phone, `🔁 *${o.name}*\n\nשלום ${c.name}, ${line}\n👈 ${link}`);
+        }
+        results.routinesToday++;
+      }
+      if ((todays as any[]).length) {
+        const admins = await sql`SELECT name, email, phone FROM users WHERE role='admin' AND status='active'`;
+        const names = (todays as any[]).map(o => `${o.name}${o.time ? ` (${o.time})` : ""}`).join(", ");
+        for (const a of admins as any[]) {
+          if (a.phone) await sendWhatsApp(a.phone, `🔁 *שגרות להיום*\n\n${names}\n👈 ${APP_URL}/admin/routines`);
+        }
+      }
+
+      // 3.7b — yesterday's occurrences that required documentation and are still 'planned' → managers
+      const undocumented = await sql`
+        SELECT o.id, r.name FROM routine_occurrences o JOIN routines r ON r.id = o.routine_id
+        WHERE o.due_date = ${yStr} AND o.status = 'planned' AND r.requires_doc = true AND r.active = true AND COALESCE(r.linked_type, '') <> 'weekly_report'`;
+      if ((undocumented as any[]).length) {
+        const admins = await sql`SELECT name, email, phone FROM users WHERE role='admin' AND status='active'`;
+        const names = (undocumented as any[]).map(o => o.name).join(", ");
+        const html = wrap("📝 שגרות מאתמול שעדיין לא תועדו", `<div style="font-size:14px;color:#374151;">${names}</div>
+          <a href="${APP_URL}/admin/routines" style="display:inline-block;margin-top:16px;background:#0D2744;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">תעד עכשיו</a>`);
+        for (const a of admins as any[]) {
+          if (a.email) await sendEmail(a.email, "שגרות מאתמול ממתינות לתיעוד", html);
+          if (a.phone) await sendWhatsApp(a.phone, `📝 *לא תועד אתמול:* ${names}\n👈 ${APP_URL}/admin/routines`);
+        }
+        results.routinesUndocumented = (undocumented as any[]).length;
+      }
+    }
+  } catch (e: any) {
+    results.errors.push(`routines: ${e.message}`);
   }
 
   // ── 4. Manager digest — one email/WhatsApp summarising everything
