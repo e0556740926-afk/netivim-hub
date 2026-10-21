@@ -43,3 +43,23 @@ export async function hasColumn(table: string, column: string): Promise<boolean>
 export function resetSchemaCache() {
   cache.clear();
 }
+
+/**
+ * Additive, idempotent DDL for a column the code already guards with
+ * hasColumn(). Used when a migration could not be applied through the
+ * usual Neon MCP path: the first request that needs the column adds it
+ * (ADD COLUMN IF NOT EXISTS — safe to race, never drops anything) and
+ * clears the cache entry so the same request can use it right away.
+ * `ddl` must be a literal string from our own code, never user input.
+ */
+export async function ensureColumn(table: string, column: string, ddl: string): Promise<boolean> {
+  if (await hasColumn(table, column)) return true;
+  try {
+    await sql.query(ddl);
+    cache.delete(`${table}.${column}`);
+    return await hasColumn(table, column);
+  } catch (e) {
+    console.error(`[schema] ensureColumn ${table}.${column} failed`, e);
+    return false;
+  }
+}

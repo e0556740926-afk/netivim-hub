@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
-import { hasColumn } from "@/lib/schema";
+import { hasColumn, ensureColumn } from "@/lib/schema";
 
 export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const cid = parseInt(id);
-  const hasLeadContact = await hasColumn("leads", "contact_id");
+  const hasLeadContact = await ensureColumn("leads", "contact_id",
+    "ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_id integer REFERENCES contacts(id)");
   const [contact, interactions, tasks, leads] = await Promise.all([
     sql`SELECT * FROM contacts WHERE id=${cid} LIMIT 1`,
     sql`SELECT * FROM interactions WHERE contact_id=${cid} ORDER BY date DESC`,

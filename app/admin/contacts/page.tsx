@@ -86,6 +86,14 @@ export default function ContactsPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Deep link from tasks/leads chips: /…/contacts?open=<id>
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const id = Number(new URLSearchParams(window.location.search).get("open"))
+    if (id) openDetail(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   async function loadDetail(id: number) {
     const res = await fetch("/api/contacts/"+id)
     const d = await res.json()

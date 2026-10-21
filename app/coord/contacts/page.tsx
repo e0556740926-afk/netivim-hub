@@ -53,6 +53,14 @@ export default function CoordContacts() {
     finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
+
+  // Deep link from tasks/leads chips: /…/contacts?open=<id>
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const id = Number(new URLSearchParams(window.location.search).get("open"))
+    if (id) openDetail(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // Own coordinator row — tasks created from a contact card are scoped to it.
   useEffect(() => {
     if (!user) return
