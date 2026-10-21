@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import {resolveContactOrganization,OrganizationError,organizationRegistryReady} from "@/lib/partner-organizations";
 import sql from "@/lib/db";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
@@ -14,6 +15,11 @@ export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("coordinator_id");
   const soft = await hasColumn("contacts", "deleted_at");
 
+  if(await organizationRegistryReady()){
+    const values:any[]=[];const filters:string[]=[];if(cid){values.push(Number(cid));filters.push('c.coordinator_id=$1')}if(soft)filters.push('c.deleted_at IS NULL');
+    const rows=await sql.query(`SELECT c.*,COALESCE(o.name,c.org) AS org,COALESCE(i.cnt,0)::int AS interaction_count FROM contacts c LEFT JOIN partner_organizations o ON o.id=c.partner_organization_id LEFT JOIN (SELECT contact_id,COUNT(*) AS cnt FROM interactions GROUP BY contact_id) i ON i.contact_id=c.id ${filters.length?'WHERE '+filters.join(' AND '):''} ORDER BY c.name`,values);
+    return NextResponse.json({contacts:rows});
+  }
   let rows;
   if (cid) {
     const id = parseInt(cid);
@@ -30,6 +36,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  const creator=await currentUser(req);
+  if(creator?.role==='coordinator'){
+    const [own]=await sql`SELECT id,name FROM coordinators WHERE user_id=${creator.id} LIMIT 1`;
+    if(!own)return NextResponse.json({error:'לא נמצאה רשומת רכז לחשבון זה'},{status:409});
+    d.coordinator_id=Number(own.id);d.owner=own.name;
+  }
+  let organization:any;
+  try{organization=await resolveContactOrganization(d,req.method==='POST')}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'שיוך ארגון נכשל'},{status:e instanceof OrganizationError?e.status:500})}
+  if('coordinator_id' in d){
+    if(d.coordinator_id){const [coord]=await sql`SELECT id,name FROM coordinators WHERE id=${Number(d.coordinator_id)} LIMIT 1`;if(!coord)return NextResponse.json({error:'הרכז לא נמצא'},{status:400});d.coordinator_id=Number(coord.id);d.owner=coord.name}else{d.coordinator_id=null;d.owner=''}
+  }
   const soft = await hasColumn("contacts", "deleted_at");
 
   if (d.phone && !d.force) {
@@ -39,10 +56,10 @@ export async function POST(req: NextRequest) {
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
 
-  const rows = await sql`
-    INSERT INTO contacts (coordinator_id,owner,name,org,role,phone,email,type,status,potential,last_contact,notes)
-    VALUES (${d.coordinator_id||null},${d.owner||''},${d.name},${d.org||''},${d.role||''},${d.phone||''},${d.email||''},${d.type||'partner'},${d.status||'cold'},${d.potential||1},${d.last_contact||null},${d.notes||''})
-    RETURNING *`;
+  const columns=['coordinator_id','owner','name','org','role','phone','email','type','status','potential','last_contact','notes'];
+  const values:any[]=[d.coordinator_id||null,d.owner||'',d.name,d.org||'',d.role||'',d.phone||'',d.email||'',d.type||'partner',d.status||'cold',d.potential||1,d.last_contact||null,d.notes||''];
+  if(organization){columns.push('partner_organization_id');values.push(organization.id)}
+  const rows=await sql.query(`INSERT INTO contacts (${columns.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING *`,values);
   const me = await currentUser(req);
   logAudit({ entityType:"contact", entityId:rows[0].id, action:"create", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
   return NextResponse.json({ contact: rows[0] });
@@ -50,8 +67,18 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
+  let organization:any;
+  try{organization=await resolveContactOrganization(d,req.method==='POST')}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'שיוך ארגון נכשל'},{status:e instanceof OrganizationError?e.status:500})}
+  if('coordinator_id' in d){
+    if(d.coordinator_id){const [coord]=await sql`SELECT id,name FROM coordinators WHERE id=${Number(d.coordinator_id)} LIMIT 1`;if(!coord)return NextResponse.json({error:'הרכז לא נמצא'},{status:400});d.coordinator_id=Number(coord.id);d.owner=coord.name}else{d.coordinator_id=null;d.owner=''}
+  }
   const before = await sql`SELECT status, owner FROM contacts WHERE id=${d.id} LIMIT 1`;
-  await sql`UPDATE contacts SET name=${d.name},org=${d.org||''},role=${d.role||''},phone=${d.phone||''},email=${d.email||''},type=${d.type},status=${d.status},potential=${d.potential||1},last_contact=${d.last_contact||null},notes=${d.notes||''},owner=${d.owner||''} WHERE id=${d.id}`;
+  const updates:Record<string,any>={name:d.name,org:d.org||'',role:d.role||'',phone:d.phone||'',email:d.email||'',type:d.type,status:d.status,potential:d.potential||1,last_contact:d.last_contact||null,notes:d.notes||'',owner:d.owner||''};
+  if('coordinator_id' in d)updates.coordinator_id=d.coordinator_id;
+  if(organization)updates.partner_organization_id=organization.id;
+  const values=Object.values(updates);values.push(d.id);
+  await sql.query(`UPDATE contacts SET ${Object.keys(updates).map((key,i)=>key+'=$'+(i+1)).join(',')} WHERE id=$${values.length}`,values);
+
   const me = await currentUser(req);
   const b: any = before[0] || {};
   const parts = [];
@@ -86,3 +113,4 @@ export async function PUT(req: NextRequest) {
   logAudit({ entityType:"contact", entityId:id, action:"restore", actorId: me?.id, actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
 }
+

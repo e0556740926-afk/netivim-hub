@@ -1,4 +1,6 @@
 "use client"
+import OrganizationDirectory from "@/components/partners/OrganizationDirectory"
+import {useToast} from "@/components/ui/Toast"
 import EmptyState from "@/components/ui/EmptyState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
@@ -15,7 +17,7 @@ const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
 const STATUS_LABEL: Record<string,string> = { active:"שותף פעיל", initial:"נוצר קשר", meeting:"פגישה", cold:"ליד קר", irrelevant:"לא רלוונטי" }
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
 
-const EMPTY_FORM = { name:"", org:"", role:"", phone:"", email:"", type:"partner", status:"cold", potential:1, owner:"", last_contact:new Date().toISOString().slice(0,10), notes:"" }
+const EMPTY_FORM = { name:"", org:"", partner_organization_id:null as number|null, role:"", phone:"", email:"", type:"partner", status:"cold", potential:1, owner:"", last_contact:new Date().toISOString().slice(0,10), notes:"" }
 const EMPTY_INT = { date:new Date().toISOString().slice(0,10), type:"call", summary:"", next_step:"" }
 const TASK_TYPE: Record<string,string> = { call:"שיחה", meeting:"פגישה", materials:"חומרים", backoffice:"בק-אופיס" }
 const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
@@ -25,6 +27,9 @@ export default function CoordContacts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const { user } = useAuth()
+  const {success,error:toastError}=useToast()
+  const [view,setView]=useState("contacts")
+  const [organizations,setOrganizations]=useState<any[]>([]),[registryReady,setRegistryReady]=useState(false)
   const [contacts, setContacts] = useState<any[]>([])
   const [q, setQ] = useState("")
   const [fStatus, setFStatus] = useState("")
@@ -44,11 +49,12 @@ export default function CoordContacts() {
   const today = new Date().toISOString().slice(0,10)
 
   async function load() {
-    setLoading(true); setError(false)
+    setError(false)
     try {
-      const res = await fetch("/api/contacts")
-      const { contacts } = await res.json()
-      setContacts(contacts||[])
+      const [res,orgRes]=await Promise.all([fetch('/api/contacts'),fetch('/api/contacts/organizations')]);
+      if(!res.ok||!orgRes.ok)throw Error('טעינת המאגר נכשלה');
+      const {contacts}=await res.json(),orgData=await orgRes.json();
+      setContacts(contacts||[]);setOrganizations(orgData.organizations||[]);setRegistryReady(orgData.available!==false)
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
   }
@@ -98,33 +104,25 @@ export default function CoordContacts() {
   }
 
   function startAdd() {
+    setView("contacts")
     setEditId(null)
     setForm({...EMPTY_FORM, owner:user?.name||"", last_contact:new Date().toISOString().slice(0,10)})
     setShowForm(true); setOpenId(null); setDetail(null)
   }
   function startEdit(c:any) {
     setEditId(c.id)
-    setForm({name:c.name||"",org:c.org||"",role:c.role||"",phone:c.phone||"",email:c.email||"",type:c.type||"partner",status:c.status||"cold",potential:c.potential||1,owner:c.owner||"",last_contact:c.last_contact||"",notes:c.notes||""})
+    setForm({name:c.name||"",org:c.org||"",partner_organization_id:c.partner_organization_id||organizations.find(o=>o.name===c.org)?.id||null,role:c.role||"",phone:c.phone||"",email:c.email||"",type:c.type||"partner",status:c.status||"cold",potential:c.potential||1,owner:c.owner||"",last_contact:c.last_contact||"",notes:c.notes||""})
     setShowForm(true); setOpenId(null); setDetail(null)
   }
 
-  async function save(force = false) {
-    if (!form.name.trim()) return
+  async function save(force=false){
+    if(!form.name.trim()){toastError('יש להזין שם איש קשר');return}
+    if(!registryReady||!form.partner_organization_id){toastError('יש לבחור עמותה או מוסד קיימים');return}
     setSaving(true)
-    if (editId) {
-      await fetch("/api/contacts",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,id:editId})})
-    } else {
-      const res = await fetch("/api/contacts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,force})})
-      if (res.status === 409) {
-        const d = await res.json()
-        setSaving(false)
-        if (confirm(`איש קשר עם טלפון זה כבר קיים (${d.duplicate.name}${d.duplicate.org?` · ${d.duplicate.org}`:""}). להוסיף בכל זאת?`)) {
-          return save(true)
-        }
-        return
-      }
-    }
-    setSaving(false); setShowForm(false); load()
+    try{const res=await fetch('/api/contacts',{method:editId?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(editId?{...form,id:editId}:{...form,force})});const data=await res.json();
+      if(res.status===409&&data.duplicate&&!editId){setSaving(false);if(confirm(`איש קשר עם טלפון זה כבר קיים (${data.duplicate.name}). להוסיף בכל זאת?`))return save(true);return}
+      if(!res.ok)throw Error(data.error||'שמירת איש הקשר נכשלה');setShowForm(false);await load();success('איש הקשר נשמר')
+    }catch(e){toastError(e instanceof Error?e.message:'שמירת איש הקשר נכשלה')}finally{setSaving(false)}
   }
 
   async function saveInt() {
@@ -150,12 +148,14 @@ export default function CoordContacts() {
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
   if (loading) return <div className="p-4 max-w-2xl mx-auto space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
-  return <div className="p-4">
+  return <div className="partners-ws partner-coordinator-page">
     <div className="flex items-center justify-between mb-3">
       <div className="text-lg font-extrabold">אנשי קשר</div>
       <button onClick={startAdd} className="px-3 py-1.5 bg-[#0D2744] text-white rounded-[9px] text-sm font-semibold">+ הוסף</button>
     </div>
 
+    <div className="partner-view-tabs partner-coord-tabs"><button aria-pressed={view==='contacts'} onClick={()=>setView('contacts')}>אנשי קשר <span>{contacts.length}</span></button><button aria-pressed={view==='organizations'} onClick={()=>{setShowForm(false);setView('organizations')}}>עמותות ומוסדות <span>{organizations.length}</span></button></div>
+    {view==='organizations'?<OrganizationDirectory organizations={organizations} contacts={contacts} available={registryReady} onChanged={load} onAddContact={o=>{startAdd();setForm(f=>({...f,org:o.name,partner_organization_id:o.id}))}} onOpenContact={id=>{setView('contacts');openDetail(id)}}/>:<>
     {/* Filters */}
     <div className="flex gap-2 mb-2">
       <div className="flex-1 flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[10px] px-3 py-2">
@@ -186,7 +186,7 @@ export default function CoordContacts() {
       <div className="space-y-2">
         <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="שם מלא *" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
         <div className="grid grid-cols-2 gap-2">
-          <input value={form.org} onChange={e=>setForm(f=>({...f,org:e.target.value}))} placeholder="ארגון" className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+          <label className="partner-coord-org-select">עמותה / מוסד *<select aria-label="בחירת עמותה או מוסד קיימים" value={form.partner_organization_id||''} disabled={!registryReady} onChange={e=>{const o=organizations.find(o=>String(o.id)===e.target.value);setForm(f=>({...f,org:o?.name||'',partner_organization_id:o?.id||null}))}}><option value="">בחירת ארגון קיים</option>{organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>את פרטי הארגון מנהלים בלשונית עמותות ומוסדות.</small></label>
           <input value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} placeholder="תפקיד" className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
           <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="טלפון" className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
           <input value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="דואל" className="px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
@@ -336,5 +336,6 @@ export default function CoordContacts() {
         </div>
       })}
     </div>
+    </>}
   </div>
 }

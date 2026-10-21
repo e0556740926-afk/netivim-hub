@@ -639,3 +639,33 @@ ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_updated_at timestamptz;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_synced_at timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_sf_record_id ON leads(sf_record_id) WHERE sf_record_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS integration_state (key text PRIMARY KEY, value text, updated_at timestamptz DEFAULT now());
+
+-- ── Partner organizations registry (contacts & partners redesign, 2026-10-21) ──
+CREATE TABLE IF NOT EXISTS partner_organizations (
+  id serial PRIMARY KEY,
+  name text NOT NULL CHECK (length(btrim(name)) > 0),
+  registration_number text NOT NULL DEFAULT '',
+  city text NOT NULL DEFAULT '',
+  address text NOT NULL DEFAULT '',
+  phone text NOT NULL DEFAULT '',
+  email text NOT NULL DEFAULT '',
+  website text NOT NULL DEFAULT '',
+  contact_name text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  version integer NOT NULL DEFAULT 1,
+  created_by integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS partner_organizations_name_unique
+  ON partner_organizations (lower(regexp_replace(btrim(name), '\s+', ' ', 'g')));
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS partner_organization_id integer REFERENCES partner_organizations(id);
+CREATE INDEX IF NOT EXISTS contacts_partner_organization_id_idx ON contacts(partner_organization_id);
+-- Preserve all existing contacts; names are consolidated without removing rows.
+INSERT INTO partner_organizations(name)
+SELECT DISTINCT regexp_replace(btrim(org), '\s+', ' ', 'g')
+FROM contacts WHERE org IS NOT NULL AND btrim(org) <> ''
+ON CONFLICT DO NOTHING;
+UPDATE contacts c SET partner_organization_id=o.id,org=o.name
+FROM partner_organizations o
+WHERE c.partner_organization_id IS NULL AND lower(regexp_replace(btrim(c.org), '\s+', ' ', 'g'))=lower(o.name);

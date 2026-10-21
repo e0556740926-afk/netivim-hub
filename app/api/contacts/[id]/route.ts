@@ -15,16 +15,17 @@ export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }>
     // or collected at an event this contact partnered on (events.partner_contact_id).
     hasLeadContact
       ? sql`
-        SELECT l.id, l.name, l.phone, l.city, l.status, l.created_at, l.event_id, e.name AS event_name,
+        SELECT l.id, l.name, l.phone, l.city, l.status, l.created_at, l.event_id, l.coordinator_id, c.name AS coordinator_name, e.name AS event_name,
                CASE WHEN l.contact_id=${cid} THEN 'direct' ELSE 'event' END AS via
-        FROM leads l LEFT JOIN events e ON e.id=l.event_id
+        FROM leads l LEFT JOIN events e ON e.id=l.event_id LEFT JOIN coordinators c ON c.id=l.coordinator_id
         WHERE l.deleted_at IS NULL AND (l.contact_id=${cid} OR e.partner_contact_id=${cid})
         ORDER BY l.created_at DESC LIMIT 100`
       : sql`
-        SELECT l.id, l.name, l.phone, l.city, l.status, l.created_at, l.event_id, e.name AS event_name, 'event' AS via
-        FROM leads l JOIN events e ON e.id=l.event_id
+        SELECT l.id, l.name, l.phone, l.city, l.status, l.created_at, l.event_id, l.coordinator_id, c.name AS coordinator_name, e.name AS event_name, 'event' AS via
+        FROM leads l JOIN events e ON e.id=l.event_id LEFT JOIN coordinators c ON c.id=l.coordinator_id
         WHERE l.deleted_at IS NULL AND e.partner_contact_id=${cid}
         ORDER BY l.created_at DESC LIMIT 100`,
   ]);
   return NextResponse.json({ contact: contact[0]||null, interactions, tasks, leads });
 }
+

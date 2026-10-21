@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveReferral } from "@/lib/referrals";
 import sql from "@/lib/db";
 import { hasColumn } from "@/lib/schema";
 
@@ -9,6 +10,10 @@ import { hasColumn } from "@/lib/schema";
  * carry a coordinator_id or an owner_name.
  */
 export async function GET(req: NextRequest) {
+  const referralToken=req.nextUrl.searchParams.get('ref');
+  if(referralToken){
+    try{const referral=await resolveReferral(referralToken);if(!referral)return NextResponse.json({error:'הקישור אינו תקין או שפג תוקפו',coord:null},{status:404,headers:{'Cache-Control':'no-store'}});return NextResponse.json({coord:{id:referral.coordinatorId,name:referral.coordinatorName,type:'coordinator'},referral:{partnerName:referral.partnerName,organization:referral.organization}},{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({error:'לא ניתן לטעון את הקישור כרגע',coord:null},{status:503})}
+  }
   const slug = req.nextUrl.searchParams.get("slug");
   if (!slug) return NextResponse.json({ coord: null });
 
@@ -26,3 +31,4 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ coord: null });
 }
+

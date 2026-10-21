@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { resolveReferral } from "@/lib/referrals";
 import sql from "@/lib/db";
 import { sendEmail, newLeadEmail } from "@/lib/email";
 import { sendPush } from "@/lib/push";
@@ -70,6 +71,10 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  // The signed referral is authoritative; ignore client-supplied ownership.
+  if(d.referral_token){
+    try{const referral=await resolveReferral(d.referral_token);if(!referral)return NextResponse.json({error:'הקישור אינו תקין או שפג תוקפו'},{status:400});d.coordinator_id=referral.coordinatorId;d.owner_name='';d.contact_id=referral.contactId;d.source='link';d.event_id=null}catch{return NextResponse.json({error:'לא ניתן לאמת את הקישור כרגע'},{status:503})}
+  }
   // Duplicate check — phone or id_number (upgrade proposal §2.1 extends
   // this from phone-only to also match id_number, matching the
   // reference system's "ת.ז + טלפון" combined check).
@@ -269,3 +274,4 @@ export async function PUT(req: NextRequest) {
   await sql`UPDATE leads SET deleted_at=NULL WHERE id=${id}`;
   return NextResponse.json({ ok: true });
 }
+
