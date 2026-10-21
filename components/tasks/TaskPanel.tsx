@@ -1,4 +1,5 @@
 "use client"
+import useTaskDialog from "./useTaskDialog"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { STATUS, TYPE_LABEL, PRIORITY_LABEL, RECURRENCE_LABEL, initials, avatarColor, relDay } from "./task-model"
@@ -43,6 +44,7 @@ const FIELD = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg
 const LABEL = "text-[11px] font-bold tracking-wide text-[#64748B] block mb-1"
 
 export default function TaskPanel({ mode, task, form, setForm, people, contacts, events, today, saving, onSave, onDelete, onClose, showNotifyLog, base }: Props) {
+  const dialogRef = useTaskDialog(onClose)
   const router = useRouter()
   const titleRef = useRef<HTMLInputElement>(null)
   const closeRef = useRef(onClose)
@@ -113,9 +115,9 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
   return (
     <>
       <div className="panel-backdrop" onClick={onClose} />
-      <aside className="panel" role="dialog" aria-modal="true" aria-label={task ? "עריכת משימה" : "משימה חדשה"} dir="rtl">
+      <aside ref={dialogRef} tabIndex={-1} className="panel" role="dialog" aria-modal="true" aria-label={task ? "פרטי משימה ועריכה" : "משימה חדשה"} dir="rtl">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#EEF2F6]">
-          <div className="text-xs font-bold text-[#64748B]">{task ? `משימה #${task.id}` : "משימה חדשה"}</div>
+          <div className="text-xs font-bold text-[#64748B]">{task ? `פרטי משימה · #${task.id}` : "יצירת משימה חדשה"}</div>
           <div className="flex items-center gap-1">
             {task && onDelete && (
               <button onClick={onDelete} className="press px-2.5 py-1.5 rounded-[8px] text-xs font-semibold text-[#64748B] hover:text-[#960010] hover:bg-[#FFF1F1]">מחיקה</button>
@@ -126,19 +128,19 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <div className="tw-panel-body flex-1 overflow-y-auto px-5 py-4 space-y-5">
           <input ref={titleRef} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
             placeholder="מה צריך לעשות?" aria-label="כותרת"
             className="w-full text-lg font-bold text-[#0D2744] placeholder:text-[#B6C2D1] placeholder:font-semibold bg-transparent border-0 border-b border-[#E2E8F0] focus:outline-none focus:border-[#00488D] py-1.5 transition-colors" />
 
           {/* Status as a segmented control — the most-changed field, so it gets the most room. */}
-          <div>
+          <div className="tw-panel-status">
             <span className={LABEL}>סטטוס</span>
             <div className="grid grid-cols-4 gap-1 bg-[#F1F5F9] p-1 rounded-[10px]">
               {STATUS.map(s => {
                 const on = form.status === s.key
                 return (
-                  <button key={s.key} type="button" onClick={() => setForm(f => ({ ...f, status: s.key }))}
+                  <button key={s.key} type="button" aria-pressed={on} onClick={() => setForm(f => ({ ...f, status: s.key }))}
                     className="press rounded-[8px] py-1.5 text-[12px] font-bold"
                     style={{ background: on ? "#fff" : "transparent", color: on ? s.fg : "#64748B", boxShadow: on ? "0 1px 2px rgba(13,39,68,.12)" : "none" }}>
                     {s.label}
@@ -151,7 +153,7 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>תאריך יעד</label>
-              <input type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className={FIELD} />
+              <input aria-label="תאריך יעד" type="date" value={form.due_date} onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} className={FIELD} />
               <div className="flex gap-1 mt-1.5">
                 {[["היום", today], ["מחר", shift(today, 1)], ["שבוע", shift(today, 7)]].map(([l, v]) => (
                   <button key={l} type="button" onClick={() => setForm(f => ({ ...f, due_date: v }))}
@@ -161,33 +163,34 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
             </div>
             <div>
               <label className={LABEL}>דחיפות</label>
-              <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className={FIELD}>
+              <select aria-label="דחיפות" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className={FIELD}>
                 {Object.entries(PRIORITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
               <label className={LABEL}>סוג</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={FIELD}>
+              <select aria-label="סוג משימה" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} className={FIELD}>
                 {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
             <div>
               <label className={LABEL}>חזרה</label>
-              <select value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))} className={FIELD}>
+              <select aria-label="חזרה" value={form.recurrence} onChange={e => setForm(f => ({ ...f, recurrence: e.target.value }))} className={FIELD}>
                 <option value="">חד-פעמית</option>
                 {Object.entries(RECURRENCE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
           </div>
 
-          <div>
+          <div className="tw-panel-assignees">
             <span className={LABEL}>{mode === "admin" ? "משויכים" : "שותפים למשימה"}</span>
+            <p>אפשר לשייך את המשימה למספר עובדים. נבחרו {form.assignees.length}.</p>
             <div className="flex flex-wrap gap-1.5">
               {people.map(p => {
                 const on = form.assignees.includes(p.name)
                 const col = avatarColor(p.name)
                 return (
-                  <button key={`${p.id}-${p._isManager ? "m" : "c"}`} type="button" onClick={() => toggleAssignee(p.name)}
+                  <button key={`${p.id}-${p._isManager ? "m" : "c"}`} type="button" aria-pressed={on} onClick={() => toggleAssignee(p.name)}
                     className={`press inline-flex items-center gap-1.5 text-xs rounded-full pl-2.5 pr-1 py-1 border ${on ? "bg-[#0D2744] border-[#0D2744] text-white" : "bg-white border-[#E2E8F0] text-[#334155] hover:border-[#94A3B8]"}`}>
                     <span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: on ? "rgba(255,255,255,.18)" : col.bg, color: on ? "#fff" : col.fg }}>{initials(p.name)}</span>
                     <span>{p.name.replace(/\s*👑\s*/g, "")}</span>
@@ -198,10 +201,10 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="tw-panel-relations grid grid-cols-2 gap-3">
             <div>
               <label className={LABEL}>איש קשר</label>
-              <select value={form.contact_id} onChange={e => setForm(f => ({ ...f, contact_id: e.target.value }))} className={FIELD}>
+              <select aria-label="איש קשר" value={form.contact_id} onChange={e => setForm(f => ({ ...f, contact_id: e.target.value }))} className={FIELD}>
                 <option value="">— ללא —</option>
                 {contacts.map(c => <option key={c.id} value={c.id}>{c.name}{c.org ? ` · ${c.org}` : ""}</option>)}
               </select>
@@ -209,7 +212,7 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
             </div>
             <div>
               <label className={LABEL}>אירוע</label>
-              <select value={form.event_id} onChange={e => setForm(f => ({ ...f, event_id: e.target.value }))} className={FIELD}>
+              <select aria-label="אירוע" value={form.event_id} onChange={e => setForm(f => ({ ...f, event_id: e.target.value }))} className={FIELD}>
                 <option value="">— ללא —</option>
                 {events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
@@ -217,9 +220,9 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
             </div>
           </div>
 
-          <div>
+          <div className="tw-panel-notes">
             <label className={LABEL}>פרטים</label>
-            <textarea value={form.details} onChange={e => setForm(f => ({ ...f, details: e.target.value }))} rows={3} className={FIELD + " resize-y leading-relaxed"} placeholder="הקשר, מה כבר נעשה, מה חסר…" />
+            <textarea aria-label="פרטי המשימה" value={form.details} onChange={e => setForm(f => ({ ...f, details: e.target.value }))} rows={3} className={FIELD + " resize-y leading-relaxed"} placeholder="הקשר, מה כבר נעשה, מה חסר…" />
           </div>
 
           {task?.id && (
@@ -246,7 +249,8 @@ export default function TaskPanel({ mode, task, form, setForm, people, contacts,
                 {extrasLoading && checklist.length === 0 && <li className="text-xs text-[#94A3B8]">טוען…</li>}
               </ul>
               <input value={newItem} onChange={e => setNewItem(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addItem() } }}
-                placeholder="+ פריט חדש, Enter להוספה" className="w-full mt-1 px-2 py-1.5 text-sm bg-transparent border-b border-dashed border-[#CBD5E1] focus:outline-none focus:border-[#00488D] transition-colors" />
+                placeholder="פריט חדש לרשימת המשנה" aria-label="פריט חדש לרשימת המשנה" className="w-full mt-1 px-2 py-1.5 text-sm bg-transparent border-b border-dashed border-[#CBD5E1] focus:outline-none focus:border-[#00488D] transition-colors" />
+              <button className="tw-add-check" disabled={!newItem.trim()} onClick={addItem}>הוסף פריט</button>
             </section>
           )}
 
@@ -305,3 +309,4 @@ function shift(iso: string, n: number) {
   const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
   return z.toISOString().slice(0, 10)
 }
+

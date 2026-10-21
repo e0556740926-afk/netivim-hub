@@ -55,6 +55,27 @@ export function isLate(t: any, today: string): boolean {
   return !!t.due_date && String(t.due_date).slice(0, 10) < today && t.status !== "done"
 }
 
+export type DueFilter = "" | "open" | "overdue" | "today" | "week" | "none" | "done" | "future" | "doneweek"
+export function matchesDue(t: any, filter: DueFilter, today: string, view = "list"): boolean {
+  const due = t.due_date ? String(t.due_date).slice(0, 10) : ""
+  const completed = t.status === "done"
+  if (view === "board" && (filter === "open" || filter === "done")) return true
+  switch (filter) {
+    case "open": return !completed
+    case "today": return !completed && due === today
+    case "future": return !completed && !!due && due > today
+    case "overdue": return !completed && !!due && due < today
+    case "week": return !completed && !!due && due <= addDays(today, 6)
+    case "none": return !completed && !due
+    case "done": return completed
+    case "doneweek": {
+      const changed = String(t.status_changed_at || t.updated_at || t.created_at || "").slice(0, 10)
+      return completed && !!changed && changed >= addDays(today, -6) && changed <= today
+    }
+    default: return true
+  }
+}
+
 /** Short Hebrew relative date: היום / מחר / אתמול / dd.mm */
 export function relDay(due: string | null | undefined, today: string): string {
   if (!due) return ""
@@ -80,3 +101,4 @@ export function avatarColor(name: string): { bg: string; fg: string } {
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return palette[h % palette.length]
 }
+

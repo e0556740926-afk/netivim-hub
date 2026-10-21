@@ -1,4 +1,5 @@
 "use client"
+import useTaskDialog from "./useTaskDialog"
 import { useEffect, useState } from "react"
 import { useToast } from "@/components/ui/Toast"
 import { TYPE_LABEL, RECURRENCE_LABEL } from "./task-model"
@@ -12,6 +13,7 @@ import type { Person } from "./TaskPanel"
 export default function AdminExtras({ tab, people, today, onClose, onChanged }: {
   tab: "templates" | "series"; people: Person[]; today: string; onClose: () => void; onChanged: () => void
 }) {
+  const dialogRef = useTaskDialog(onClose)
   const { success, error } = useToast()
   const [templates, setTemplates] = useState<any[]>([])
   const [series, setSeries] = useState<any[]>([])
@@ -61,7 +63,7 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
   return (
     <>
       <div className="panel-backdrop" onClick={onClose} />
-      <aside className="panel" role="dialog" aria-modal="true" dir="rtl">
+      <aside ref={dialogRef} tabIndex={-1} className="panel tw-admin-panel" role="dialog" aria-label={tab === "templates" ? "תבניות משימות" : "סדרות חוזרות"} aria-modal="true" dir="rtl">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#EEF2F6]">
           <div className="text-base font-extrabold text-[#0D2744]">{tab === "templates" ? "תבניות משימות" : "סדרות חוזרות"}</div>
           <button onClick={onClose} aria-label="סגור" className="press w-8 h-8 rounded-[8px] text-[#64748B] hover:bg-[#F1F5F9] flex items-center justify-center">
@@ -148,3 +150,4 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
     </>
   )
 }
+
