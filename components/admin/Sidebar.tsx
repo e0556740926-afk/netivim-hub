@@ -22,6 +22,7 @@ const GROUPS: Group[] = [
       { label: "אנשי קשר ושותפים", path: "/admin/contacts", dot: "#A78BFA" },
       { label: "אירועים", path: "/admin/events", dot: "#F472B6", badgeKey: "pending" },
       { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
+      { label: "שגרות", path: "/admin/routines", dot: "#2DD4BF" },
       { label: "לוח מובילים", path: "/admin/leaderboard", dot: "#FBBF24" },
     ],
   },
