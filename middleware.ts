@@ -36,7 +36,6 @@ const MODULE_MATRIX: Record<string, Partial<Record<Role, string>>> = {
   tasks: { admin: "M", ceo: "R", rav: "O", recruitment_manager: "T", advisor: "O", field_manager: "T", coordinator: "O", secretary: "O", viewer: "R" },
   newsletters: { admin: "M", ceo: "M", recruitment_manager: "E", field_manager: "M", coordinator: "R", secretary: "E" },
   budget_main: { admin: "M", ceo: "M", recruitment_manager: "R", field_manager: "E", secretary: "E", viewer: "A" },
-  budget_field: { admin: "M", ceo: "R", field_manager: "M", coordinator: "E" },
   reports: { admin: "M", ceo: "M", rav: "R", recruitment_manager: "T", advisor: "O", field_manager: "M", coordinator: "O", secretary: "R", viewer: "A" },
   audit_log: { admin: "M", ceo: "R", recruitment_manager: "T" },
   settings_users: { admin: "M" },
@@ -52,9 +51,6 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/tasks", "tasks"],
   ["/api/newsletter/audiences", "newsletters"],
   ["/api/expenses", "budget_main"],
-  ["/api/budget-sources", "budget_main"],
-  ["/api/budget", "budget_main"],
-  ["/api/field-budget", "budget_field"],
   ["/api/audit-log", "audit_log"],
   ["/api/users", "settings_users"],
 ];

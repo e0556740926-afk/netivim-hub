@@ -30,7 +30,7 @@ export default function LeadSourcesPage() {
 
   return (
     <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>בית › הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>מקורות ליד</span></div>
+      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>בית › לוח מובילים › <span style={{ color: T.navy, fontWeight: 600 }}>מקורות ליד</span></div>
       <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>מקורות ליד</div>
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>הרשימה הזו מופיעה כבורר חובה בכל מקום שמוסיפים ליד חדש. רכזים נוספים לכאן אוטומטית כשנוצר משתמש רכז; אפשר גם להוסיף מקורות אחרים (לא רכז) ידנית.</div>
 

@@ -52,7 +52,12 @@ export default function LeaderboardPage() {
     <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
       <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>לוח מובילים · לידים החודש לפי מקור</div>
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>
-        כל מקור (רכז או גורם חופשי) שהוגדר ב&quot;מקורות ליד&quot; בהגדרות, וכמה לידים הוא הביא — לא רק רכזים.
+        כל מקור (רכז או גורם חופשי) עם לינק משלו, וכמה לידים הוא הביא החודש — כולל כמה מהם הגיעו דרך הלינק.
+        <span style={{ marginRight: 12 }}>
+          <a href="/admin/leaderboard/sources" style={{ color: T.blue, fontWeight: 600 }}>ניהול מקורות ולינקים</a>
+          <span style={{ margin: "0 6px" }}>·</span>
+          <a href="/admin/leaderboard/channels" style={{ color: T.blue, fontWeight: 600 }}>ערוצי הגעה</a>
+        </span>
       </div>
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 20 }}>
@@ -89,7 +94,7 @@ export default function LeaderboardPage() {
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 600 }}>
           <thead><tr style={{ background: "#EDF2F8" }}>
-            {["#", "מקור", "החודש", "יעד", "התקדמות", "סה\"כ (כל הזמנים)", "%"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
+            {["#", "מקור", "החודש", "דרך הלינק", "יעד", "התקדמות", "סה\"כ (כל הזמנים)", "%"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
           </tr></thead>
           <tbody>
             {sorted.map((s: any, i: number) => {
@@ -102,6 +107,12 @@ export default function LeaderboardPage() {
                     {s.label}{s.coordinator_id && <span style={{ fontSize: 11, color: T.slate, marginRight: 6 }}>רכז</span>}
                   </td>
                   <td style={{ padding: "10px 14px", fontWeight: 700, color: col }}>{s.total_this_month}</td>
+                  <td style={{ padding: "10px 14px" }}>
+                    <span style={{ fontWeight: 600 }}>{s.via_link_this_month}</span>
+                    {s.slug && typeof window !== "undefined" && (
+                      <button title="העתק לינק" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/s/${s.slug}`)} style={{ marginRight: 6, background: T.bg, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer", color: T.slate }}>🔗 העתק</button>
+                    )}
+                  </td>
                   <td style={{ padding: "10px 14px" }}>
                     {editingSource === s.id ? (
                       <div style={{ display: "flex", gap: 4 }}>
@@ -124,7 +135,7 @@ export default function LeaderboardPage() {
                 </tr>
               )
             })}
-            {!sorted.length && <tr><td colSpan={7} style={{ padding: 20, textAlign: "center", color: T.slate }}>אין עדיין מקורות פעילים — הגדר ב&quot;מקורות ליד&quot;</td></tr>}
+            {!sorted.length && <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: T.slate }}>אין עדיין מקורות פעילים — הגדר ב&quot;מקורות ליד&quot;</td></tr>}
           </tbody>
         </table>
         </div>

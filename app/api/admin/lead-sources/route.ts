@@ -7,6 +7,12 @@ function makeSlug(label: string, id: number) {
 }
 
 export async function GET() {
+  // Every source gets its own public link — backfill a slug for any
+  // source created before slugs existed (or inserted without one).
+  const missing = await sql`SELECT id, label FROM lead_sources WHERE slug IS NULL OR slug = ''`;
+  for (const m of missing) {
+    await sql`UPDATE lead_sources SET slug=${makeSlug(m.label, m.id)} WHERE id=${m.id} AND (slug IS NULL OR slug = '')`;
+  }
   const rows = await sql`
     SELECT ls.*, c.name AS coordinator_name FROM lead_sources ls
     LEFT JOIN coordinators c ON c.id = ls.coordinator_id

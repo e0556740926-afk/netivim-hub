@@ -6,11 +6,19 @@ export async function GET() {
   const month = now.getMonth() + 1, year = now.getFullYear();
 
   const [sources, targets, orgTargetRow] = await Promise.all([
+    // A coordinator's leads count toward their source whether they came
+    // through the source link (lead_source_id) or the coordinator's own
+    // personal link / manual entry (coordinator_id) — one number per person.
     sql`
-      SELECT ls.id, ls.label, ls.coordinator_id, ls.active,
-        (SELECT count(*)::int FROM leads l WHERE l.lead_source_id = ls.id AND l.deleted_at IS NULL) AS total_all_time,
-        (SELECT count(*)::int FROM leads l WHERE l.lead_source_id = ls.id AND l.deleted_at IS NULL
-          AND EXTRACT(MONTH FROM l.created_at) = ${month} AND EXTRACT(YEAR FROM l.created_at) = ${year}) AS total_this_month
+      SELECT ls.id, ls.label, ls.coordinator_id, ls.active, ls.slug,
+        (SELECT count(*)::int FROM leads l WHERE l.deleted_at IS NULL
+          AND (l.lead_source_id = ls.id OR (ls.coordinator_id IS NOT NULL AND l.coordinator_id = ls.coordinator_id))) AS total_all_time,
+        (SELECT count(*)::int FROM leads l WHERE l.deleted_at IS NULL
+          AND (l.lead_source_id = ls.id OR (ls.coordinator_id IS NOT NULL AND l.coordinator_id = ls.coordinator_id))
+          AND EXTRACT(MONTH FROM l.created_at) = ${month} AND EXTRACT(YEAR FROM l.created_at) = ${year}) AS total_this_month,
+        (SELECT count(*)::int FROM leads l WHERE l.deleted_at IS NULL AND l.source = 'link'
+          AND (l.lead_source_id = ls.id OR (ls.coordinator_id IS NOT NULL AND l.coordinator_id = ls.coordinator_id))
+          AND EXTRACT(MONTH FROM l.created_at) = ${month} AND EXTRACT(YEAR FROM l.created_at) = ${year}) AS via_link_this_month
       FROM lead_sources ls WHERE ls.active = true ORDER BY total_this_month DESC`,
     sql`SELECT lead_source_id, target_leads FROM lead_source_targets WHERE month=${month} AND year=${year}`,
     sql`SELECT value FROM app_settings WHERE key='org_lead_target_monthly'`,
@@ -26,7 +34,7 @@ export async function GET() {
   const [{ n: totalLeadsThisMonth }] = await sql`
     SELECT count(*)::int AS n FROM leads WHERE deleted_at IS NULL
       AND EXTRACT(MONTH FROM created_at) = ${month} AND EXTRACT(YEAR FROM created_at) = ${year}`;
-  const attributedThisMonth = rows.reduce((s, r) => s + r.total_this_month, 0);
+  const attributedThisMonth = Math.min(totalLeadsThisMonth, rows.reduce((s, r) => s + r.total_this_month, 0));
 
   return NextResponse.json({
     month, year,

@@ -18,22 +18,20 @@ const GROUPS: Group[] = [
   {
     key: "field", label: "שטח וקהילה", dot: "#34D399",
     items: [
+      { label: "לידים", path: "/admin/leads", dot: "#34D399" },
       { label: "אנשי קשר ושותפים", path: "/admin/contacts", dot: "#A78BFA" },
       { label: "אירועים", path: "/admin/events", dot: "#F472B6", badgeKey: "pending" },
-      { label: "תקציב שטח", path: "/admin/field-budget", dot: "#FBBF24" },
       { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
-      { label: "יעדי לידים", path: "/admin/targets", dot: "#34D399" },
       { label: "לוח מובילים", path: "/admin/leaderboard", dot: "#FBBF24" },
     ],
   },
   {
     key: "manage", label: "ניהול", dot: "#FBBF24",
     items: [
-      { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
-      { label: "דיוורים לקהלים", path: "/admin/newsletter/audiences", dot: "#C9A84C" },
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
-      { label: "תקציב ורכש", path: "/admin/budget", dot: "#FBBF24" },
+      { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
+      { label: "דיוורים לקהלים", path: "/admin/newsletter/audiences", dot: "#C9A84C" },
       { label: "הגדרות", path: "/admin/settings", dot: "#94A3B8" },
     ],
   },
@@ -104,7 +102,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                 {g.items.map(n => (
                   <div key={n.path} onClick={() => navigate(n.path)}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-[9px] cursor-pointer text-[13px] transition-all ${
-                      path === n.path ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"
+                      (path === n.path || (n.path !== "/admin/newsletter" && path.startsWith(n.path + "/"))) ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"
                     }`}>
                     <span className="w-1.5 h-1.5 rounded-sm flex-shrink-0 opacity-80" style={{background:n.dot}}/>
                     <span className="flex-1">{n.label}</span>

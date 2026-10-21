@@ -3,7 +3,7 @@ import sql from "@/lib/db";
 export type Role = "admin" | "ceo" | "rav" | "recruitment_manager" | "advisor" | "field_manager" | "coordinator" | "secretary" | "viewer";
 export type ModuleName =
   | "leads" | "contacts" | "events" | "tasks"
-  | "newsletters" | "budget_main" | "budget_field" | "reports"
+  | "newsletters" | "budget_main" | "reports"
   | "audit_log" | "settings_users";
 
 export interface UserCtx { id: number; role: string; team?: string | null }
@@ -27,7 +27,6 @@ const MATRIX: Record<ModuleName, Partial<Record<Role, "M" | "E" | "R" | "O" | "T
   tasks: { admin: "M", ceo: "R", rav: "O", recruitment_manager: "T", advisor: "O", field_manager: "T", coordinator: "O", secretary: "O", viewer: "R" },
   newsletters: { admin: "M", ceo: "M", recruitment_manager: "E", field_manager: "M", coordinator: "R", secretary: "E" },
   budget_main: { admin: "M", ceo: "M", recruitment_manager: "R", field_manager: "E", secretary: "E", viewer: "A" },
-  budget_field: { admin: "M", ceo: "R", field_manager: "M", coordinator: "E" },
   reports: { admin: "M", ceo: "M", rav: "R", recruitment_manager: "T", advisor: "O", field_manager: "M", coordinator: "O", secretary: "R", viewer: "A" },
   audit_log: { admin: "M", ceo: "R", recruitment_manager: "T" },
   settings_users: { admin: "M" },

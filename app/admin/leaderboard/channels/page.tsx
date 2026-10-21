@@ -30,7 +30,7 @@ export default function ArrivalChannelsPage() {
 
   return (
     <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>בית › הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>ערוצי הגעה</span></div>
+      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>בית › לוח מובילים › <span style={{ color: T.navy, fontWeight: 600 }}>ערוצי הגעה</span></div>
       <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>ערוצי הגעה</div>
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>
         זה "איך הגיע הליד" (טופס אתר / פייסבוק / הפניה אישית) — נפרד לגמרי מ"מקורות ליד" (מי הביא אותו: רכז/גורם ספציפי). שני השדות מוזנים בנפרד בכל טופס הוספת ליד.

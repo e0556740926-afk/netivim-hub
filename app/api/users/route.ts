@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const cRows = await sql`INSERT INTO coordinators (user_id,name,role,area,email,phone,slug) VALUES (${u.id},${d.name},'רכז שטח',${d.area||''},${d.email},${d.phone||''},${coordinatorSlug}) RETURNING id`;
     coordinatorId = cRows[0].id;
     // Every coordinator is automatically a selectable lead source too —
-    // this is the list managed at /admin/settings/lead-sources.
+    // this is the list managed at /admin/leaderboard/sources.
     await sql`INSERT INTO lead_sources (label, coordinator_id, slug) VALUES (${d.name}, ${coordinatorId}, ${'src-coord-' + coordinatorId}) ON CONFLICT (label) DO NOTHING`;
   }
   return NextResponse.json({ user: u, coordinatorSlug, coordinatorId });

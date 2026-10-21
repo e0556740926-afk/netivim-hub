@@ -7,6 +7,7 @@ import { fd } from "@/lib/utils"
 import Card from "@/components/ui/Card"
 import ExportButton from "@/components/ui/ExportButton"
 import Button from "@/components/ui/Button"
+import TargetsPanel from "@/components/admin/TargetsPanel"
 
 const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
 const INT_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", whatsapp:"וואטסאפ", email:"דואל", other:"אחר" }
@@ -17,7 +18,11 @@ const MTG_TYPE: Record<string,string> = { regular:"שגרתית", urgent:"חיר
 export default function CoordManagementPage() {
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<"meetings"|"reports"|"tracking">("meetings")
+  const [tab, setTab] = useState<"meetings"|"reports"|"tracking"|"targets">(() => {
+    if (typeof window === "undefined") return "meetings"
+    const t = new URLSearchParams(window.location.search).get("tab")
+    return t === "targets" || t === "reports" || t === "tracking" ? t : "meetings"
+  })
   const [meetings, setMeetings] = useState<any[]>([])
   const [reports, setReports] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
@@ -125,6 +130,7 @@ export default function CoordManagementPage() {
           ["meetings","סיכומי פגישות","🤝"],
           ["reports","דיווחים שבועיים","📋"],
           ["tracking","מעקב פעילות","📊"],
+          ["targets","יעדי לידים","🎯"],
         ] as const).map(([key,label,icon])=>(
           <button key={key} onClick={()=>setTab(key)}
             className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${tab===key?"border-[#00488D] text-[#00488D]":"border-transparent text-[#475569] hover:text-[#0D2744]"}`}>
@@ -405,6 +411,7 @@ export default function CoordManagementPage() {
           </div>
         </div>
       )}
+      {tab==="targets" && <TargetsPanel/>}
     </div>
   )
 }

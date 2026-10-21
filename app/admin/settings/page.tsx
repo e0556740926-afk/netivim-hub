@@ -130,9 +130,6 @@ export default function SettingsPage() {
       <div className="flex items-center gap-3">
         <a href="/admin/settings/fields" className="text-sm font-semibold text-[#00488D]">בונה שדות מותאמים</a>
         <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
-        <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
-        <a href="/admin/settings/lead-sources" className="text-sm font-semibold text-[#00488D]">מקורות ליד</a>
-        <a href="/admin/settings/arrival-channels" className="text-sm font-semibold text-[#00488D]">ערוצי הגעה</a>
         <Button onClick={startAdd}>+ משתמש חדש</Button>
       </div>
     </div>
