@@ -3,257 +3,236 @@ import { SkeletonCard } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { fd } from "@/lib/utils"
+import { fd, ds, ini, MONTH_HE } from "@/lib/utils"
 import Card from "@/components/ui/Card"
 import ExportButton from "@/components/ui/ExportButton"
 import Button from "@/components/ui/Button"
 import TargetsPanel from "@/components/admin/TargetsPanel"
+import MeetingForm, { MTG_TYPE } from "@/components/admin/MeetingForm"
+import EngagementLight, { LIGHT } from "@/components/admin/EngagementLight"
 
-const INT_ICON: Record<string,string> = { call:"📞", meeting:"🤝", whatsapp:"💬", email:"✉️", other:"📝" }
-const INT_LABEL: Record<string,string> = { call:"שיחה", meeting:"פגישה", whatsapp:"וואטסאפ", email:"דואל", other:"אחר" }
-const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }
-const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" }
-const MTG_TYPE: Record<string,string> = { regular:"שגרתית", urgent:"חירום", goal:"מטרה מוגדרת" }
+type Tab = "compare" | "meetings" | "reports" | "targets"
+function ym(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` }
+function ymLabel(s: string) { const [y, m] = s.split("-"); return `${MONTH_HE[Number(m) - 1]} ${y}` }
+function shiftYm(s: string, by: number) { const [y, m] = s.split("-").map(Number); const d = new Date(y, m - 1 + by, 1); return ym(d) }
+function ago(d?: string | null) {
+  if (!d) return "אף פעם"
+  const days = ds(d)
+  if (days <= 0) return "היום"
+  if (days === 1) return "אתמול"
+  return `לפני ${days} ימים`
+}
 
 export default function CoordManagementPage() {
+  const router = useRouter()
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<"meetings"|"reports"|"tracking"|"targets">(() => {
-    if (typeof window === "undefined") return "meetings"
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "compare"
     const t = new URLSearchParams(window.location.search).get("tab")
-    return t === "targets" || t === "reports" || t === "tracking" ? t : "meetings"
+    return t === "targets" || t === "reports" || t === "meetings" ? t : "compare"
   })
+  const [month, setMonth] = useState(ym())
+  const [compare, setCompare] = useState<any>(null)
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "light", dir: 1 })
   const [meetings, setMeetings] = useState<any[]>([])
   const [reports, setReports] = useState<any[]>([])
   const [coords, setCoords] = useState<any[]>([])
-  const [activeCoord, setActiveCoord] = useState<any>(null)
-  const [activity, setActivity] = useState<any>(null)
-  const [actTab, setActTab] = useState<"tasks"|"leads"|"interactions"|"reports">("tasks")
-  const [weekDate, setWeekDate] = useState(() => {
-    const d = new Date()
-    d.setDate(d.getDate() - d.getDay() - 6)
-    return d.toISOString().slice(0,10)
-  })
-
-  // Meeting form
   const [showMtgForm, setShowMtgForm] = useState(false)
-  const [mtgForm, setMtgForm] = useState({ coordinator_id:"", date:new Date().toISOString().slice(0,10), type:"regular", agenda:"", summary:"", next_meeting_date:"" })
-  const [extracting, setExtracting] = useState(false)
-  const [extractedTasks, setExtractedTasks] = useState<any[]>([])
-  const [savingMtg, setSavingMtg] = useState(false)
-
-  // Reports filter
   const [rFilter, setRFilter] = useState("")
-  const [openReport, setOpenReport] = useState<number|null>(null)
+  const [openReport, setOpenReport] = useState<number | null>(null)
 
   async function load() {
     setLoading(true); setError(false)
     try {
-      const [mr, rr, cr] = await Promise.all([
-        fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")
-      ])
-      const { meetings } = await mr.json()
-      const { reports } = await rr.json()
-      const { coordinators } = await cr.json()
-      setMeetings(meetings||[])
-      setReports(reports||[])
-      setCoords(coordinators||[])
+      const [mr, rr, cr] = await Promise.all([fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")])
+      setMeetings((await mr.json()).meetings || [])
+      setReports((await rr.json()).reports || [])
+      setCoords((await cr.json()).coordinators || [])
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
   }
-  useEffect(() => { load().finally(()=>setLoading(false)) }, [])
-
-  async function extractTasks() {
-    if (!mtgForm.summary.trim() || !mtgForm.coordinator_id) return
-    setExtracting(true)
-    setExtractedTasks([])
+  async function loadCompare(m: string) {
     try {
-      const coord = coords.find((c:any) => String(c.id) === mtgForm.coordinator_id)
-      const res = await fetch("/api/extract-tasks", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ summary: mtgForm.summary, coordinator_name: coord?.name||"", date: mtgForm.date })
-      })
-      const d = await res.json()
-      setExtractedTasks(d.tasks || [])
-    } finally { setExtracting(false) }
+      const r = await fetch(`/api/admin/coordinators/compare?month=${m}`)
+      if (!r.ok) throw new Error()
+      setCompare(await r.json())
+    } catch { setCompare({ coordinators: [], totals: {} }) }
+  }
+  useEffect(() => { load() }, [])
+  useEffect(() => { loadCompare(month) }, [month])
+
+  const LIGHT_ORDER: Record<string, number> = { red: 0, yellow: 1, green: 2 }
+  const rows: any[] = [...(compare?.coordinators || [])].sort((a, b) => {
+    const k = sort.key
+    const av = k === "light" ? LIGHT_ORDER[a.light] : (a[k] ?? -Infinity)
+    const bv = k === "light" ? LIGHT_ORDER[b.light] : (b[k] ?? -Infinity)
+    if (av === bv) return a.name.localeCompare(b.name, "he")
+    return (av > bv ? 1 : -1) * sort.dir
+  })
+  function sortBy(key: string) { setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 }) }
+
+  function exportCsv() {
+    const head = ["רכז", "אזור", "מצב", "לידים", "יעד", "% יעד", "דרך לינק", "משימות פתוחות", "באיחור", "בוצעו החודש", "זמן סגירה ממוצע (ימים)", "אינטראקציות", "אירועים", "דיווחים", "פגישות", "כניסות 7 ימים", "פעולות 7 ימים", "כניסה אחרונה", "פעילות אחרונה"]
+    const lines = rows.map(r => [r.name, r.area, LIGHT[r.light]?.label, r.leads_month, r.target_leads, r.target_leads ? Math.round(r.leads_month / r.target_leads * 100) + "%" : "", r.leads_via_link_month, r.tasks_open, r.tasks_overdue, r.tasks_done_month, r.avg_close_days ?? "", r.interactions_month, r.events_month, r.reports_month, r.meetings_month, r.logins_7d, r.actions_7d, r.last_login_at ? fd(r.last_login_at) : "", r.last_active_at ? fd(r.last_active_at) : ""])
+    const csv = "﻿" + [head, ...lines].map(l => l.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `coordinators-${month}.csv`; a.click()
   }
 
-  async function saveMeeting() {
-    if (!mtgForm.coordinator_id || !mtgForm.summary.trim()) return
-    setSavingMtg(true)
-    try {
-      // Save meeting
-      await fetch("/api/meetings", {
-        method: "POST",
-        headers: { "Content-Type":"application/json" },
-        body: JSON.stringify({ ...mtgForm, coordinator_id: parseInt(mtgForm.coordinator_id) })
-      })
-      // Save extracted tasks
-      for (const t of extractedTasks) {
-        if (!t._skip) {
-          await fetch("/api/tasks", {
-            method: "POST",
-            headers: { "Content-Type":"application/json" },
-            body: JSON.stringify({ ...t, coordinator_id: parseInt(mtgForm.coordinator_id), status: "todo" })
-          })
-        }
-      }
-      setShowMtgForm(false)
-      setMtgForm({ coordinator_id:"", date:new Date().toISOString().slice(0,10), type:"regular", agenda:"", summary:"", next_meeting_date:"" })
-      setExtractedTasks([])
-      load()
-    } finally { setSavingMtg(false) }
-  }
+  const filteredReports = rFilter ? reports.filter(r => r.coordinator_name === rFilter) : reports
+  const coordNames = [...new Set(reports.map(r => r.coordinator_name))] as string[]
+  const t = compare?.totals || {}
 
-  async function openTracking(coord: any) {
-    if (activeCoord?.id === coord.id) { setActiveCoord(null); setActivity(null); return }
-    setActiveCoord(coord)
-    const res = await fetch("/api/coord/activity?coordinator_id=" + coord.id)
-    setActivity(await res.json())
-    setActTab("tasks")
-  }
+  if (error) return <div className="p-6"><ErrorState retry={load} /></div>
+  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} rows={4} />)}</div>
 
-  const filteredReports = rFilter ? reports.filter((r:any)=>r.coordinator_name===rFilter) : reports
-  const coordNames = [...new Set(reports.map((r:any)=>r.coordinator_name))]
-
-  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
-  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
+  const th = (label: string, key?: string, cls = "") => (
+    <th onClick={key ? () => sortBy(key) : undefined}
+      className={`text-right px-3 py-2.5 text-[11px] font-bold text-[#64748B] whitespace-nowrap ${key ? "cursor-pointer hover:text-[#0D2744] select-none" : ""} ${cls}`}>
+      {label}{key && sort.key === key && <span className="mr-1 text-[#00488D]">{sort.dir === 1 ? "▲" : "▼"}</span>}
+    </th>
+  )
 
   return (
     <div className="p-4 md:p-6 lg:p-8 fade-up">
-      <h1 className="text-2xl font-extrabold text-[#0D2744] mb-5">ניהול רכזים</h1>
+      <div className="flex items-end justify-between mb-5 flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-[#0D2744]">ניהול רכזים</h1>
+          <div className="text-sm text-[#64748B] mt-0.5">מה כל רכז עשה בפועל בתוך המערכת — לחיצה על רכז פותחת את הכרטיס המלא שלו</div>
+        </div>
+        {compare && (
+          <div className="flex items-center gap-2 text-xs">
+            {(["green", "yellow", "red"] as const).map(l => (
+              <span key={l} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold" style={{ background: LIGHT[l].bg, color: LIGHT[l].fg }}>
+                <span className="w-2 h-2 rounded-full" style={{ background: LIGHT[l].dot }} />{t[l] ?? 0} {LIGHT[l].label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-[#E2E8F0] pb-0">
-        {([
-          ["meetings","סיכומי פגישות","🤝"],
-          ["reports","דיווחים שבועיים","📋"],
-          ["tracking","מעקב פעילות","📊"],
-          ["targets","יעדי לידים","🎯"],
-        ] as const).map(([key,label,icon])=>(
-          <button key={key} onClick={()=>setTab(key)}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${tab===key?"border-[#00488D] text-[#00488D]":"border-transparent text-[#475569] hover:text-[#0D2744]"}`}>
+      <div className="flex gap-2 mb-6 border-b border-[#E2E8F0] overflow-x-auto">
+        {([["compare", "השוואת רכזים", "📊"], ["meetings", "סיכומי פגישות", "🤝"], ["reports", "דיווחים שבועיים", "📋"], ["targets", "יעדי לידים", "🎯"]] as const).map(([key, label, icon]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${tab === key ? "border-[#00488D] text-[#00488D]" : "border-transparent text-[#475569] hover:text-[#0D2744]"}`}>
             {icon} {label}
           </button>
         ))}
       </div>
 
-      {/* ===== MEETINGS TAB ===== */}
-      {tab==="meetings" && (
+      {tab === "compare" && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-[#64748B]">{meetings.length} פגישות מתועדות</div>
-            <Button onClick={()=>{setShowMtgForm(true);setExtractedTasks([])}}>+ סיכום פגישה חדש</Button>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+            <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-[10px] p-1">
+              <button onClick={() => setMonth(m => shiftYm(m, -1))} className="w-8 h-8 rounded-[7px] hover:bg-[#F1F5F9] text-[#475569]">›</button>
+              <span className="px-3 text-sm font-bold text-[#0D2744] min-w-[110px] text-center">{ymLabel(month)}</span>
+              <button onClick={() => setMonth(m => shiftYm(m, 1))} disabled={month >= ym()} className="w-8 h-8 rounded-[7px] hover:bg-[#F1F5F9] text-[#475569] disabled:opacity-30">‹</button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => window.open(`/admin/reports/monthly?month=${month}`, "_blank")}
+                className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors">📊 דו״ח חודשי ארגוני</button>
+              <Button size="sm" variant="secondary" onClick={exportCsv}>⬇ ייצוא CSV</Button>
+            </div>
           </div>
 
-          {showMtgForm && (
-            <Card className="mb-5 border-2 border-[#00488D]">
-              <div className="p-5">
-                <div className="text-sm font-bold text-[#00488D] mb-4">סיכום פגישה חדש</div>
-                <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
-                  <div>
-                    <label className="text-xs font-semibold block mb-1">רכז *</label>
-                    <select value={mtgForm.coordinator_id} onChange={e=>setMtgForm(f=>({...f,coordinator_id:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D]">
-                      <option value="">— בחר רכז —</option>
-                      {coords.map((c:any)=><option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold block mb-1">תאריך</label>
-                    <input type="date" value={mtgForm.date} onChange={e=>setMtgForm(f=>({...f,date:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold block mb-1">סוג פגישה</label>
-                    <select value={mtgForm.type} onChange={e=>setMtgForm(f=>({...f,type:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D]">
-                      {Object.entries(MTG_TYPE).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <label className="text-xs font-semibold block mb-1">אג&apos;נדה / נושאים שדוברו</label>
-                  <input value={mtgForm.agenda} onChange={e=>setMtgForm(f=>({...f,agenda:e.target.value}))} placeholder="נושאי הפגישה בקצרה..." className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
-                </div>
-                <div className="mb-3">
-                  <label className="text-xs font-semibold block mb-1">סיכום הפגישה * <span className="text-[#00488D] font-normal">(ה-AI יגזור מכאן משימות)</span></label>
-                  <textarea value={mtgForm.summary} onChange={e=>setMtgForm(f=>({...f,summary:e.target.value}))} rows={5}
-                    placeholder="כתוב כאן את סיכום הפגישה בחופשיות — מה סוכם, מה צריך לעשות, מה האתגרים..."
-                    className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#00488D]"/>
-                </div>
-                <div className="mb-4">
-                  <label className="text-xs font-semibold block mb-1">תאריך פגישה הבאה</label>
-                  <input type="date" value={mtgForm.next_meeting_date} onChange={e=>setMtgForm(f=>({...f,next_meeting_date:e.target.value}))} className="w-48 px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
-                </div>
-
-                {/* AI Extract Button */}
-                <div className="flex gap-2 mb-4">
-                  <button onClick={extractTasks} disabled={extracting || !mtgForm.summary.trim() || !mtgForm.coordinator_id}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#5B21B6] text-white rounded-[9px] text-sm font-semibold disabled:opacity-50 hover:bg-[#4C1D95] transition-colors">
-                    {extracting ? (
-                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block"/><span>מחלץ משימות...</span></>
-                    ) : (
-                      <><span>✨</span><span>חלץ משימות עם AI</span></>
-                    )}
-                  </button>
-                  {extractedTasks.length > 0 && <span className="text-xs text-[#166534] self-center font-semibold">✓ נמצאו {extractedTasks.length} משימות</span>}
-                </div>
-
-                {/* Extracted Tasks */}
-                {extractedTasks.length > 0 && (
-                  <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-[11px] p-4 mb-4">
-                    <div className="text-xs font-bold text-[#5B21B6] mb-3">✨ משימות שחולצו — בדוק וערוך לפני השמירה</div>
-                    <div className="space-y-2">
-                      {extractedTasks.map((t:any, i:number) => (
-                        <div key={i} className={`flex items-start gap-2.5 p-3 rounded-[9px] border transition-colors ${t._skip?"border-[#E5E7EB] bg-[#F9FAFB] opacity-50":"border-[#C4B5FD] bg-white"}`}>
-                          <input type="checkbox" checked={!t._skip} onChange={e=>setExtractedTasks(ts=>ts.map((x,j)=>j===i?{...x,_skip:!e.target.checked}:x))} className="mt-0.5 accent-[#5B21B6] flex-shrink-0"/>
-                          <div className="flex-1 min-w-0">
-                            <input value={t.title} onChange={e=>setExtractedTasks(ts=>ts.map((x,j)=>j===i?{...x,title:e.target.value}:x))}
-                              className="w-full text-sm font-semibold bg-transparent border-none outline-none focus:bg-white focus:border focus:border-[#C4B5FD] rounded px-1"/>
-                            {t.details && <div className="text-xs text-[#6B7280] mt-0.5 px-1">{t.details}</div>}
-                          </div>
-                          <div className="text-xs text-[#5B21B6] bg-[#EDE9FE] px-2 py-0.5 rounded-full flex-shrink-0">
-                            {({call:"שיחה",meeting:"פגישה",materials:"חומרים",backoffice:"בק-אופיס"} as Record<string,string>)[t.type]||t.type}
-                          </div>
-                          <div className="text-xs text-[#94A3B8] flex-shrink-0">{fd(t.due_date)}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-xs text-[#6B7280] mt-2">תאריך יעד ברירת מחדל: שבוע מהיום · ניתן לשנות מאוחר יותר</div>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button onClick={saveMeeting} disabled={savingMtg}>{savingMtg ? "שומר..." : `שמור פגישה${extractedTasks.filter((t:any)=>!t._skip).length>0?" ו-"+extractedTasks.filter((t:any)=>!t._skip).length+" משימות":""}`}</Button>
-                  <Button variant="secondary" onClick={()=>{setShowMtgForm(false);setExtractedTasks([])}}>ביטול</Button>
-                </div>
+          {!compare ? <SkeletonCard rows={5} /> : (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                    <tr>
+                      {th("רכז", "name")}{th("מצב", "light")}{th("לידים / יעד", "leads_month")}{th("דרך לינק", "leads_via_link_month")}
+                      {th("משימות פתוחות", "tasks_open")}{th("באיחור", "tasks_overdue")}{th("בוצעו", "tasks_done_month")}{th("סגירה ממוצעת", "avg_close_days")}
+                      {th("אינטראקציות", "interactions_month")}{th("אירועים", "events_month")}{th("דיווחים", "reports_month")}{th("פגישות", "meetings_month")}
+                      {th("כניסות 7י׳", "logins_7d")}{th("פעולות 7י׳", "actions_7d")}{th("פעיל לאחרונה", "last_active_at")}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(r => {
+                      const p = r.target_leads ? Math.min(100, Math.round(r.leads_month / r.target_leads * 100)) : null
+                      return (
+                        <tr key={r.id} onClick={() => router.push(`/admin/reports/${r.id}`)} className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F0F7FF] cursor-pointer transition-colors">
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">{ini(r.name)}</div>
+                              <div><div className="font-semibold text-[#0D2744] whitespace-nowrap">{r.name}</div><div className="text-[11px] text-[#94A3B8]">{r.area}</div></div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5"><EngagementLight light={r.light} withLabel /></td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold tabular-nums">{r.leads_month}<span className="text-[#94A3B8] font-normal"> / {r.target_leads || "—"}</span></span>
+                              {p !== null && <div className="w-14 h-1.5 bg-[#F0F4F8] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${p}%`, background: p >= 100 ? "#166534" : p >= 60 ? "#00488D" : "#B45309" }} /></div>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.leads_via_link_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.tasks_open}</td>
+                          <td className="px-3 py-2.5 tabular-nums font-bold" style={{ color: r.tasks_overdue > 0 ? "#960010" : "#166534" }}>{r.tasks_overdue}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.tasks_done_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums text-[#475569]">{r.avg_close_days == null ? "—" : `${r.avg_close_days} י׳`}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.interactions_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.events_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.reports_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.meetings_month}</td>
+                          <td className="px-3 py-2.5 tabular-nums" style={{ color: r.logins_7d === 0 ? "#960010" : undefined }}>{r.logins_7d}</td>
+                          <td className="px-3 py-2.5 tabular-nums">{r.actions_7d}</td>
+                          <td className="px-3 py-2.5 text-xs text-[#64748B] whitespace-nowrap">{ago(r.last_active_at || r.last_login_at)}</td>
+                        </tr>
+                      )
+                    })}
+                    {rows.length === 0 && <tr><td colSpan={15} className="px-3 py-10 text-center text-sm text-[#94A3B8]">אין רכזים</td></tr>}
+                  </tbody>
+                  {rows.length > 0 && (
+                    <tfoot className="bg-[#F8FAFC] border-t border-[#E2E8F0] text-xs font-bold text-[#0D2744]">
+                      <tr>
+                        <td className="px-3 py-2.5">סה״כ · {rows.length} רכזים</td><td />
+                        <td className="px-3 py-2.5 tabular-nums">{t.leads} / {t.target || "—"}</td><td />
+                        <td className="px-3 py-2.5 tabular-nums">{t.tasks_open}</td>
+                        <td className="px-3 py-2.5 tabular-nums" style={{ color: t.tasks_overdue > 0 ? "#960010" : "#166534" }}>{t.tasks_overdue}</td>
+                        <td colSpan={9} />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+              <div className="px-4 py-2.5 border-t border-[#F1F5F9] text-[11px] text-[#94A3B8] leading-relaxed">
+                רמזור: <b className="text-[#166534]">פעיל</b> = 2+ כניסות ו-5+ פעולות ב-7 הימים האחרונים ופחות מ-25% משימות באיחור ·
+                <b className="text-[#991B1B]"> דורש תשומת לב</b> = ללא כניסה 7 ימים או 50%+ מהמשימות הפתוחות באיחור · <b className="text-[#B45309]">חלקי</b> = כל השאר.
+                פעולות = כל פעולה שנרשמה ביומן המערכת (ליד, משימה, אירוע, דיווח, כניסה).
               </div>
             </Card>
           )}
+        </div>
+      )}
 
-          {/* Meetings list */}
+      {tab === "meetings" && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-[#64748B]">{meetings.length} פגישות מתועדות</div>
+            <Button onClick={() => setShowMtgForm(true)}>+ סיכום פגישה חדש</Button>
+          </div>
+          {showMtgForm && <MeetingForm coordinators={coords} onSaved={() => { setShowMtgForm(false); load() }} onCancel={() => setShowMtgForm(false)} />}
           <div className="space-y-3">
             {meetings.length === 0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין פגישות מתועדות עדיין</div>}
-            {meetings.map((m:any) => (
+            {meetings.map(m => (
               <Card key={m.id}>
                 <div className="p-4">
                   <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">
-                        {(m.coordinator_name||"").split(" ").map((w:string)=>w[0]).join("")}
-                      </div>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/admin/reports/${m.coordinator_id}?tab=meetings`)}>
+                      <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">{ini(m.coordinator_name || "")}</div>
                       <div>
                         <div className="text-sm font-bold">{m.coordinator_name}</div>
-                        <div className="text-xs text-[#64748B]">{MTG_TYPE[m.type]||m.type} · {fd(m.date)} {m.area&&`· ${m.area}`}</div>
+                        <div className="text-xs text-[#64748B]">{MTG_TYPE[m.type] || m.type} · {fd(m.date)} {m.area && `· ${m.area}`}</div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {m.next_meeting_date && <div className="text-xs text-[#00488D] bg-[#F0F7FF] px-2 py-1 rounded-lg">פגישה הבאה: {fd(m.next_meeting_date)}</div>}
-                      <button onClick={async()=>{if(confirm("למחוק?"))await fetch("/api/meetings",{method:"DELETE",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:m.id})}).then(()=>load())}}
+                      <button onClick={async () => { if (confirm("למחוק?")) await fetch("/api/meetings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id }) }).then(() => load()) }}
                         className="text-[#CBD5E1] hover:text-[#960010] text-xs">✕</button>
                     </div>
                   </div>
                   {m.agenda && <div className="text-xs font-semibold text-[#374151] mb-1">נושאים: <span className="font-normal text-[#475569]">{m.agenda}</span></div>}
-                  <div className="text-sm text-[#475569] bg-[#F9FAFB] rounded-[9px] p-3">{m.summary}</div>
+                  <div className="text-sm text-[#475569] bg-[#F9FAFB] rounded-[9px] p-3 whitespace-pre-wrap">{m.summary}</div>
                 </div>
               </Card>
             ))}
@@ -261,23 +240,20 @@ export default function CoordManagementPage() {
         </div>
       )}
 
-      {/* ===== REPORTS TAB ===== */}
-      {tab==="reports" && (
+      {tab === "reports" && (
         <div>
           <div className="flex gap-2 mb-4 items-center">
-            <select value={rFilter} onChange={e=>setRFilter(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
+            <select value={rFilter} onChange={e => setRFilter(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
               <option value="">כל הרכזים</option>
-              {(coordNames as string[]).map(n=><option key={n} value={n}>{n}</option>)}
+              {coordNames.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
-            <span className="text-xs text-[#94A3B8]">{filteredReports.length} דיווחים</span><ExportButton type="reports" label="ייצוא דיווחים"/>
+            <span className="text-xs text-[#94A3B8]">{filteredReports.length} דיווחים</span><ExportButton type="reports" label="ייצוא דיווחים" />
           </div>
           <div className="space-y-3">
-            {filteredReports.map((r:any) => (
+            {filteredReports.map(r => (
               <Card key={r.id}>
-                <div onClick={()=>setOpenReport(openReport===r.id?null:r.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-[#F8FAFC] transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {(r.coordinator_name||"").split(" ").map((w:string)=>w[0]).join("")}
-                  </div>
+                <div onClick={() => setOpenReport(openReport === r.id ? null : r.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-[#F8FAFC] transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">{ini(r.coordinator_name || "")}</div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{r.coordinator_name}</div>
                     <div className="text-xs text-[#64748B]">שבוע {fd(r.week_start)} · {r.area}</div>
@@ -286,132 +262,23 @@ export default function CoordManagementPage() {
                     <div className="text-sm font-bold text-[#00488D]">{r.leads_count} לידים</div>
                     <div className="text-xs text-[#64748B]">{new Date(r.submitted_at).toLocaleDateString("he-IL")}</div>
                   </div>
-                  <span className="text-[#94A3B8] text-sm">{openReport===r.id?"▲":"▼"}</span>
+                  <span className="text-[#94A3B8] text-sm">{openReport === r.id ? "▲" : "▼"}</span>
                 </div>
-                {openReport===r.id && (
+                {openReport === r.id && (
                   <div className="border-t border-[#E2E8F0] p-4 bg-[#F8FAFC] grid grid-cols-2 gap-4">
-                    <div><div className="text-xs font-bold text-[#374151] mb-1">הישגים מרכזיים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.achievements||"—"}</div></div>
-                    <div><div className="text-xs font-bold text-[#374151] mb-1">אתגרים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.challenges||"—"}</div></div>
-                    <div className="col-span-2"><div className="text-xs font-bold text-[#374151] mb-1">תכנון שבוע הבא</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.next_week_plan||"—"}</div></div>
+                    <div><div className="text-xs font-bold text-[#374151] mb-1">הישגים מרכזיים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.achievements || "—"}</div></div>
+                    <div><div className="text-xs font-bold text-[#374151] mb-1">אתגרים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.challenges || "—"}</div></div>
+                    <div className="col-span-2"><div className="text-xs font-bold text-[#374151] mb-1">תכנון שבוע הבא</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.next_week_plan || "—"}</div></div>
                   </div>
                 )}
               </Card>
             ))}
-            {filteredReports.length===0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין דיווחים</div>}
+            {filteredReports.length === 0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין דיווחים</div>}
           </div>
         </div>
       )}
 
-      {/* ===== TRACKING TAB ===== */}
-      {tab==="tracking" && (
-        <div>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <div className="text-sm text-[#64748B]">לחץ על רכז לצפייה בכל הפעילות שלו</div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold text-[#374151]">שבוע לדו״ח:</label>
-              <input type="date" value={weekDate} onChange={e=>setWeekDate(e.target.value)}
-                className="text-xs border border-[#E2E8F0] rounded-[8px] px-2.5 py-1.5 bg-white focus:outline-none focus:border-[#00488D]"/>
-              <button onClick={()=>window.open(`/admin/reports/monthly?month=${new Date().toISOString().slice(0,7)}`,"_blank")}
-                className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors whitespace-nowrap">
-                📊 דו״ח חודשי ארגוני
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {coords.map((coord:any) => (
-              <div key={coord.id}>
-                <div onClick={()=>openTracking(coord)}
-                  className={`flex items-center gap-3 p-4 bg-white border rounded-[12px] cursor-pointer transition-colors ${activeCoord?.id===coord.id?"border-[#00488D] bg-[#F0F7FF]":"border-[#E2E8F0] hover:border-[#BFDBFE]"}`}>
-                  <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">
-                    {coord.name.split(" ").map((w:string)=>w[0]).join("")}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold">{coord.name}</div>
-                    <div className="text-xs text-[#64748B]">{coord.area||""}</div>
-                  </div>
-                  <button onClick={(e)=>{e.stopPropagation();window.open(`/admin/reports/weekly?coordinator_id=${coord.id}&week=${weekDate}`,"_blank")}}
-                    className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors whitespace-nowrap">
-                    📋 דו״ח שבועי
-                  </button>
-                  <span className={`text-lg transition-transform ${activeCoord?.id===coord.id?"rotate-90":""}`}>›</span>
-                </div>
-
-                {activeCoord?.id===coord.id && activity && (
-                  <div className="border border-t-0 border-[#00488D] rounded-b-[12px] bg-white overflow-hidden">
-                    <div className="flex justify-end px-4 pt-3">
-                      <ExportButton type="coord-activity" label="ייצוא דוח פעילות" params={{coordinator_id:coord.id}}/>
-                    </div>
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
-                      {([
-                        {label:"משימות",count:activity.tasks?.length||0,key:"tasks"},
-                        {label:"לידים",count:activity.leads?.length||0,key:"leads"},
-                        {label:"אינטראקציות",count:activity.interactions?.length||0,key:"interactions"},
-                        {label:"דיווחים",count:activity.reports?.length||0,key:"reports"},
-                      ]).map(x=>(
-                        <button key={x.key} onClick={()=>setActTab(x.key as any)}
-                          className={`py-3 text-center transition-colors ${actTab===x.key?"bg-[#F0F7FF]":""}`} style={{direction:"rtl"}}>
-                          <div className={`text-xl font-extrabold ${actTab===x.key?"text-[#00488D]":"text-[#0D2744]"}`}>{x.count}</div>
-                          <div className="text-xs text-[#64748B]">{x.label}</div>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="p-4 max-h-72 overflow-y-auto">
-                      {actTab==="tasks" && <div className="space-y-2">
-                        {(activity.tasks||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין משימות</div>}
-                        {(activity.tasks||[]).map((t:any)=>(
-                          <div key={t.id} className="flex items-start gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                            <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${t.status==="done"?"bg-[#166534]":t.status==="waiting"?"bg-[#B45309]":"bg-[#00488D]"}`}/>
-                            <div className="flex-1"><div className="text-sm font-semibold">{t.title}</div>
-                              <div className="text-xs text-[#64748B]">{TASK_STATUS[t.status]||t.status}{t.due_date&&` · ${fd(t.due_date.slice(0,10))}`}{t.event_name&&` · ${t.event_name}`}</div></div>
-                            <div className="text-xs text-[#94A3B8]">{fd(t.created_at?.slice(0,10))}</div>
-                          </div>
-                        ))}
-                      </div>}
-                      {actTab==="leads" && <div className="space-y-2">
-                        {(activity.leads||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין לידים</div>}
-                        {(activity.leads||[]).map((l:any)=>(
-                          <div key={l.id} className="flex items-center gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                            <div className="w-7 h-7 rounded-full bg-[#F0F7FF] text-[#00488D] flex items-center justify-center text-xs font-bold">{l.name?.[0]}</div>
-                            <div className="flex-1"><div className="text-sm font-semibold">{l.name}</div><div className="text-xs text-[#64748B]">{l.phone} · {l.source==="link"?"לינק":l.source==="event"?"אירוע":"ידני"}</div></div>
-                            <div className="text-xs text-[#00488D] bg-[#F0F7FF] px-2 py-0.5 rounded-full">{LEAD_STATUS[l.status]||l.status}</div>
-                            <div className="text-xs text-[#94A3B8]">{fd(l.created_at?.slice(0,10))}</div>
-                          </div>
-                        ))}
-                      </div>}
-                      {actTab==="interactions" && <div className="space-y-2">
-                        {(activity.interactions||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין אינטראקציות</div>}
-                        {(activity.interactions||[]).map((i:any)=>(
-                          <div key={i.id} className="flex gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                            <div className="w-7 h-7 rounded-full bg-[#F0F7FF] flex items-center justify-center text-sm">{INT_ICON[i.type]||"📝"}</div>
-                            <div className="flex-1"><div className="text-xs font-semibold">{i.contact_name||"—"} · {INT_LABEL[i.type]||i.type}</div>
-                              <div className="text-xs text-[#475569] bg-[#F9FAFB] rounded p-1.5 mt-0.5">{i.summary}</div></div>
-                            <div className="text-xs text-[#94A3B8]">{fd(i.date)}</div>
-                          </div>
-                        ))}
-                      </div>}
-                      {actTab==="reports" && <div className="space-y-2">
-                        {(activity.reports||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין דיווחים</div>}
-                        {(activity.reports||[]).map((r:any)=>(
-                          <div key={r.id} className="py-3 border-b border-[#F1F5F9] last:border-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="text-sm font-semibold">שבוע {fd(r.week_start)}</div>
-                              <div className="text-xs text-[#00488D] font-bold">{r.leads_count} לידים</div>
-                            </div>
-                            {r.achievements && <div className="text-xs bg-[#F9FAFB] rounded p-2 mb-1"><span className="font-semibold">הישגים: </span>{r.achievements}</div>}
-                            {r.challenges && <div className="text-xs bg-[#FFF9F0] rounded p-2"><span className="font-semibold">אתגרים: </span>{r.challenges}</div>}
-                          </div>
-                        ))}
-                      </div>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {tab==="targets" && <TargetsPanel/>}
+      {tab === "targets" && <TargetsPanel />}
     </div>
   )
 }

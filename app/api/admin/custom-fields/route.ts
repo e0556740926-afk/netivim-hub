@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     VALUES (${d.label}, ${d.field_type}, ${JSON.stringify(d.options || [])}::jsonb, ${!!d.required}, ${!!d.in_list}, ${d.visible_roles || []}, ${d.group_name || "שדות מותאמים כלליים"}, ${max_order + 1})
     RETURNING *`;
   const me = await currentUser(req);
-  logAudit({ entityType: "custom_field", entityId: rows[0].id, action: "create", actorName: me?.name, actorEmail: me?.email, summary: `שדה מותאם חדש: ${d.label}` });
+  logAudit({ entityType: "custom_field", entityId: rows[0].id, action: "create", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `שדה מותאם חדש: ${d.label}` });
   return NextResponse.json({ field: rows[0] });
 }
 

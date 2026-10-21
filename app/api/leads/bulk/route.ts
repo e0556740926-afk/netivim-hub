@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "missing target" }, { status: 400 });
     }
     for (const id of ids) {
-      logAudit({ entityType: "lead", entityId: id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "שיוך קבוצתי" });
+      logAudit({ entityType: "lead", entityId: id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "שיוך קבוצתי" });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (!d.status) return NextResponse.json({ error: "missing status" }, { status: 400 });
     await sql`UPDATE leads SET status=${d.status} WHERE id = ANY(${ids})`;
     for (const id of ids) {
-      logAudit({ entityType: "lead", entityId: id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
+      logAudit({ entityType: "lead", entityId: id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     if (hasCol.length) await sql`UPDATE leads SET deleted_at=now() WHERE id = ANY(${ids})`;
     else await sql`DELETE FROM leads WHERE id = ANY(${ids})`;
     for (const id of ids) {
-      logAudit({ entityType: "lead", entityId: id, action: "delete", actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
+      logAudit({ entityType: "lead", entityId: id, action: "delete", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }

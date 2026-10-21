@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   if (d.action === "status") {
     if (!d.status) return NextResponse.json({ error: "missing status" }, { status: 400 });
     await sql`UPDATE tasks SET status=${d.status} WHERE id = ANY(${ids})`;
-    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
+    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorId: me?.id, actorName: who, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }
 
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const assignees: string[] = Array.isArray(d.assignees) ? d.assignees : [];
     await sql`UPDATE tasks SET assignees=${assignees} WHERE id = ANY(${ids})`;
     await syncAssignedAndParticipantsForIds(ids);
-    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `שיוך קבוצתי → ${assignees.join(", ")}` });
+    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorId: me?.id, actorName: who, actorEmail: me?.email, summary: `שיוך קבוצתי → ${assignees.join(", ")}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }
 
@@ -40,20 +40,20 @@ export async function POST(req: NextRequest) {
     if (!d.name) return NextResponse.json({ error: "missing name" }, { status: 400 });
     await sql`UPDATE tasks SET assignees = array_append(assignees, ${d.name}) WHERE id = ANY(${ids}) AND NOT (${d.name} = ANY(assignees))`;
     await syncAssignedAndParticipantsForIds(ids);
-    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `נוסף לשיוך: ${d.name}` });
+    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorId: me?.id, actorName: who, actorEmail: me?.email, summary: `נוסף לשיוך: ${d.name}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }
 
   if (d.action === "priority") {
     if (!d.priority) return NextResponse.json({ error: "missing priority" }, { status: 400 });
     await sql`UPDATE tasks SET priority=${d.priority} WHERE id = ANY(${ids})`;
-    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorName: who, actorEmail: me?.email, summary: `דחיפות קבוצתית → ${d.priority}` });
+    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "update", actorId: me?.id, actorName: who, actorEmail: me?.email, summary: `דחיפות קבוצתית → ${d.priority}` });
     return NextResponse.json({ ok: true, count: ids.length });
   }
 
   if (d.action === "delete") {
     await sql`DELETE FROM tasks WHERE id = ANY(${ids})`;
-    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "delete", actorName: who, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
+    for (const id of ids) logAudit({ entityType: "task", entityId: id, action: "delete", actorId: me?.id, actorName: who, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
     return NextResponse.json({ ok: true, count: ids.length });
   }
 

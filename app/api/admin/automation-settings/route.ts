@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest) {
     await sql`
       INSERT INTO app_settings (key, value) VALUES (${key}, ${String(d[key])})
       ON CONFLICT (key) DO UPDATE SET value=${String(d[key])}`;
-    logAudit({ entityType: "setting", entityId: 0, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `הגדרת אוטומציה עודכנה: ${key} → ${d[key]}` });
+    logAudit({ entityType: "setting", entityId: 0, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `הגדרת אוטומציה עודכנה: ${key} → ${d[key]}` });
   }
   resetAutomationSettingsCache();
   return NextResponse.json({ ok: true });

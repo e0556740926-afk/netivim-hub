@@ -37,12 +37,12 @@ export async function PATCH(req: NextRequest) {
 
   if (d.action === "pause") {
     await sql`UPDATE tasks SET next_run=NULL WHERE id=${d.id}`;
-    logAudit({ entityType: "task", entityId: d.id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "סדרה חוזרת הושהתה" });
+    logAudit({ entityType: "task", entityId: d.id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "סדרה חוזרת הושהתה" });
     return NextResponse.json({ ok: true });
   }
   if (d.action === "resume") {
     await sql`UPDATE tasks SET next_run=CURRENT_DATE WHERE id=${d.id}`;
-    logAudit({ entityType: "task", entityId: d.id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "סדרה חוזרת חודשה" });
+    logAudit({ entityType: "task", entityId: d.id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "סדרה חוזרת חודשה" });
     return NextResponse.json({ ok: true });
   }
   if (d.action === "update") {
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
       await sql`UPDATE tasks SET assignees=${d.assignees} WHERE id=${d.id}`;
       await syncAssignedAndParticipants(d.id, d.assignees);
     }
-    logAudit({ entityType: "task", entityId: d.id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "עריכת סדרה חוזרת" });
+    logAudit({ entityType: "task", entityId: d.id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "עריכת סדרה חוזרת" });
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: "unknown action" }, { status: 400 });

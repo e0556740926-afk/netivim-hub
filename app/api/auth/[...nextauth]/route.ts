@@ -25,7 +25,16 @@ const handler = NextAuth({
     async signIn({ user }) {
       if (!user?.email) return false;
       const dbUser = await getUserByEmail(user.email);
-      return dbUser !== null;
+      if (!dbUser) return false;
+      // Mirror of the password login: stamp last_login_at and log the
+      // login for the coordinator activity feed. Best-effort.
+      try {
+        const { default: sql } = await import("@/lib/db");
+        await sql`UPDATE users SET last_login_at = now() WHERE id = ${dbUser.id}`;
+        const { logAudit } = await import("@/lib/audit");
+        await logAudit({ entityType: "user", entityId: dbUser.id, action: "login", actorId: dbUser.id, actorName: dbUser.name, actorEmail: dbUser.email, summary: "כניסה למערכת (Google)" });
+      } catch (e) { console.error("[login audit]", e); }
+      return true;
     },
     // Enrich the JWT at sign-in so middleware can read the role
     // without a DB round-trip on every request.

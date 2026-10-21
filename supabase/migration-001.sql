@@ -585,3 +585,11 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS region_tag text;
 -- 2026-10-21: link a lead to the contact/partner who referred it (field-only system).
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_id integer REFERENCES contacts(id);
 CREATE INDEX IF NOT EXISTS leads_contact_id_idx ON leads(contact_id);
+
+-- 2026-10-21: ניהול רכזים — who did what, per person. Logins are now
+-- audited (entity_type='user', action='login') and every audit line
+-- may carry the acting user's id, so the activity feed can match a
+-- coordinator by id and not only by display name.
+ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS actor_id integer;
+CREATE INDEX IF NOT EXISTS idx_audit_actor_created ON audit_log(actor_name, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_actor_id_created ON audit_log(actor_id, created_at DESC);
