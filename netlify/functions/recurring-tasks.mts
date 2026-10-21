@@ -82,7 +82,7 @@ async function sendWhatsApp(phone: string | null | undefined, message: string) {
   const chatId = toChatId(phone);
   if (!chatId) return;
   try {
-    await fetch(`https://api.green-api.com/waInstance${GREENAPI_ID}/sendMessage/${GREENAPI_TOKEN}`, {
+    await fetch(`${(process.env.GREENAPI_API_URL || "https://api.green-api.com").replace(/\/$/, "")}/waInstance${GREENAPI_ID}/sendMessage/${GREENAPI_TOKEN}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chatId, message }),

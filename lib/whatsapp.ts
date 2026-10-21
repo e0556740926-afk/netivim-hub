@@ -37,7 +37,7 @@ export async function sendWhatsApp(phone: string | null | undefined, message: st
     return { ok: false, reason: "bad_phone" };
   }
   try {
-    const url = `https://api.green-api.com/waInstance${ID_INSTANCE}/sendMessage/${API_TOKEN}`;
+    const url = `${(process.env.GREENAPI_API_URL || "https://api.green-api.com").replace(/\/$/, "")}/waInstance${ID_INSTANCE}/sendMessage/${API_TOKEN}`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
