@@ -27,7 +27,7 @@ export default function LeadsBarChart({ data, height = 180 }: { data: Point[]; h
         <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#CBD5E1] inline-block" />יעד</span>
         <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#00488D] inline-block" />בפועל</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" role="img" aria-label="לידים לפי חודש, יעד מול בפועל" onMouseLeave={() => setHover(null)}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" role="group" aria-label="לידים לפי חודש, יעד מול בפועל" onMouseLeave={() => setHover(null)}>
         {ticks.map(t => (
           <g key={t}>
             <line x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} stroke="#EEF2F7" strokeWidth={1} />
@@ -40,7 +40,7 @@ export default function LeadsBarChart({ data, height = 180 }: { data: Point[]; h
           const on = hover === i
           const m = Number(d.month.slice(5)) - 1
           return (
-            <g key={d.month} onMouseEnter={() => setHover(i)} style={{ cursor: "default" }}>
+            <g key={d.month} role="button" tabIndex={0} aria-label={`${MONTH_HE[m]} ${d.month.slice(0,4)}: בפועל ${d.actual}, יעד ${d.planned || "לא הוגדר"}`} onFocus={() => setHover(i)} onBlur={() => setHover(null)} onClick={() => setHover(hover === i ? null : i)} onKeyDown={e => { if(e.key === "Enter" || e.key === " ") { e.preventDefault();setHover(i) } }} onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }}>
               <rect x={padL + group * i} y={padT} width={group} height={innerH} fill={on ? "#F8FAFC" : "transparent"} />
               <rect x={cx - barW - gap / 2} y={y(d.planned)} width={barW} height={Math.max(0, innerH - (y(d.planned) - padT))} rx={3} fill="#CBD5E1" />
               <rect x={cx + gap / 2} y={y(d.actual)} width={barW} height={Math.max(0, innerH - (y(d.actual) - padT))} rx={3}
@@ -60,6 +60,11 @@ export default function LeadsBarChart({ data, height = 180 }: { data: Point[]; h
           <div>בפועל {data[hover].actual} · יעד {data[hover].planned || "—"}</div>
         </div>
       )}
+      <details className="dash-chart-data"><summary>נתוני הגרף בטבלה <span aria-hidden="true">⌄</span></summary>
+        <table><caption className="sr-only">לידים לפי חודש: יעד וביצוע</caption><thead><tr><th scope="col">חודש</th><th scope="col">יעד</th><th scope="col">בפועל</th></tr></thead>
+          <tbody>{data.map(d=><tr key={d.month}><th scope="row">{MONTH_HE[Number(d.month.slice(5))-1]} {d.month.slice(0,4)}</th><td>{d.planned || "—"}</td><td>{d.actual}</td></tr>)}</tbody>
+        </table>
+      </details>
     </div>
   )
 }
@@ -70,3 +75,4 @@ function niceCeil(v: number) {
   const m = n <= 1 ? 1 : n <= 2 ? 2 : n <= 4 ? 4 : n <= 5 ? 5 : 10
   return m * p
 }
+

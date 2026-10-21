@@ -11,11 +11,11 @@ export const OK = "#166534"
 export const WARN = "#B45309"
 export const BAD = "#960010"
 
-export function Section({ title, hint, action, children, className = "" }: {
-  title: string; hint?: string; action?: ReactNode; children: ReactNode; className?: string
+export function Section({ title, hint, action, children, className = "", scrollable = false }: {
+  title: string; hint?: string; action?: ReactNode; children: ReactNode; className?: string; scrollable?: boolean
 }) {
   return (
-    <section className={`bg-white border border-[#E2E8F0] rounded-[16px] p-4 md:p-5 ${className}`}>
+    <section className={`dash-section bg-white border border-[#E2E8F0] rounded-[16px] p-4 md:p-5 ${className}`}>
       <header className="flex items-start justify-between gap-3 mb-3">
         <div>
           <h2 className="text-[15px] font-extrabold text-[#0D2744] leading-tight">{title}</h2>
@@ -23,7 +23,7 @@ export function Section({ title, hint, action, children, className = "" }: {
         </div>
         {action}
       </header>
-      {children}
+      {scrollable ? <div className="dash-section-body" role="region" aria-label={`תוכן ${title}`} tabIndex={0}>{children}</div> : children}
     </section>
   )
 }
@@ -34,10 +34,10 @@ export function Kpi({ label, value, sub, tone = "navy", onClick, delta }: {
   const color = tone === "ok" ? OK : tone === "warn" ? WARN : tone === "bad" ? BAD : NAVY
   return (
     <button type="button" onClick={onClick} disabled={!onClick}
-      className="text-right bg-white border border-[#E2E8F0] rounded-[14px] p-4 transition-[transform,box-shadow] duration-150 ease-out enabled:hover:shadow-[0_2px_10px_rgba(13,39,68,.08)] enabled:active:scale-[.98] disabled:cursor-default">
+      className="dash-kpi text-right bg-white border border-[#E2E8F0] rounded-[14px] p-4 transition-[transform,box-shadow] duration-150 ease-out enabled:hover:shadow-[0_2px_10px_rgba(13,39,68,.08)] enabled:active:scale-[.98] disabled:cursor-default">
       <div className="text-xs text-[#64748B] font-medium">{label}</div>
       <div className="flex items-baseline gap-2 mt-1.5">
-        <div style={{ color }} className="text-[28px] font-extrabold leading-none tabular-nums">{value}</div>
+        <div style={{ color }} className="text-[28px] font-extrabold leading-none tabular-nums"><bdi dir="ltr">{value}</bdi></div>
         {delta !== undefined && delta !== null && (
           <span className={`text-[11px] font-bold ${delta >= 0 ? "text-[#166534]" : "text-[#960010]"}`}>{delta >= 0 ? "▲" : "▼"} {Math.abs(delta)}%</span>
         )}
@@ -79,8 +79,9 @@ export function DoneCheck({ onDone, color = BLUE }: { onDone: () => void; color?
   return (
     <button type="button" aria-label="סמן כבוצע" onClick={onDone}
       style={{ borderColor: color, color }}
-      className="w-6 h-6 rounded-[7px] border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 transition-[background-color,transform] duration-150 ease-out hover:bg-[#EFF6FF] active:scale-90">
+      className="dash-done-check w-6 h-6 rounded-[7px] border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 transition-[background-color,transform] duration-150 ease-out hover:bg-[#EFF6FF] active:scale-90">
       ✓
     </button>
   )
 }
+
