@@ -5,14 +5,23 @@
  */
 
 export type Intent =
+  | { kind: "menu" }
   | { kind: "help" }
+  | { kind: "digit"; n: number }
+  | { kind: "events" }
+  | { kind: "lead_status"; query: string }
+  | { kind: "task_status"; index: number; status: "inprogress" | "waiting" | "todo" }
   | { kind: "yes" }
   | { kind: "no" }
   | { kind: "my_tasks" }
   | { kind: "done"; index: number }
   | { kind: "postpone"; index: number; due: string }
   | { kind: "new_task"; title: string; due: string | null; urgent: boolean; missingTitle: boolean }
+  | { kind: "new_lead"; lead: LeadDraft }
+  | { kind: "fix"; field: keyof LeadDraft; value: string }
   | { kind: "unknown" }
+
+export type LeadDraft = { name: string; phone: string; age: number | null; city: string; notes: string }
 
 const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"]
 const DAY_LETTERS: Record<string, number> = { "א": 0, "ב": 1, "ג": 2, "ד": 3, "ה": 4, "ו": 5, "ש": 6 }
@@ -76,16 +85,29 @@ export function parse(raw: string, today = todayIL()): Intent {
   if (!text) return { kind: "unknown" }
   const lower = text.toLowerCase()
 
-  if (/^(עזרה|תפריט|help|\?|היי|שלום|הי)$/.test(lower)) return { kind: "help" }
+  if (/^(תפריט|היי|שלום|הי|שלום לך|בוקר טוב|ערב טוב|start|התחל)[!.]?$/.test(lower)) return { kind: "menu" }
+  if (/^(עזרה|help|\?|הסבר|איך|איך עושים)[?!.]?$/.test(lower)) return { kind: "help" }
+  if (/^[1-9]$/.test(text)) return { kind: "digit", n: Number(text) }
+  if (/^(אירועים|האירועים שלי|אירועים קרובים|יומן|ביומן|לו"ז|לוז|השבוע|השבוע שלי|מה יש לי|מה יש לי השבוע|מה יש לי ביומן|מה יש ביומן|יומן לשבוע|מה מתוכנן)[?!.]?$/.test(text)) return { kind: "events" }
   if (/^(כן|אישור|שמור|מאשר|מאשרת|ok|אוקיי|👍)[.!]?$/.test(lower)) return { kind: "yes" }
   if (/^(לא|ביטול|בטל|עזוב)[.!]?$/.test(lower)) return { kind: "no" }
   if (/^(המשימות שלי|משימות|מה המשימות שלי|רשימה)[?.!]?$/.test(text)) return { kind: "my_tasks" }
 
   let m: RegExpMatchArray | null
+  if ((m = text.match(/^(?:סטטוס|מצב|בדיקה|בדוק|מה הסטטוס של|מה המצב של|מה קורה עם)\s*(?:של\s+)?(?:ליד|הליד)?\s*[:\-–]?\s*(.+)$/))) return { kind: "lead_status", query: m[1].trim() }
+  if ((m = text.match(/^(?:בטיפול|בתהליך|התחלתי)\s*(\d{1,2})$/))) return { kind: "task_status", index: Number(m[1]), status: "inprogress" }
+  if ((m = text.match(/^(?:ממתין|מחכה|ממתינה)\s*(\d{1,2})$/))) return { kind: "task_status", index: Number(m[1]), status: "waiting" }
   if ((m = text.match(/^(?:בוצע|סיימתי|בוצעה)\s*(\d{1,2})$/))) return { kind: "done", index: Number(m[1]) }
   if ((m = text.match(/^(?:דחה|דחי|לדחות)\s*(\d{1,2})\s*(.*)$/))) {
     const { due } = extractDate(m[2] || "מחר", today)
     return { kind: "postpone", index: Number(m[1]), due: due || addDays(today, 1) }
+  }
+
+  if ((m = text.match(/^ליד(?:\s+חדש)?\s*[:\-–]?\s*([\s\S]*)$/))) return { kind: "new_lead", lead: parseLead(m[1] || "") }
+
+  if ((m = text.match(/^(שם|טלפון|נייד|גיל|עיר|הערה|הערות)\s*[:\-–]\s*(.+)$/))) {
+    const map: Record<string, keyof LeadDraft> = { "שם": "name", "טלפון": "phone", "נייד": "phone", "גיל": "age", "עיר": "city", "הערה": "notes", "הערות": "notes" }
+    return { kind: "fix", field: map[m[1]], value: m[2].trim() }
   }
 
   if ((m = text.match(/^משימה(?:\s+חדשה)?\s*[:\-–]?\s*(.*)$/))) {
@@ -107,14 +129,102 @@ export function fmtDue(iso: string | null, today = todayIL()): string {
   return `יום ${HEB_DAY[weekday(iso)]} ${Number(dd)}.${Number(mm)}`
 }
 
+export const CAPABILITIES = [
+  "📥 להכניס ליד חדש",
+  "🔎 לבדוק סטטוס של ליד",
+  "📝 להוסיף משימה",
+  "✅ לעדכן או לדחות משימות",
+  "📅 לראות מה יש לך בשבוע הקרוב",
+]
+
+export function welcomeText(firstName: string) {
+  return [
+    `שלום ${firstName} 👋`,
+    "אני הבוט של *נתיבים*. אפשר לכתוב לי ישירות, ואני יודע:",
+    "",
+    ...CAPABILITIES.map(c => "• " + c),
+    "",
+    "רוצה שאסביר איך עושים כל אחד?",
+    "*1* — כן, תסביר  ·  *2* — לא, אני מסתדר",
+  ].join("\n")
+}
+
 export const HELP_TEXT = [
-  "*בוט נתיבים* 🤖",
+  "*איך עושים* 👇",
   "",
-  "אפשר לכתוב לי:",
-  "• *משימה: להתקשר לאבי מחר* — משימה חדשה (אפשר להוסיף *דחוף*)",
-  "• *המשימות שלי* — המשימות הפתוחות",
-  "• *בוצע 2* — סימון משימה מהרשימה כבוצעה",
-  "• *דחה 2 ליום ראשון* — דחיית משימה",
+  "*📥 ליד חדש*",
+  "ליד: משה כהן 0521234567 בן 19 מבני ברק",
+  "_אפשר להוסיף \"הערה: ...\". לפני השמירה אשאל לאישור._",
   "",
-  "תאריכים: היום, מחר, מחרתיים, יום ראשון, 25.11, בעוד 3 ימים",
+  "*🔎 סטטוס ליד*",
+  "סטטוס 0521234567  ·  או  ·  סטטוס משה כהן",
+  "",
+  "*📝 משימה חדשה*",
+  "משימה: להתקשר לישיבת מאור מחר דחוף",
+  "_תאריכים: היום, מחר, יום ראשון, 25.11, בעוד 3 ימים_",
+  "",
+  "*✅ עדכון משימות*",
+  "המשימות שלי — רשימה ממוספרת, ואז:",
+  "בוצע 2  ·  בטיפול 2  ·  ממתין 2  ·  דחה 2 ליום ראשון",
+  "",
+  "*📅 השבוע הקרוב*",
+  "יומן  ·  או  ·  מה יש לי השבוע",
+  "",
+  "בכל רגע: *תפריט* — חזרה לכאן",
 ].join("\n")
+
+export const SHORT_HINT = "כתבו *תפריט* לרשימת האפשרויות, או *עזרה* לדוגמאות."
+
+// ── leads ───────────────────────────────────────────────────────
+export const CITIES = ["ירושלים","בני ברק","בית שמש","אלעד","מודיעין עילית","ביתר עילית","אשדוד","צפת","טבריה","חיפה","נתניה","פתח תקווה","פתח תקוה","רכסים","קרית גת","ערד","אופקים","נתיבות","באר שבע","תל אביב","רמת גן","חולון","בת ים","ראשון לציון","רחובות","לוד","רמלה","טלזסטון","קרית ספר","עמנואל","חריש","קרית יערים","אור יהודה","קרית אתא","עפולה","דימונה","אשקלון","הרצליה","כפר סבא","רעננה","חדרה","כרמיאל","מגדל העמק","קרית שמונה","נהריה","עכו","גבעת שמואל","יבנה","גדרה","מעלה אדומים","אריאל","קדומים","בית אל","כוכב יעקב","גבעת זאב","קצרין","מודיעין","קרית מלאכי","שדרות","קרית ביאליק","קרית מוצקין","נוף הגליל","בית שאן","יקנעם","זכרון יעקב","אור עקיבא","קרית אונו","גבעתיים","הוד השרון","רמת השרון","נס ציונה","באר יעקב","קרית עקרון","מזכרת בתיה","כפר חב\"ד","כפר חבד","ביתר","קרית יערים"]
+
+/** Israeli mobile → 05XXXXXXXX, or "" if none found. */
+export function findPhone(text: string): { phone: string; rest: string } {
+  const m = text.match(/(?:\+?972[-\s]?|0)5\d(?:[-\s]?\d){7}/)
+  if (!m) return { phone: "", rest: text }
+  const digits = m[0].replace(/\D/g, "")
+  const phone = digits.startsWith("972") ? "0" + digits.slice(3) : digits
+  return { phone: /^05\d{8}$/.test(phone) ? phone : "", rest: text.replace(m[0], " ") }
+}
+
+export function parseLead(raw: string): LeadDraft {
+  let t = " " + clean(raw) + " "
+  let notes = ""
+  const nm = t.match(/\s(?:הערה|הערות)\s*[:\-–]?\s*(.+)$/)
+  if (nm) { notes = nm[1].trim(); t = t.slice(0, nm.index) + " " }
+
+  const ph = findPhone(t); t = ph.rest
+
+  let age: number | null = null
+  const am = t.match(/\s(?:בן|בגיל|גיל)\s*[:\-]?\s*(\d{1,2})(?=\s)/)
+  if (am) { age = Number(am[1]); t = t.replace(am[0], " ") }
+  else {
+    const bare = t.match(/\s(1[2-9]|[23]\d)(?=\s)/) // a lone number in a lead line is almost always the age
+    if (bare) { age = Number(bare[1]); t = t.replace(bare[0], " ") }
+  }
+
+  let city = ""
+  const cm = t.match(/\s(?:עיר|גר ב|גרה ב|מתגורר ב)\s*[:\-]?\s*([^,]+?)(?=\s*(?:,|$))/)
+  if (cm) { city = cm[1].trim(); t = t.replace(cm[0], " ") }
+  else {
+    const sorted = [...CITIES].sort((a, b) => b.length - a.length)
+    for (const c of sorted) {
+      const re = new RegExp(`\\s(?:מ|ב|מה|מ-|ב-)?${c.replace(/"/g, '\\"')}(?=[\\s,.]|$)`)
+      const mm = t.match(re)
+      if (mm) { city = c.replace("פתח תקוה", "פתח תקווה").replace("כפר חבד", "כפר חב\"ד"); t = t.replace(mm[0], " "); break }
+    }
+  }
+
+  const name = clean(t.replace(/[,.;:]+/g, " ")).split(" ").slice(0, 4).join(" ")
+  return { name, phone: ph.phone, age: age && age >= 10 && age <= 99 ? age : null, city, notes: notes.slice(0, 500) }
+}
+
+export function leadSummary(l: LeadDraft): string {
+  return [
+    `👤 ${l.name || "— חסר שם —"}`,
+    `📞 ${l.phone || "— חסר טלפון —"}`,
+    `🎂 ${l.age ? "גיל " + l.age : "גיל לא צוין"}`,
+    `📍 ${l.city || "עיר לא צוינה"}`,
+    l.notes ? `📝 ${l.notes}` : "",
+  ].filter(Boolean).join("\n")
+}
