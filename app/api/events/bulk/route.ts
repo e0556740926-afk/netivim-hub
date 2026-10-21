@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { eventScope } from "@/lib/event-access";
 
 /**
  * Bulk operations for a selected set of events, mirroring
@@ -18,6 +19,15 @@ export async function POST(req: NextRequest) {
   if (!ids.length) return NextResponse.json({ error: "no ids" }, { status: 400 });
 
   const me = await currentUser(req);
+  const scope = await eventScope(req);
+  if (scope.isCoordinator) {
+    // Silently narrow the selection to the coordinator's own events.
+    if (!scope.ownCoordId) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+    const own = await sql`SELECT id FROM events WHERE id = ANY(${ids}) AND coordinator_id=${scope.ownCoordId}`;
+    ids.splice(0, ids.length, ...(own as any[]).map(r => r.id));
+    if (!ids.length) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+    if (d.action === "status" && (d.status === "approved" || d.status === "marketing")) d.status = "pending_approval";
+  }
 
   if (d.action === "status") {
     if (!d.status) return NextResponse.json({ error: "missing status" }, { status: 400 });

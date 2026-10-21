@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { eventScope } from "@/lib/event-access";
 
 /** ASCII-only slug for the event's public lead-capture link — same reasoning as coordinator slugs (fragile across share channels if non-Latin). */
 function makeEventSlug(name: string, id: number): string {
@@ -29,6 +30,13 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  // A coordinator can only create events under their own name — the
+  // client-supplied coordinator_id is ignored for them, not trusted.
+  const scope = await eventScope(req);
+  if (scope.isCoordinator) {
+    if (!scope.ownCoordId) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+    d.coordinator_id = scope.ownCoordId;
+  }
   const rows = await sql`
     INSERT INTO events (name, date, time, location, status, budget_planned, target_attendees, capacity, partner_contact_id, approved, coordinator_id)
     VALUES (${d.name}, ${d.date||null}, ${d.time||''}, ${d.location||''}, 'pending_approval', ${d.budget_planned||0}, ${d.target_attendees||0}, ${d.capacity||null}, ${d.partner_contact_id||null}, false, ${d.coordinator_id||null})

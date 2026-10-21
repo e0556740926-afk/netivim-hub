@@ -5,6 +5,7 @@ import { sendPush } from "@/lib/push";
 import { sendWhatsApp, eventApprovedMsg } from "@/lib/whatsapp";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { canTouchEvent } from "@/lib/event-access";
 
 /**
  * Standard pre-event checklist, auto-created once per event on
@@ -43,6 +44,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const d = await req.json();
   const eid = parseInt(id);
   const me = await currentUser(req);
+  const { ok, scope } = await canTouchEvent(req, eid);
+  if (!ok) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
+  if (scope.isCoordinator) {
+    // Approval is a manager decision: a coordinator may edit their own
+    // event freely but can neither approve it nor flip the approved flag,
+    // and can't move it into an approved-only status themselves.
+    if (d.approve) return NextResponse.json({ error: "אישור אירוע שמור למנהל" }, { status: 403 });
+    if (!d.results) {
+      const [cur] = await sql`SELECT approved, status FROM events WHERE id=${eid} LIMIT 1`;
+      d.approved = !!cur?.approved;
+      if (!cur?.approved && (d.status === "approved" || d.status === "marketing")) d.status = "pending_approval";
+    }
+  }
 
   if (d.approve) {
     await sql`UPDATE events SET approved=true, status='marketing' WHERE id=${eid}`;
@@ -105,6 +119,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const me = await currentUser(req);
+  const { ok } = await canTouchEvent(req, parseInt(id));
+  if (!ok) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
   await sql`DELETE FROM events WHERE id=${parseInt(id)}`;
   logAudit({ entityType:"event", entityId:parseInt(id), action:"delete", actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
