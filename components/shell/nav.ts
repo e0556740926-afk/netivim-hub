@@ -67,7 +67,7 @@ export function menuFor(kind: ShellKind, u: U): MenuGroup[] {
   manage.push({ label: "לוח שנה", sub: "סדר יום ותצוגת חודש", path: "/admin/calendar", icon: "calendar" })
   if (can(u, "newsletters")) {
     manage.push({ label: "ניוזלטר", sub: "ניהול תוכן הניוזלטר", path: "/admin/newsletter", icon: "mail" })
-    manage.push({ label: "דיוורים לקהלים", sub: "ניהול קהלים ודיוורים", path: "/admin/newsletter/audiences", icon: "send" })
+    manage.push({ label: "מרכז דיוורים", sub: "קהלים, ייבוא וקמפיינים", path: "/admin/messaging", icon: "send" })
   }
 
   const groups: MenuGroup[] = [
@@ -96,6 +96,10 @@ export function quickActionsFor(kind: ShellKind, u: U): QuickAction[] {
   }
   if (canWrite(u, "events")) out.push({ type: "event", title: kind === "coord" ? "הצעת אירוע" : "אירוע חדש", sub: kind === "coord" ? "נשלח לאישור המנהל" : "פתיחת טופס האירוע", icon: "event", path: `${base}/events` })
   if (kind === "coord") out.push({ type: "report", title: "עדכון לדוח", sub: "הדיווח השבועי למנהל", icon: "report", path: "/coord/profile" })
+  if (kind === "admin" && u?.role !== "coordinator" && canWrite(u, "newsletters")) {
+    out.push({ type: "campaign", title: "קמפיין חדש", sub: "מייל, SMS או וואטסאפ — טיוטה", icon: "send", path: "/admin/messaging/campaigns/new" })
+    out.push({ type: "import", title: "ייבוא נמענים", sub: "Excel או CSV לקהל", icon: "report", path: "/admin/messaging/import" })
+  }
   if (kind === "admin" && u?.role === "admin") out.push({ type: "user", title: "משתמש חדש", sub: "דרך ניהול המשתמשים הקיים", icon: "user", path: "/admin/settings" })
   return out
 }

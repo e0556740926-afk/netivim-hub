@@ -32,7 +32,7 @@ const GROUPS: Group[] = [
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
       { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
-      { label: "דיוורים לקהלים", path: "/admin/newsletter/audiences", dot: "#C9A84C" },
+      { label: "מרכז דיוורים", path: "/admin/messaging", dot: "#C9A84C" },
       { label: "הגדרות", path: "/admin/settings", dot: "#94A3B8" },
     ],
   },

@@ -27,6 +27,15 @@ export async function POST(req: NextRequest) {
       // Re-subscribing after a previous opt-out — reactivate rather
       // than reject, this is a normal and expected flow.
       await sql`UPDATE newsletter_subscribers SET status='active', unsubscribed_at=NULL WHERE id=${row.id}`;
+      // The person signed up again themselves — lift their email unsubscribe in
+      // the messaging center as well (bounces/complaints stay blocked).
+      try {
+        if (await hasColumn("msg_suppressions", "id")) {
+          await sql`DELETE FROM msg_suppressions WHERE channel IN ('email','all') AND value_norm=${String(d.email).trim().toLowerCase()} AND reason='unsubscribe'`;
+          await sql`INSERT INTO msg_consents (recipient_id, channel, status, source, evidence, created_by)
+            SELECT id, 'email', 'granted', 'הרשמה מחדש לניוזלטר', 'newsletter_subscriber:' || ${row.id}, 'נמען' FROM msg_recipients WHERE newsletter_subscriber_id=${row.id}`;
+        }
+      } catch (e) { console.error("[newsletter] messaging resubscribe sync", e); }
       return NextResponse.json({ ok: true, reactivated: true });
     }
     return NextResponse.json({ ok: true, already: true });

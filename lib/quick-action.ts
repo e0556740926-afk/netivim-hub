@@ -14,7 +14,7 @@ export const QUICK_EVENT = "netivim:quick-action"
 
 export type QuickType =
   | "lead" | "task" | "partner" | "interaction" | "organization"
-  | "event" | "report" | "user"
+  | "event" | "report" | "user" | "campaign" | "import"
 
 export function requestQuickAction(type: QuickType) {
   window.dispatchEvent(new CustomEvent(QUICK_EVENT, { detail: type }))

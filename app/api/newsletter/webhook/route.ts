@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import sql from "@/lib/db";
+import { hasColumn } from "@/lib/schema";
 
 // Signature verification needs Node's crypto module.
 export const runtime = "nodejs";
@@ -50,6 +51,17 @@ export async function POST(req: NextRequest) {
 
   const type: string = payload.type || "";
   const data = payload.data || {};
+
+  // Replays: Resend (Svix) may deliver the same event more than once. Record
+  // each event id once; a repeat changes no counter and no status.
+  const eventId = req.headers.get("svix-id") || "";
+  if (eventId && (await hasColumn("msg_provider_events", "id"))) {
+    const fresh = await sql`INSERT INTO msg_provider_events (provider, provider_event_id, event_type, payload)
+      VALUES ('resend', ${eventId}, ${type}, ${JSON.stringify({ email_id: data.email_id || null, to: data.to || null })}::jsonb)
+      ON CONFLICT (provider, provider_event_id) DO NOTHING RETURNING id`;
+    if (!fresh.length) return NextResponse.json({ ok: true, duplicate: true });
+    if (data.email_id) await applyCampaignEvent(type, String(data.email_id), fresh[0].id).catch(e => console.error("[messaging webhook]", e));
+  }
   const email: string | null = Array.isArray(data.to) ? data.to[0] : (data.to || null);
   const broadcastId: string | null = data.broadcast_id || null;
   const linkUrl: string | null = data.click?.link || data.link || null;
@@ -100,4 +112,28 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Messaging-center deliveries are matched by the provider's email id.
+ * Status only moves forward (accepted → delivered); a late or repeated
+ * event never moves it back. Bounces and complaints become suppressions.
+ */
+async function applyCampaignEvent(type: string, emailId: string, eventRowId: number) {
+  const [cr] = await sql`SELECT id, recipient_id, address FROM msg_campaign_recipients WHERE provider_id = ${emailId} LIMIT 1`;
+  if (!cr) return;
+  await sql`UPDATE msg_provider_events SET campaign_recipient_id = ${cr.id} WHERE id = ${eventRowId}`;
+  if (type === "email.delivered") {
+    await sql`UPDATE msg_campaign_recipients SET status = 'delivered', updated_at = now() WHERE id = ${cr.id} AND status IN ('accepted','unknown')`;
+  } else if (type === "email.opened") {
+    await sql`UPDATE msg_campaign_recipients SET opened_at = COALESCE(opened_at, now()) WHERE id = ${cr.id}`;
+  } else if (type === "email.clicked") {
+    await sql`UPDATE msg_campaign_recipients SET clicked_at = COALESCE(clicked_at, now()) WHERE id = ${cr.id}`;
+  } else if (type === "email.bounced") {
+    await sql`UPDATE msg_campaign_recipients SET status = 'failed', last_error = 'החזרה (bounce) מהשרת של הנמען', updated_at = now() WHERE id = ${cr.id} AND status <> 'failed'`;
+    await sql`INSERT INTO msg_suppressions (channel, value_norm, reason, source) VALUES ('email', ${cr.address}, 'bounce', 'resend') ON CONFLICT DO NOTHING`;
+  } else if (type === "email.complained") {
+    await sql`INSERT INTO msg_suppressions (channel, value_norm, reason, source) VALUES ('email', ${cr.address}, 'complaint', 'resend') ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO msg_consents (recipient_id, channel, status, source, evidence, created_by) VALUES (${cr.recipient_id}, 'email', 'revoked', 'תלונת דואר זבל', ${"resend:" + emailId}, 'ספק')`;
+  }
 }

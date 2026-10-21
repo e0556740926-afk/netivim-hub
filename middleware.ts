@@ -17,6 +17,13 @@ const PUBLIC_API = [
   "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
   "/api/integrations/salesforce/status", // called by Make.com — authenticated by SF_SYNC_SECRET inside the route
+  // Newsletter/messaging endpoints reached from emails and public pages —
+  // each authenticates itself (signed webhook, private token, or public data):
+  "/api/newsletter/webhook",     // Resend → Svix signature checked in the route
+  "/api/newsletter/unsubscribe", // one-click unsubscribe by private token (RFC 8058)
+  "/api/newsletter/preferences", // public preference center
+  "/api/newsletter/archive",     // public archive of sent issues
+  "/api/messaging/unsubscribe",  // one-click unsubscribe for campaigns, private token
 ];
 
 /**
@@ -51,6 +58,7 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/events", "events"],
   ["/api/tasks", "tasks"],
   ["/api/newsletter/audiences", "newsletters"],
+  ["/api/messaging", "newsletters"],      // messaging center; finer view/edit/send checks in lib/messaging/server.ts
   ["/api/expenses", "budget_main"],
   ["/api/routines", "reports"],      // manager routines — admins write, coordinators read (reports row: coordinator = O)
   ["/api/audit-log", "audit_log"],
