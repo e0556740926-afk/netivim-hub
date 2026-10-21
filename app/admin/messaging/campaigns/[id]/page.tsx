@@ -197,7 +197,7 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
         {mode === "schedule" && <label className="mc-field" style={{ maxWidth: 320 }}>מועד (שעון ישראל)<input type="datetime-local" value={when} onChange={e => setWhen(e.target.value)} /><small>העבודה ברקע רצה כל כמה דקות; המסירה מתחילה סמוך למועד.</small></label>}
         {!conn.connected && <div className="mc-note" style={{ marginTop: 12 }}>השליחה נעולה — הערוץ אינו מחובר. אפשר לשמור את הטיוטה ולחזור אליה.</div>}
         {!canSend && conn.connected && <div className="mc-note" style={{ marginTop: 12 }}>אישור ושליחה זמינים רק למנהלים עם הרשאת שליחה. הטיוטה נשמרת ומחכה לאישור.</div>}
-        {problems.length > 0 && <div className="mc-note red" style={{ marginTop: 12 }}>{problems.join(" · ")}</div>}
+        {problems.length > 0 && <div className="mc-note red" style={{ marginTop: 12 }}>{problems.join(" · ")} <button type="button" className="lw-link" onClick={() => go(3)}>מעבר לשלב התוכן ←</button></div>}
         <div className="mc-stepfoot">
           <button type="button" className="lw-btn" onClick={() => go(4)}>חזרה</button>
           <button type="button" className="lw-btn lw-btn-primary" disabled={!conn.connected || !canSend || approving || problems.length > 0 || !elig?.eligible || (mode === "schedule" && !when)} onClick={approve}>

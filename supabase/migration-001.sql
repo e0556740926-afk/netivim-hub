@@ -875,3 +875,13 @@ CREATE TABLE IF NOT EXISTS msg_activity (
 INSERT INTO msg_audiences(name, description, source, system_key)
 SELECT 'נרשמי הניוזלטר', 'מסונכרן אוטומטית מרשימת הניוזלטר הקיימת', 'ניוזלטר', 'newsletter'
 WHERE NOT EXISTS (SELECT 1 FROM msg_audiences WHERE system_key='newsletter');
+
+-- ═══ WhatsApp bot (phase 1, 2026-10-21) ═══
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+  phone text PRIMARY KEY,
+  user_id bigint,
+  state text NOT NULL DEFAULT '',
+  draft jsonb NOT NULL DEFAULT '{}',
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS whatsapp_messages_wa_id_idx ON whatsapp_messages(wa_message_id);

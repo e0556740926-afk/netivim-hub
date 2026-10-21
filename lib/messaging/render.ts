@@ -147,7 +147,7 @@ export function contentProblems(channel: string, c: CampaignContent): string[] {
   const out: string[] = []
   if (channel === "email") {
     if (!String(c.subject || "").trim()) out.push("חסרה שורת נושא")
-    if (c.mode === "html" ? !String(c.html || "").trim() : !(c.title || c.intro || c.main?.text)) out.push("חסר תוכן למייל")
+    if (c.mode === "html" ? !String(c.html || "").trim() : !(c.title || c.intro || c.main?.text || c.closing || (c.sections || []).some(x => x.title || x.text))) out.push("גוף המייל ריק — בשלב \"תוכן\" יש למלא כותרת, פתיחה או טקסט")
     if (c.cta && c.cta.label && !safeUrl(c.cta.url || "")) out.push("כתובת הכפתור אינה קישור http/https תקין")
     if (c.main?.image_url && !safeUrl(c.main.image_url)) out.push("כתובת התמונה אינה קישור ציבורי תקין")
     if (c.reply_to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.reply_to)) out.push("כתובת Reply-To אינה תקינה")
