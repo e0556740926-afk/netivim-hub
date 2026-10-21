@@ -96,6 +96,14 @@ export default function AdminLeads() {
   }
 
   useEffect(()=>{ load() },[])
+  // Deep link from dashboard / coordinator card: /admin/leads?open=<id>
+  useEffect(() => {
+    if (typeof window === "undefined" || !leads.length) return
+    const id = Number(new URLSearchParams(window.location.search).get("open"))
+    const l = id ? leads.find((x: any) => x.id === id) : null
+    if (l && !openLead) openDetail(l)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads])
 
   // Live duplicate warning while typing a new lead — non-blocking; the
   // server still enforces the hard block on submit.
