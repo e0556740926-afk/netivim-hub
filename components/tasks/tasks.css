@@ -1,0 +1,65 @@
+/* Tasks workspace — motion + browser-surface theming.
+   Scoped under .tasks-ws so nothing leaks into other screens. */
+
+.tasks-ws {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  font-variant-numeric: tabular-nums;
+}
+.tasks-ws ::selection { background: #DBEAFE; color: #0D2744; }
+.tasks-ws :focus-visible { outline: 2px solid #00488D; outline-offset: 2px; border-radius: 8px; }
+.tasks-ws input, .tasks-ws textarea { caret-color: #00488D; }
+
+/* Pressables answer the finger. */
+.tasks-ws .press { transition: transform 140ms var(--ease-out), background-color 140ms ease, color 140ms ease, border-color 140ms ease; }
+.tasks-ws .press:active { transform: scale(0.97); }
+
+/* Row entrance — one authored moment, short stagger, never blocks input. */
+.tasks-ws .row-in { animation: taskRowIn 220ms var(--ease-out) both; }
+@keyframes taskRowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Completion: the check fills, the title strikes through, then the row leaves. */
+.tasks-ws .check {
+  width: 22px; height: 22px; border-radius: 999px; border: 1.5px solid #CBD5E1; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;
+  transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.tasks-ws .check svg { opacity: 0; transform: scale(0.6); transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .tasks-ws .check:hover { border-color: #00488D; }
+  .tasks-ws .check:hover svg { opacity: 0.45; transform: scale(1); }
+}
+.tasks-ws .check.on { background: #166534; border-color: #166534; }
+.tasks-ws .check.on svg { opacity: 1; transform: scale(1); }
+.tasks-ws .title { transition: color 180ms ease, text-decoration-color 180ms ease; text-decoration: line-through transparent; text-decoration-thickness: 1.5px; }
+.tasks-ws .title.done { color: #94A3B8; text-decoration-color: #94A3B8; }
+.tasks-ws .leaving { animation: taskRowOut 260ms var(--ease-out) 120ms both; }
+@keyframes taskRowOut { to { opacity: 0; transform: translateX(-12px); max-height: 0; } }
+
+/* Side panel */
+.tasks-ws .panel-backdrop { position: fixed; inset: 0; background: rgba(13, 39, 68, 0.28); z-index: 70; animation: fadeIn 180ms ease both; }
+@keyframes fadeIn { from { opacity: 0; } }
+.tasks-ws .panel {
+  position: fixed; top: 0; bottom: 0; left: 0; width: min(460px, 100vw); background: #fff; z-index: 71;
+  box-shadow: 8px 0 32px -8px rgba(13, 39, 68, 0.25);
+  display: flex; flex-direction: column;
+  animation: panelIn 240ms var(--ease-drawer) both;
+}
+@keyframes panelIn { from { transform: translateX(-100%); } }
+@media (max-width: 640px) {
+  .tasks-ws .panel { top: auto; width: 100vw; max-height: 92dvh; border-radius: 18px 18px 0 0; animation: sheetIn 260ms var(--ease-drawer) both; box-shadow: 0 -8px 32px -8px rgba(13, 39, 68, 0.3); }
+  @keyframes sheetIn { from { transform: translateY(100%); } }
+}
+
+/* Status menu / popover */
+.tasks-ws .pop { transform-origin: top right; animation: popIn 150ms var(--ease-out) both; }
+@keyframes popIn { from { opacity: 0; transform: scale(0.96); } }
+
+/* Board column drop highlight */
+.tasks-ws .col { transition: background-color 160ms ease, border-color 160ms ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tasks-ws .row-in, .tasks-ws .leaving, .tasks-ws .pop { animation: none; }
+  .tasks-ws .panel, .tasks-ws .panel-backdrop { animation: fadeIn 150ms ease both; }
+  .tasks-ws .press:active { transform: none; }
+}
