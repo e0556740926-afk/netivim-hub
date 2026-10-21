@@ -8,21 +8,13 @@ import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 import PersonalLinkPopup from "./PersonalLinkPopup"
 import ViewAsControl from "./ViewAsControl"
 
-type Item = { label: string; path: string; dot: string; badgeKey?: string; missing?: boolean; ceoOnly?: boolean }
-type Group = { key: "advisors" | "field" | "exec"; label: string; dot: string; items: Item[] }
+type Item = { label: string; path: string; dot: string; badgeKey?: string }
+type Group = { key: "field" | "manage"; label: string; dot: string; items: Item[] }
 
+// Field-only system: everything that isn't field work (advisors team,
+// cases, institutions, call center, executive dashboards, statistics,
+// report builder) was removed — see git tag archive/full-crm-2026-10-21.
 const GROUPS: Group[] = [
-  {
-    key: "advisors", label: "צוות ייעוץ", dot: "#EF4444",
-    items: [
-      { label: "לידים", path: "/admin/leads", dot: "#34D399" },
-      { label: "תיקי ייעוץ", path: "/admin/cases", dot: "#EF4444" },
-      { label: "מוסדות", path: "/admin/organizations", dot: "#A78BFA" },
-      { label: "ניהול יועצים", path: "/admin/advisors-team", dot: "#60A5FA" },
-      { label: "ניהול מוקד", path: "/admin/call-center", dot: "#60A5FA" },
-      { label: "דשבורד מוקד", path: "/admin/call-center/dashboard", dot: "#2E5C8A", missing: true },
-    ],
-  },
   {
     key: "field", label: "שטח וקהילה", dot: "#34D399",
     items: [
@@ -30,17 +22,13 @@ const GROUPS: Group[] = [
       { label: "אירועים", path: "/admin/events", dot: "#F472B6", badgeKey: "pending" },
       { label: "תקציב שטח", path: "/admin/field-budget", dot: "#FBBF24" },
       { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
-      { label: "דשבורד קהילה", path: "/admin/community-dashboard", dot: "#60A5FA" },
-      { label: "יעדי לידים (זמני)", path: "/admin/targets", dot: "#34D399" },
-      { label: "לוח מובילים (זמני)", path: "/admin/leaderboard", dot: "#FBBF24" },
+      { label: "יעדי לידים", path: "/admin/targets", dot: "#34D399" },
+      { label: "לוח מובילים", path: "/admin/leaderboard", dot: "#FBBF24" },
     ],
   },
   {
-    key: "exec", label: "הנהלה", dot: "#FBBF24",
+    key: "manage", label: "ניהול", dot: "#FBBF24",
     items: [
-      { label: "דשבורד מנהלים", path: "/admin/dashboards/executive", dot: "#2E5C8A" },
-      { label: "סטטיסטיקות", path: "/admin/statistics", dot: "#6B4E9E", ceoOnly: true },
-      { label: "דוחות", path: "/admin/report-builder", dot: "#6B4E9E" },
       { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
       { label: "דיוורים לקהלים", path: "/admin/newsletter/audiences", dot: "#C9A84C" },
       { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
@@ -56,7 +44,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [badges, setBadges] = useState<Record<string,number>>({})
-  const [open, setOpen] = useState<Record<string, boolean>>({ advisors: true, field: true, exec: true })
+  const [open, setOpen] = useState<Record<string, boolean>>({ field: true, manage: true })
 
   useEffect(() => {
     async function load() {
@@ -81,14 +69,6 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     onClose?.()
   }
 
-  // A team manager (users.team = 'advisors' | 'field') sees only their own
-  // group. No team set (chief admin / general admin) sees all three —
-  // matches the org-chart split the user described: מנהל ראשי sees
-  // everything, מנהל צוות sees only their team's tabs.
-  const team = (user as any)?.team as "advisors" | "field" | undefined
-  const visibleGroups = team ? GROUPS.filter(g => g.key === team) : GROUPS
-  const canSeeStatistics = !team || (user as any)?.isCeo
-
   return (
     <aside className="w-[220px] flex-shrink-0 bg-[#0D2744] flex flex-col h-screen overflow-y-auto">
       <div className="px-4 py-4 border-b border-white/10 flex items-center justify-between">
@@ -108,10 +88,10 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             path === "/admin/dashboard" ? "bg-white/15 text-white" : "text-white/90 hover:bg-white/8"
           }`}>
           <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:"#60A5FA"}}/>
-          <span className="flex-1">לוח בקרה ראשי</span>
+          <span className="flex-1">דשבורד שטח</span>
         </div>
         <div className="h-px bg-white/10 my-1"/>
-        {visibleGroups.map(g => (
+        {GROUPS.map(g => (
           <div key={g.key}>
             <div onClick={() => setOpen(o => ({ ...o, [g.key]: !o[g.key] }))}
               className="flex items-center gap-2.5 px-3 py-2.5 rounded-[9px] cursor-pointer text-sm font-bold text-white/90 hover:bg-white/8">
@@ -121,13 +101,13 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             </div>
             {open[g.key] && (
               <div className="flex flex-col gap-0.5 pr-3 mb-1">
-                {g.items.filter(n => !n.ceoOnly || canSeeStatistics).map(n => (
+                {g.items.map(n => (
                   <div key={n.path} onClick={() => navigate(n.path)}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-[9px] cursor-pointer text-[13px] transition-all ${
                       path === n.path ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"
                     }`}>
                     <span className="w-1.5 h-1.5 rounded-sm flex-shrink-0 opacity-80" style={{background:n.dot}}/>
-                    <span className="flex-1">{n.label}{n.missing && <span className="text-white/30 text-[10px]"> · בתכנון</span>}</span>
+                    <span className="flex-1">{n.label}</span>
                     {n.badgeKey && badges[n.badgeKey] > 0 && (
                       <span className="w-5 h-5 rounded-full bg-[#960010] text-white text-[10px] flex items-center justify-center font-bold">
                         {badges[n.badgeKey]}
@@ -152,7 +132,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           <div className="flex-1 min-w-0">
             <div className="text-white text-xs font-semibold truncate">{user?.name}</div>
             <div className="text-white/50 text-[10px]">
-              {user?.role==="admin" ? (team==="advisors"?"מנהל צוות ייעוץ":team==="field"?"מנהל צוות שטח וקהילה":"מנהל ראשי") : user?.role==="coordinator"?"רכז":"צופה"}
+              {user?.role==="admin" ? "מנהל" : user?.role==="coordinator"?"רכז":"צופה"}
             </div>
           </div>
           <button onClick={logout} className="text-white/40 hover:text-white/80 text-xs transition-colors">יציאה</button>

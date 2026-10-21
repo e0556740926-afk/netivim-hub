@@ -3,8 +3,7 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 
 const ROLES = [
-  ["ceo", "מנכ\"ל"], ["rav", "רב (התייעצות)"], ["recruitment_manager", "מנהל צוות ייעוץ/גיוס"],
-  ["advisor", "יועץ"], ["field_manager", "מנהל שטח/קהילות"], ["coordinator", "רכז"],
+  ["ceo", "מנכ\"ל"], ["field_manager", "מנהל שטח/קהילות"], ["coordinator", "רכז"],
   ["secretary", "מזכירות"], ["viewer", "צופה"],
 ]
 

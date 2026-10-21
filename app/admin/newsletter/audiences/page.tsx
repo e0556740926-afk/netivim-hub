@@ -3,10 +3,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 
 const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F" }
-const AUDIENCE_LABEL: Record<string, string> = { contacts_partners: "אנשי קשר ושותפים", advisees: "נועצים", parents: "הורים שפנו אלינו" }
+const AUDIENCE_LABEL: Record<string, string> = { contacts_partners: "אנשי קשר ושותפים", parents: "הורים שפנו אלינו" }
 
 export default function NewsletterAudiences() {
-  const [audience, setAudience] = useState("advisees")
+  const [audience, setAudience] = useState("contacts_partners")
   const [filters, setFilters] = useState<Record<string, string>>({})
   const [count, setCount] = useState<number | null>(null)
   const [recipients, setRecipients] = useState<any[]>([])
@@ -35,7 +35,7 @@ export default function NewsletterAudiences() {
 
   const fields = audience === "contacts_partners"
     ? [["type", "סוג"], ["owner", "בעלים"]]
-    : [["city", "עיר"], ["sector", "מגזר"], ["advisor_status", "סטטוס תיק"], ["owner_name", "יועץ מטפל"], ["source", "מקור פנייה"]]
+    : [["city", "עיר"], ["source", "מקור פנייה"]]
 
   const eligibleCount = channel === "whatsapp" ? recipients.filter(r => r.phone).length : recipients.filter(r => r.email).length
 
@@ -46,7 +46,7 @@ export default function NewsletterAudiences() {
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 20, marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {(["advisees", "contacts_partners", "parents"] as const).map(a => (
+          {(["contacts_partners", "parents"] as const).map(a => (
             <button key={a} onClick={() => { setAudience(a); setFilters({}) }} style={{ background: audience === a ? T.blue : T.bg, color: audience === a ? "#fff" : T.slate, border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{AUDIENCE_LABEL[a]}</button>
           ))}
         </div>

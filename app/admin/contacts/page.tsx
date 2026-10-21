@@ -293,7 +293,7 @@ export default function ContactsPage() {
           <div className="flex-1 min-w-0">
             <div className="text-base font-bold">{detail.contact.name}</div>
             <div className="text-sm text-[#64748B]">
-      {detail.contact.role} · {detail.contact.organization_id ? <a href={`/admin/organizations/${detail.contact.organization_id}`} className="text-[#00488D] underline">{detail.contact.org}</a> : detail.contact.org}
+      {detail.contact.role} · {detail.contact.org}
     </div>
             <div className="flex gap-2 mt-1.5 flex-wrap">
               {STATUS_COLORS[detail.contact.status] && <span style={STATUS_COLORS[detail.contact.status]} className="px-2.5 py-0.5 rounded-full text-xs font-semibold">{STATUS_LABEL[detail.contact.status]}</span>}
@@ -512,7 +512,7 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-3 py-2.5"><div className="font-semibold text-[#0D2744]">{c.name}</div><div className="text-xs text-[#64748B]">{c.role}</div></td>
                   <td className="px-3 py-2.5 text-sm text-[#475569]">
-                    {c.organization_id ? <a href={`/admin/organizations/${c.organization_id}`} className="text-[#00488D] underline">{c.org||"—"}</a> : (c.org||"—")}
+                    {c.org||"—"}
                   </td>
                   <td className="px-3 py-2.5 text-xs text-[#475569]">{TYPE_LABEL[c.type]||c.type}</td>
                   <td className="px-3 py-2.5 text-xs text-[#475569]">{c.owner||"—"}</td>

@@ -290,3 +290,20 @@ then re-verified with the same count queries. All 8 pre-existing tables
 (`leads`, `contacts`, `tasks`, `events`, `coordinators`, `users`,
 `monthly_targets`, `interactions`, `meetings`, `newsletter_subscribers`)
 confirmed at their original row counts after every stage — zero data loss.
+
+## 2026-10-21 — חזרה למערכת שטח בלבד
+
+- הוסרו מהאפליקציה כל המודולים שאינם שטח: צוות ייעוץ (לידים-ניהול,
+  תיקי ייעוץ, מוסדות, ניהול יועצים, ניהול מוקד), דשבורד מנהלים,
+  סטטיסטיקות, בונה דוחות, פורטלים חיצוניים (נועץ/מוסד), טופס משוב,
+  חשבונות חוץ, ושתי Netlify functions (case-automation,
+  send-scheduled-reports).
+- הקוד המלא נשמר ב-git: tag `archive/full-crm-2026-10-21` ו-branch
+  `archive/full-crm`. טבלאות ה-DB לא נגעו — אין DROP, רק הקוד הוסר.
+- לידים נשארו כהזנה בלבד (צד רכז, לינק אישי /j ו-/s, סנכרון
+  לסיילספורס, יעדים ולוח מובילים). הוסרו: שיוך אוטומטי ליועץ ומשימת
+  מעקב אוטומטית בקליטת ליד. עמוד הלידים בצד מנהל הוסר.
+- `/admin/dashboard` חזר להיות דשבורד שטח (הגרסה שלפני הרחבת ה-CRM,
+  מבוססת `/api/dashboard`); `/admin/community-dashboard` מפנה אליו.
+- הושמט מושג ה"צוות" (users.team) מהתפריט ומה-middleware — כל מנהל
+  רואה את אותו תפריט שטוח. העמודה ב-DB נשארה.

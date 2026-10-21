@@ -10,8 +10,7 @@ import Button from "@/components/ui/Button"
 import Modal from "@/components/ui/Modal"
 
 const ROLE_LABEL: Record<string,string> = {
-  admin:"מנהל מערכת", ceo:"מנכ\"ל", field_manager:"מנהל שטח/קהילות", recruitment_manager:"מנהל צוות ייעוץ/גיוס",
-  advisor:"יועץ", rav:"רב (התייעצות)", secretary:"מזכירות",
+  admin:"מנהל מערכת", ceo:"מנכ\"ל", field_manager:"מנהל שטח/קהילות", secretary:"מזכירות",
   coordinator:"רכז", viewer:"צופה",
 }
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" }
@@ -134,7 +133,6 @@ export default function SettingsPage() {
         <a href="/admin/settings/audit-log" className="text-sm font-semibold text-[#00488D]">יומן ביקורת</a>
         <a href="/admin/settings/lead-sources" className="text-sm font-semibold text-[#00488D]">מקורות ליד</a>
         <a href="/admin/settings/arrival-channels" className="text-sm font-semibold text-[#00488D]">ערוצי הגעה</a>
-        <a href="/admin/settings/external-accounts" className="text-sm font-semibold text-[#00488D]">חשבונות חוץ</a>
         <Button onClick={startAdd}>+ משתמש חדש</Button>
       </div>
     </div>
@@ -151,15 +149,7 @@ export default function SettingsPage() {
           <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
             {Object.entries(ROLE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
           </select></div>
-        {form.role === "admin" && (
-          <div><label className="text-xs font-semibold block mb-1">צוות (לתפריט הצדדי)</label>
-            <select value={form.team} onChange={e=>setForm(f=>({...f,team:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
-              <option value="">מנהל ראשי — רואה הכל</option>
-              <option value="advisors">מנהל צוות ייעוץ</option>
-              <option value="field">מנהל צוות שטח וקהילה</option>
-            </select></div>
-        )}
-        {(form.role === "advisor" || form.role === "coordinator") && (
+        {form.role === "coordinator" && (
           <div><label className="text-xs font-semibold block mb-1">מנהל ישיר (לצורך הרשאות "הצוות שלו")</label>
             <select value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
               <option value="">— ללא —</option>

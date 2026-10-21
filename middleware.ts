@@ -15,8 +15,6 @@ const PUBLIC_API = [
   "/api/coord/slug",        // needed by the public lead form to resolve a slug
   "/api/lead-sources/slug", // needed by the public source-distribution link to resolve a slug
   "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
-  "/api/feedback",          // public outcome-feedback form, secured by its own token
-  "/api/portal",            // external institution/advisee portals — secured by their own token in the URL, not a staff session
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
 ];
 
@@ -33,7 +31,6 @@ const PUBLIC_API = [
 type Role = "admin" | "ceo" | "rav" | "recruitment_manager" | "advisor" | "field_manager" | "coordinator" | "secretary" | "viewer";
 const MODULE_MATRIX: Record<string, Partial<Record<Role, string>>> = {
   leads: { admin: "M", ceo: "R", recruitment_manager: "M", advisor: "O", field_manager: "R", coordinator: "O", secretary: "E", viewer: "R" },
-  cases: { admin: "M", ceo: "R", rav: "R", recruitment_manager: "M", advisor: "O", field_manager: "R", coordinator: "O", secretary: "E", viewer: "R" },
   contacts: { admin: "M", ceo: "R", rav: "R", recruitment_manager: "M", advisor: "E", field_manager: "M", coordinator: "E", secretary: "E", viewer: "R" },
   events: { admin: "M", ceo: "R", recruitment_manager: "R", field_manager: "M", coordinator: "E", secretary: "R", viewer: "R" },
   tasks: { admin: "M", ceo: "R", rav: "O", recruitment_manager: "T", advisor: "O", field_manager: "T", coordinator: "O", secretary: "O", viewer: "R" },
@@ -41,7 +38,6 @@ const MODULE_MATRIX: Record<string, Partial<Record<Role, string>>> = {
   budget_main: { admin: "M", ceo: "M", recruitment_manager: "R", field_manager: "E", secretary: "E", viewer: "A" },
   budget_field: { admin: "M", ceo: "R", field_manager: "M", coordinator: "E" },
   reports: { admin: "M", ceo: "M", rav: "R", recruitment_manager: "T", advisor: "O", field_manager: "M", coordinator: "O", secretary: "R", viewer: "A" },
-  advisor_management: { admin: "M", ceo: "R", recruitment_manager: "M", advisor: "R" },
   audit_log: { admin: "M", ceo: "R", recruitment_manager: "T" },
   settings_users: { admin: "M" },
 };
@@ -51,8 +47,6 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/tasks/series", "settings_users"],
   ["/api/task-templates", "settings_users"],
   ["/api/leads", "leads"],
-  ["/api/cases", "cases"],
-  ["/api/referrals", "cases"],
   ["/api/contacts", "contacts"],
   ["/api/events", "events"],
   ["/api/tasks", "tasks"],
@@ -61,10 +55,6 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/budget-sources", "budget_main"],
   ["/api/budget", "budget_main"],
   ["/api/field-budget", "budget_field"],
-  ["/api/admin/report-builder", "reports"],
-  ["/api/admin/report-schedules", "reports"],
-  ["/api/admin/advisors", "advisor_management"],
-  ["/api/admin/call-qa", "advisor_management"],
   ["/api/audit-log", "audit_log"],
   ["/api/users", "settings_users"],
 ];
@@ -86,8 +76,6 @@ const ADMIN_ONLY: { path: string; methods?: string[] }[] = [
   { path: "/api/meetings" },
   { path: "/api/targets", methods: ["POST", "PATCH", "DELETE"] },
   { path: "/api/export" },
-  { path: "/api/statistics" },
-  { path: "/api/dashboards" },
   { path: "/api/admin" },
 ];
 
@@ -196,9 +184,7 @@ export async function middleware(req: NextRequest) {
     }
 
     // Legacy admin-only fallback for paths not yet mapped to a module
-    // above (e.g. organizations writes, which deliberately stay
-    // admin-only regardless of the contacts matrix row — see comment
-    // in PATH_TO_MODULE).
+    // above.
     if (!mod && user.role !== "admin") {
       const blocked = ADMIN_ONLY.find(
         r =>
@@ -209,23 +195,9 @@ export async function middleware(req: NextRequest) {
         return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
       }
     }
-    if (user.role !== "admin" && (pathname === "/api/organizations" || pathname.startsWith("/api/organizations/"))
-      && ["POST", "PATCH"].includes(req.method)) {
-      return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-    }
 
     return NextResponse.next();
   }
-
-// Which /admin sub-paths belong to which team, mirroring the Sidebar
-// groups. Paths not listed here (shared/exec pages) stay open to any admin.
-const ADVISORS_TEAM_PATHS = ["/admin/leads", "/admin/cases", "/admin/organizations", "/admin/advisors-team", "/admin/call-center"];
-const FIELD_TEAM_PATHS = ["/admin/contacts", "/admin/events", "/admin/reports",
-  "/admin/dashboard", "/admin/targets", "/admin/leaderboard", "/admin/field-budget", "/admin/community-dashboard"];
-
-function pathInGroup(pathname: string, group: string[]) {
-  return group.some(p => pathname === p || pathname.startsWith(p + "/"));
-}
 
   // ── Admin pages ─────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {
@@ -238,23 +210,6 @@ function pathInGroup(pathname: string, group: string[]) {
     if (user.role === "coordinator") {
       const url = req.nextUrl.clone();
       url.pathname = "/coord/home";
-      return NextResponse.redirect(url);
-    }
-    // Team managers (users.team = 'advisors' | 'field') are confined to
-    // their own group's pages — real enforcement, not just a hidden nav
-    // item. A chief admin (no team set) is unrestricted.
-    const team = (user as any).team as string | undefined;
-    if (team === "advisors" && pathInGroup(pathname, FIELD_TEAM_PATHS)) {
-      const url = req.nextUrl.clone(); url.pathname = "/admin/leads";
-      return NextResponse.redirect(url);
-    }
-    if (team === "field" && pathInGroup(pathname, ADVISORS_TEAM_PATHS)) {
-      const url = req.nextUrl.clone(); url.pathname = "/admin/contacts";
-      return NextResponse.redirect(url);
-    }
-    // Statistics ("the scary page") is CEO + chief admin only, per spec §13.1.
-    if (pathname.startsWith("/admin/statistics") && team && !(user as any).isCeo) {
-      const url = req.nextUrl.clone(); url.pathname = "/admin/dashboard";
       return NextResponse.redirect(url);
     }
   }

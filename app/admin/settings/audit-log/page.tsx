@@ -13,7 +13,6 @@ function fdt(d?: string | null) {
 export default function AuditLogPage() {
   const [entries, setEntries] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<"all" | "protected">("all")
   const [userFilter, setUserFilter] = useState("")
   const [entityFilter, setEntityFilter] = useState("")
 
@@ -28,7 +27,6 @@ export default function AuditLogPage() {
   const users = Array.from(new Set(entries.map(e => e.actor_name).filter(Boolean)))
   const entityTypes = Array.from(new Set(entries.map(e => e.entity_type).filter(Boolean)))
   const filtered = entries
-    .filter(e => tab === "all" ? e.entity_type !== "case_protected" : e.entity_type === "case_protected")
     .filter(e => !userFilter || e.actor_name === userFilter)
     .filter(e => !entityFilter || e.entity_type === entityFilter)
 
@@ -37,15 +35,7 @@ export default function AuditLogPage() {
       <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>יומן ביקורת</span></div>
       <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>יומן ביקורת</div>
 
-      <div style={{ display: "flex", gap: 4, marginBottom: -1 }}>
-        {(["all", "protected"] as const).map(t => (
-          <div key={t} onClick={() => setTab(t)} style={{ padding: "9px 20px", borderRadius: "8px 8px 0 0", background: tab === t ? "#fff" : T.bg, border: `1px solid ${T.border}`, borderBottom: "none", fontSize: 13, fontWeight: tab === t ? 700 : 600, color: tab === t ? T.navy : T.slate, cursor: "pointer" }}>
-            {t === "all" ? "כל הפעולות" : "לוג צפייה במידע מוגן"}
-          </div>
-        ))}
-      </div>
-
-      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: "0 0 12px 12px", padding: 16 }}>
+      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select value={userFilter} onChange={e => setUserFilter(e.target.value)} style={{ padding: "7px 12px", border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12 }}>
             <option value="">משתמש: הכל</option>

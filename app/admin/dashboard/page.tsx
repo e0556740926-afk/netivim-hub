@@ -1,241 +1,216 @@
 "use client"
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { Drawer, useDrawer } from "@/components/dashboards/Drawer"
+import { useEffect, useState, useCallback } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { leadColor, pct, MONTH_HE } from "@/lib/utils"
+import KPICard from "@/components/ui/KPICard"
+import Speedometer from "@/components/ui/Speedometer"
+import Badge from "@/components/ui/Badge"
+import Card from "@/components/ui/Card"
+import PageLoader from "@/components/ui/Skeleton"
+import ErrorState from "@/components/ui/ErrorState"
 
-const T = {
-  navy: "#14213D", blue: "#2E5C8A", blueBg: "#EDF2F8", slate: "#5A6472",
-  border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", okBg: "#EAF3EE",
-  warn: "#B7791F", warnBg: "#FDF6E7", breach: "#C0392B", breachBg: "#FDECEA", purple: "#6B4E9E", purpleBg: "#F2EEF8",
-}
-const FUNNEL_COLORS = ["#14213D", "#1F3864", "#2E5C8A", "#6B4E9E", "#B7791F", "#2E6B4F"]
-function money(n: number | null) { return n === null ? "—" : `₪${Math.round(n).toLocaleString()}` }
+interface Board { name:string; area:string; actual:number; target:number }
+interface ManagerBoard { name:string; actual:number }
+const MEDAL = ["🥇","🥈","🥉"]
+const ST_LABEL: Record<string,string> = { marketing:"בפרסום", pending_approval:"ממתין לאישור", approved:"מאושר", planning:"תכנון", done:"בוצע" }
 
-function Section({ title, color, children, action }: { title: string; color: string; children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: "0 1px 3px rgba(20,33,61,.06)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ width: 4, height: 18, borderRadius: 2, background: color, display: "inline-block" }} />
-          <span style={{ fontSize: 16, fontWeight: 700 }}>{title}</span>
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  )
-}
-function Hero({ label, value, color, bg, onClick }: { label: string; value: string | number; color: string; bg: string; onClick?: () => void }) {
-  return (
-    <div onClick={onClick} style={{ background: bg, borderRadius: 14, padding: "18px 20px", cursor: onClick ? "pointer" : undefined, minWidth: 0 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: color === "#fff" ? "rgba(255,255,255,.85)" : T.slate }}>{label}</div>
-      <div style={{ fontSize: 30, fontWeight: 700, marginTop: 6, color }}>{value}</div>
-    </div>
-  )
-}
-function MiniStat({ label, value, color, onClick }: { label: string; value: string | number; color?: string; onClick?: () => void }) {
-  return (
-    <div onClick={onClick} style={{ cursor: onClick ? "pointer" : undefined }}>
-      <div style={{ fontSize: 12, color: T.slate }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, marginTop: 2, color: color || T.navy }}>{value}</div>
-    </div>
-  )
-}
-
-export default function MainDashboard() {
-  const router = useRouter()
-  const [d, setD] = useState<any>(null)
+export default function Dashboard() {
+  const { user } = useAuth()
+  const [board, setBoard] = useState<Board[]>([])
+  const [managerBoard, setManagerBoard] = useState<ManagerBoard[]>([])
+  const [pending, setPending] = useState<any[]>([])
+  const [radar, setRadar] = useState<any[]>([])
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [kpis, setKpis] = useState({ events:0, budgetPct:0, lateTasks:0, pendingCount:0 })
+  const [orgLeads, setOrgLeads] = useState(0)
+  const [leadsTrend, setLeadsTrend] = useState(0)
+  const [orgTarget, setOrgTarget] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [acting, setActing] = useState<string | null>(null)
-  const drawer = useDrawer()
+  const month = new Date().getMonth()
 
-  async function load() {
+  const loadAll = useCallback(async () => {
     setLoading(true); setError(false)
     try {
-      const r = await fetch("/api/dashboards/main")
-      if (!r.ok) throw new Error()
-      setD(await r.json())
-    } catch { setError(true) } finally { setLoading(false) }
-  }
-  useEffect(() => { load() }, [])
+      const res = await fetch("/api/dashboard")
+      if (!res.ok) throw new Error()
+      const d = await res.json()
+      const { coordinators, targets, events, leadCounts, managerLeadCounts, expenseByEvent, reports, totals } = d
 
-  async function approveExpense(id: number, approve: boolean) {
-    setActing(`e${id}`)
-    await fetch("/api/expenses", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status: approve ? "paid" : "cancelled" }) })
-    await load(); setActing(null)
-  }
-  async function approveRequest(id: number) {
-    setActing(`r${id}`)
-    await fetch("/api/budget/purchase-requests", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve", id }) })
-    await load(); setActing(null)
+      // Counting now happens in SQL; these are small lookup maps.
+      const leadsByCoord = new Map<number,number>(
+        (leadCounts||[]).map((r:any)=>[r.coordinator_id, r.count])
+      )
+      const expByEvent: Record<number,number> = {}
+      ;(expenseByEvent||[]).forEach((r:any)=>{ expByEvent[r.event_id] = r.total })
+
+      const b: Board[] = (coordinators||[]).map((c:any)=>({
+        name: c.name,
+        area: c.area,
+        actual: leadsByCoord.get(c.id) || 0,
+        target: (targets||[]).find((x:any)=>x.coordinator_id===c.id)?.target_leads || 0,
+      })).sort((a:Board,b:Board)=>b.actual-a.actual)
+      setBoard(b)
+
+      // Leads a manager brought in directly (their own personal link).
+      // Deliberately not compared against a target — general count only.
+      const mb: ManagerBoard[] = (managerLeadCounts||[])
+        .map((r:any)=>({ name: r.owner_name, actual: r.count }))
+        .sort((a:ManagerBoard,b:ManagerBoard)=>b.actual-a.actual)
+      setManagerBoard(mb)
+
+      const totTarget = (targets||[]).reduce((s:number,t:any)=>s+(+t.target_leads||0),0)
+      setOrgLeads(totals?.leads||0); setOrgTarget(totTarget)
+      setLeadsTrend(totals?.leadsTrendPct ?? 0)
+
+      const active = (events||[]).filter((e:any)=>e.status!=="done"&&e.status!=="cancelled")
+      const pend = (events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval")
+      setPending(pend.slice(0,3))
+
+      const budgetPct = totals?.budget>0 ? Math.round(totals.spent/totals.budget*100) : 0
+      const lateTasks = totals?.lateTasks || 0
+
+      setKpis({ events:active.length, budgetPct, lateTasks, pendingCount:pend.length })
+
+      setRadar(active.slice(0,4).map((e:any)=>({...e,spent:expByEvent[e.id]||0})))
+
+      const al: any[]=[]
+      const subIds=new Set((reports||[]).map((r:any)=>r.coordinator_id))
+      const missing=(coordinators||[]).filter((c:any)=>!subIds.has(c.id))
+      if(missing.length) al.push({type:"error",title:"דיווח שבועי חסר",body:`${missing.map((c:any)=>c.name).join(", ")} לא הגישו`,cta:"שלח תזכורת"})
+      if(lateTasks>0) al.push({type:"warning",title:`${lateTasks} משימות באיחור`,body:"עברו את תאריך היעד",cta:"צפה במשימות"})
+      if(pend.length) al.push({type:"warning",title:"ממתינים לאישורך",body:`${pend.length} אירועים דורשים אישור`,cta:"עבור לאישורים"})
+      setAlerts(al)
+    } catch { setError(true) }
+    finally { setLoading(false) }
+  }, [])
+
+  useEffect(()=>{ loadAll() },[loadAll])
+
+  async function approveEvent(id:number) {
+    await fetch(`/api/events/${id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({approve:true})})
+    setPending(p=>p.filter(e=>e.id!==id))
+    setKpis(k=>({...k,pendingCount:k.pendingCount-1}))
   }
 
-  if (loading) return <div style={{ padding: 32 }}>טוען...</div>
-  if (error || !d) return <div style={{ padding: 32, textAlign: "center", color: T.breach }}>שגיאה בטעינה — נסה לרענן.</div>
-
-  const leadsPct = d.community.target_this_month > 0 ? Math.round((d.community.leads_this_month / d.community.target_this_month) * 100) : null
-  const f = d.funnel
-  const stages = [
-    ["סך פניות", f.total, "total_inquiries"], ["נוצר קשר", f.contacted, "contacted"], ["בתהליך פעיל", f.active_process, "active_process"],
-    ["הופנו", f.referred, "referred"], ["התקבלו", f.accepted, "accepted"], ["שובצו", f.placed, "placed"],
-  ] as [string, number, string][]
-  const maxFunnel = Math.max(1, f.total)
-  const maxTrend = Math.max(1, ...d.monthly_trend.flatMap((m: any) => [m.planned, m.actual]))
+  if(loading) return <PageLoader/>
+  if(error) return <div className="p-4 md:p-6"><ErrorState retry={loadAll}/></div>
 
   return (
-    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "28px 32px 60px", color: T.navy }}>
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 26, fontWeight: 800 }}>לוח בקרה ראשי</div>
-        <div style={{ fontSize: 13, color: T.slate, marginTop: 4 }}>תמונת מצב מלאה של נתיבים — ייעוץ, שטח, מוקד, תקציב ומשימות. כל מספר לחיץ פותח את הרשימה שמאחוריו.</div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>
-        <Hero label="תיקים פעילים" value={d.advisor.active_cases} color={T.navy} bg="#fff" onClick={() => drawer.openDrawer("active_process", `תיקים פעילים — ${d.advisor.active_cases}`)} />
-        <Hero label="חריגת SLA" value={d.advisor.breaching_sla} color="#fff" bg={d.advisor.breaching_sla > 0 ? T.breach : T.ok} onClick={() => drawer.openDrawer("new_inquiries", "פניות חדשות")} />
-        <Hero label="סיווג אדום" value={d.advisor.red_flag_cases} color="#fff" bg={d.advisor.red_flag_cases > 0 ? T.breach : T.ok} onClick={() => drawer.openDrawer("red_flag_cases", "תיקים בסיווג אדום")} />
-        <Hero label="משימות באיחור" value={d.tasks.overdue} color="#fff" bg={d.tasks.overdue > 0 ? T.warn : T.ok} onClick={() => drawer.openDrawer("overdue_tasks", "משימות באיחור")} />
-        <Hero label="ניצול תקציב" value={d.budget.utilization_pct !== null ? `${d.budget.utilization_pct}%` : "—"} color={T.navy} bg="#fff" onClick={() => router.push("/admin/budget")} />
-        <Hero label="ממתין לאישורך" value={d.budget.pending_approvals} color="#fff" bg={d.budget.pending_approvals > 0 ? T.warn : T.ok} />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 20, alignItems: "start" }}>
+    <div className="p-4 md:p-6 lg:p-8 fade-up">
+      <div className="flex items-end justify-between mb-5">
         <div>
-          <Section title="משפך תהליכי ייעוץ" color={T.breach}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              {stages.map(([label, val, key], i) => {
-                const widthPct = Math.max(22, Math.round((val / maxFunnel) * 100))
-                const prev = i > 0 ? stages[i - 1][1] : val
-                const pct = prev > 0 ? Math.round((val / prev) * 100) : null
-                return (
-                  <div key={label}>
-                    <div onClick={() => drawer.openDrawer(key, `${label} — ${val}`)} style={{ width: `${widthPct}%`, background: FUNNEL_COLORS[i], color: "#fff", borderRadius: 8, padding: "10px 18px", display: "flex", justifyContent: "space-between", cursor: "pointer" }}>
-                      <span style={{ fontSize: 13 }}>{label}</span><span style={{ fontWeight: 700 }}>{val}</span>
-                    </div>
-                    {i < stages.length - 1 && pct !== null && <div style={{ fontSize: 10, color: T.slate, margin: "2px 0" }}>↓ {pct}%</div>}
-                  </div>
-                )
-              })}
-            </div>
-          </Section>
-
-          <Section title="תכנון מול ביצוע — לידים לפי חודש" color={T.blue}>
-            <div style={{ display: "flex", gap: 14, fontSize: 11, color: T.slate, marginBottom: 12 }}>
-              <span><span style={{ display: "inline-block", width: 10, height: 10, background: T.border, borderRadius: 2, marginLeft: 4 }} />מתוכנן (יעד)</span>
-              <span><span style={{ display: "inline-block", width: 10, height: 10, background: T.blue, borderRadius: 2, marginLeft: 4 }} />בפועל</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 120 }}>
-              {d.monthly_trend.map((m: any) => (
-                <div key={m.month} style={{ flex: 1, position: "relative", height: "100%" }}>
-                  <div style={{ position: "absolute", bottom: 0, width: "100%", height: `${(m.planned / maxTrend) * 100}%`, background: T.border, borderRadius: "3px 3px 0 0" }} />
-                  <div style={{ position: "absolute", bottom: 0, width: "55%", right: "22.5%", height: `${(m.actual / maxTrend) * 100}%`, background: m.actual >= m.planned && m.planned > 0 ? T.ok : T.blue, borderRadius: "3px 3px 0 0" }} />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-              {d.monthly_trend.map((m: any) => <div key={m.month} style={{ flex: 1, textAlign: "center", fontSize: 10, color: T.slate }}>{m.month.slice(5)}</div>)}
-            </div>
-          </Section>
-
-          <Section title="ביצועי רכזים" color={T.ok}>
-            <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead><tr>
-                {["רכז", "לידים/יעד", "בתהליך פעיל", "שובצו"].map(h => <th key={h} style={{ textAlign: "right", padding: "6px 10px", fontSize: 11, color: T.slate, fontWeight: 600 }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {d.coordinator_performance.map((c: any) => {
-                  const pct = c.target_leads ? Math.min(100, Math.round((c.leads_entered / c.target_leads) * 100)) : null
-                  return (
-                    <tr key={c.coordinator_name} style={{ borderTop: `1px solid ${T.bg}` }}>
-                      <td style={{ padding: "8px 10px", fontWeight: 600 }}>{c.coordinator_name}</td>
-                      <td style={{ padding: "8px 10px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span>{c.leads_entered} / {c.target_leads ?? "—"}</span>
-                          {pct !== null && <div style={{ flex: 1, height: 6, background: T.bg, borderRadius: 3, maxWidth: 60 }}><div style={{ height: "100%", width: `${pct}%`, background: pct >= 100 ? T.ok : T.warn, borderRadius: 3 }} /></div>}
-                        </div>
-                      </td>
-                      <td style={{ padding: "8px 10px" }}>{c.converted_to_process}</td>
-                      <td style={{ padding: "8px 10px", color: T.ok, fontWeight: 700 }}>{c.placed}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table></div>
-          </Section>
+          <h1 className="text-2xl font-extrabold text-[#0D2744]">דשבורד שטח</h1>
+          <div className="text-sm text-[#64748B] mt-1">{MONTH_HE[month]} {new Date().getFullYear()} · מעודכן בזמן אמת</div>
         </div>
-
-        <div>
-          <Section title="שטח וקהילה" color={T.ok}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14 }}>
-              <MiniStat label="לידים / יעד" value={`${d.community.leads_this_month} / ${d.community.target_this_month || "—"}`} color={leadsPct !== null && leadsPct < 100 ? T.warn : T.ok} />
-              <MiniStat label="אירועים החודש" value={d.community.events_this_month} />
-              <MiniStat label="עלות לליד" value={money(d.community.cost_per_lead)} />
-              <MiniStat label="רכזים בלי דוח" value={d.community.coordinators_missing_report} color={d.community.coordinators_missing_report > 0 ? T.warn : T.ok} />
-            </div>
-          </Section>
-
-          <Section title="מוקד" color={T.slate}>
-            <div style={{ fontSize: 13, color: T.slate, textAlign: "center", padding: "8px 0" }}>אין עדיין נתוני מוקד — ממתין לאינטגרציית Aspire.</div>
-          </Section>
-
-          <Section title="מקורות מימון" color={T.warn}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {d.budget.by_source.map((s: any) => {
-                const pct = s.amount > 0 ? Math.round((Number(s.used) / Number(s.amount)) * 100) : 0
-                return (
-                  <div key={s.funder}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}><span>{s.funder}</span><span className="ltr-numeric" style={{ color: T.slate }}>{money(s.used)} / {money(s.amount)}</span></div>
-                    <div style={{ height: 7, background: T.bg, borderRadius: 4 }}><div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: pct > 90 ? T.breach : pct > 75 ? T.warn : T.blue, borderRadius: 4 }} /></div>
-                  </div>
-                )
-              })}
-              {!d.budget.by_source.length && <div style={{ color: T.slate, fontSize: 13 }}>אין עדיין מקורות מימון</div>}
-            </div>
-          </Section>
-
-          <Section title="ממתין לאישורך" color={T.warn}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {d.pending_items.expenses.map((e: any) => (
-                <div key={`e${e.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px" }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 600 }}>{e.description}</div><div style={{ fontSize: 11, color: T.slate }} className="ltr-numeric">{money(e.amount)} · {e.vendor}</div></div>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button disabled={acting === `e${e.id}`} onClick={() => approveExpense(e.id, true)} style={{ background: T.okBg, color: T.ok, border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>אשר</button>
-                    <button disabled={acting === `e${e.id}`} onClick={() => approveExpense(e.id, false)} style={{ background: T.breachBg, color: T.breach, border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>דחה</button>
-                  </div>
-                </div>
-              ))}
-              {d.pending_items.requests.map((r: any) => (
-                <div key={`r${r.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: `1px solid ${T.border}`, borderRadius: 8, padding: "8px 12px" }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 600 }}>רכש — {r.item}</div><div style={{ fontSize: 11, color: T.slate }}>{r.requested_by}</div></div>
-                  <button disabled={acting === `r${r.id}`} onClick={() => approveRequest(r.id)} style={{ background: T.okBg, color: T.ok, border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>אשר והזמן</button>
-                </div>
-              ))}
-              {!d.pending_items.expenses.length && !d.pending_items.requests.length && <div style={{ color: T.slate, fontSize: 13, textAlign: "center" }}>אין דבר הממתין לאישור</div>}
-            </div>
-          </Section>
-
-          <Section title="מנהלה ומערכת" color={T.purple}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 14, marginBottom: 16 }}>
-              <MiniStat label="אישורי התמדה ממתינים" value={d.admin.pending_retention} />
-              <MiniStat label="חשבונות על טוקן ישן" value={d.admin.legacy_token_accounts} />
-              <MiniStat label="משתמשים לא פעילים 30+" value={d.admin.inactive_users_30d} />
-              <MiniStat label="הפניות ממתינות למוסד" value={d.advisor.pending_institution_referrals} onClick={() => drawer.openDrawer("pending_institution_referrals", "הפניות ממתינות")} />
-            </div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: T.slate, marginBottom: 8 }}>יומן ביקורת — פעולות רגישות אחרונות</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {d.admin.recent_sensitive_audit.map((a: any) => (
-                <div key={a.id} style={{ fontSize: 12, borderTop: `1px solid ${T.bg}`, padding: "5px 0", display: "flex", justifyContent: "space-between" }}>
-                  <span>{a.actor_name || "אוטומטי"} — {a.summary || a.action}</span>
-                  <span style={{ color: T.slate }}>{new Date(a.created_at).toLocaleDateString("he-IL")}</span>
-                </div>
-              ))}
-              {!d.admin.recent_sensitive_audit.length && <div style={{ color: T.slate, fontSize: 12 }}>אין רשומות רגישות לאחרונה</div>}
-            </div>
-          </Section>
-        </div>
+        <div className="px-3 py-1.5 bg-[#DCFCE7] text-[#166534] text-sm font-semibold rounded-lg">{board.length} רכזים פעילים</div>
       </div>
 
-      <Drawer open={drawer.open} title={drawer.title} rows={drawer.rows} loading={drawer.loading} onClose={drawer.close} />
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <KPICard label="אירועים פעילים" value={kpis.events}/>
+        <KPICard label="ניצול תקציב" value={`${kpis.budgetPct}%`} color={kpis.budgetPct>90?"#960010":kpis.budgetPct>75?"#B45309":"#0D2744"}/>
+        <KPICard label="משימות באיחור" value={kpis.lateTasks} color={kpis.lateTasks>0?"#960010":"#0D2744"}/>
+        <KPICard label="ממתינים לאישור" value={kpis.pendingCount} color={kpis.pendingCount>0?"#B45309":"#166534"}/>
+      </div>
+
+      {/* Pending approval */}
+      {pending.length>0 && <Card className="mb-4 border-r-4 border-[#B45309]">
+        <div className="px-4 py-3 border-b border-[#E2E8F0] text-sm font-bold text-[#B45309]">⏳ ממתינים לאישורך</div>
+        <div className="p-3 space-y-2">
+          {pending.map(e=><div key={e.id} className="flex items-center gap-3 p-3 bg-[#F0F4F8] rounded-[10px]">
+            <div className="flex-1"><div className="text-sm font-semibold">{e.name}</div><div className="text-xs text-[#64748B]">{e.date} · ₪{(+e.budget_planned).toLocaleString()}</div></div>
+            <button onClick={()=>approveEvent(e.id)} className="px-4 py-1.5 bg-[#166534] text-white text-sm font-semibold rounded-lg hover:bg-[#15803d] transition-colors">אשר ✓</button>
+          </div>)}
+        </div>
+      </Card>}
+
+      {/* Speedometer + Leaderboard */}
+      <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-4 mb-4">
+        <Card className="p-5 flex flex-col items-center gap-3">
+          <div className="flex items-center justify-between w-full">
+            <div className="text-sm font-bold">מד לידים ארגוני</div>
+            {leadsTrend !== 0 && (
+              <span
+                style={{ color: leadsTrend > 0 ? "#166534" : "#960010", background: leadsTrend > 0 ? "#DCFCE7" : "#FFF0F0" }}
+                className="text-xs font-bold px-2 py-0.5 rounded-full"
+              >
+                {leadsTrend > 0 ? "▲" : "▼"} {Math.abs(leadsTrend)}%
+              </span>
+            )}
+          </div>
+          <Speedometer actual={orgLeads} target={orgTarget} size={170}/>
+          <div className="text-xs text-[#64748B] text-center">{orgLeads} / {orgTarget} לידים החודש</div>
+        </Card>
+        <Card className="p-5">
+          <div className="text-sm font-bold mb-4">דירוג רכזים · לידים החודש</div>
+          <div className="space-y-3">
+            {board.map((c,i)=>{
+              const p=pct(c.actual,c.target); const col=leadColor(p)
+              return <div key={c.name} className="flex items-center gap-3">
+                <div className="w-6 text-sm font-bold text-[#94A3B8] text-center">{MEDAL[i]||i+1}</div>
+                <div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold">{c.name.split(" ").map(w=>w[0]).join("")}</div>
+                <div className="w-24 text-sm font-semibold truncate">{c.name}</div>
+                <div className="w-12 text-xs text-[#64748B]">{c.area}</div>
+                <div className="flex-1 h-2 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${p}%`,background:col}} className="h-full rounded-full transition-all duration-700"/></div>
+                <div className="w-16 text-left text-sm font-bold" style={{color:col}}>{c.actual}/{c.target}</div>
+              </div>
+            })}
+            {board.length===0&&<div className="text-sm text-[#94A3B8] text-center py-4">אין רכזים</div>}
+          </div>
+
+          {managerBoard.length > 0 && <>
+            <div className="text-xs font-bold text-[#94A3B8] uppercase tracking-wide mt-5 mb-3 pt-4 border-t border-[#F1F5F9]">
+              לידים ממנהלים · כללי (ללא יעד)
+            </div>
+            <div className="space-y-2.5">
+              {managerBoard.map((m) => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <div className="w-6 text-center flex-shrink-0">👑</div>
+                  <div className="w-8 h-8 rounded-full bg-[#EDE9FE] text-[#5B21B6] flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {m.name.split(" ").map(w=>w[0]).join("")}
+                  </div>
+                  <div className="flex-1 text-sm font-semibold truncate">{m.name}</div>
+                  <div className="text-sm font-bold text-[#5B21B6]">{m.actual} לידים</div>
+                </div>
+              ))}
+            </div>
+          </>}
+        </Card>
+      </div>
+
+      {/* Radar + Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
+        <Card className="p-5">
+          <div className="text-sm font-bold mb-4">📡 רדאר אירועים קרובים</div>
+          <div className="space-y-2.5">
+            {radar.map(e=>{
+              const d=new Date(e.date); const bp=e.budget_planned>0?Math.round(+e.spent/e.budget_planned*100):0
+              return <div key={e.id} className="flex items-center gap-3 p-3 border border-[#E2E8F0] rounded-[11px] hover:border-[#00488D] transition-colors">
+                <div className="w-12 text-center flex-shrink-0"><div className="text-lg font-extrabold leading-none">{d.getDate()}</div><div className="text-xs text-[#64748B]">{["ינו","פבר","מרץ","אפר","מאי","יונ","יול","אוג","ספט","אוק","נוב","דצמ"][d.getMonth()]}</div></div>
+                <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{e.name}</div><div className="text-xs text-[#64748B] truncate">{e.location}</div></div>
+                <Badge text={ST_LABEL[e.status]||e.status}/>
+                <div className="w-20 flex-shrink-0"><div className="h-1.5 bg-[#F0F4F8] rounded-full overflow-hidden"><div style={{width:`${Math.min(bp,100)}%`,background:bp>90?"#960010":"#00488D"}} className="h-full rounded-full"/></div><div className="text-xs text-[#64748B] mt-1">₪{e.spent?.toLocaleString()}</div></div>
+              </div>
+            })}
+            {radar.length===0&&<div className="text-sm text-[#94A3B8] text-center py-4">אין אירועים קרובים</div>}
+          </div>
+        </Card>
+        <Card className="p-5">
+          <div className="text-sm font-bold mb-4">🚨 מרכז פעולות</div>
+          <div className="space-y-2.5">
+            {alerts.map((a,i)=>{
+              const COLORS:Record<string,{bg:string,border:string,text:string}>={error:{bg:"#FFF0F0",border:"#960010",text:"#960010"},warning:{bg:"#FFFBEB",border:"#B45309",text:"#B45309"},info:{bg:"#F0F7FF",border:"#00488D",text:"#00488D"}}; const c=COLORS[a.type]||{bg:"#F8FAFC",border:"#64748B",text:"#64748B"}
+              return <div key={i} style={{background:c.bg,borderRight:`3px solid ${c.border}`}} className="p-3 rounded-[11px]">
+                <div style={{color:c.text}} className="text-sm font-semibold">{a.title}</div>
+                <div className="text-xs text-[#475569] mt-1">{a.body}</div>
+                <div className="text-xs font-bold text-[#00488D] mt-2 cursor-pointer">{a.cta} →</div>
+              </div>
+            })}
+            {alerts.length===0&&<div className="p-4 text-center text-sm text-[#94A3B8]">✓ אין התראות פעילות</div>}
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }
