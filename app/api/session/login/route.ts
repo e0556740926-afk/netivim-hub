@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { signSession, toSessionUser, SESSION_COOKIE } from "@/lib/session";
 import { verifyPassword, isHashed, hashPassword } from "@/lib/password";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json();
@@ -33,6 +34,8 @@ export async function POST(req: NextRequest) {
   const user = toSessionUser(row);
   const token = await signSession(user);
   await sql`UPDATE users SET last_login_at = now() WHERE id = ${row.id}`;
+  // Feeds the coordinator activity feed / engagement score (ניהול רכזים).
+  logAudit({ entityType: "user", entityId: row.id, action: "login", actorId: row.id, actorName: row.name, actorEmail: row.email, summary: "כניסה למערכת" });
 
   const res = NextResponse.json({ user });
   res.cookies.set(SESSION_COOKIE, token, {

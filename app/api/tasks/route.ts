@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
     await persistNotifyLog(task.id, log);
   }
   const me = await currentUser(req);
-  logAudit({ entityType:"task", entityId:task.id, action:"create", actorName:me?.name||d.assigned_by, summary:`נוצרה: ${d.title}` });
+  logAudit({ entityType:"task", entityId:task.id, action:"create", actorId: me?.id, actorName:me?.name||d.assigned_by, summary:`נוצרה: ${d.title}` });
   return NextResponse.json({ task });
 }
 
@@ -227,7 +227,7 @@ export async function PATCH(req: NextRequest) {
     if (d.status === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
     await sql`UPDATE tasks SET status=${d.status} WHERE id=${d.id}`;
     const me0 = await currentUser(req);
-    logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me0?.name, actorEmail:me0?.email, summary:`סטטוס → ${d.status}` });
+    logAudit({ entityType:"task", entityId:d.id, action:"update", actorId: me0?.id, actorName:me0?.name, actorEmail:me0?.email, summary:`סטטוס → ${d.status}` });
     return NextResponse.json({ ok: true });
   }
 
@@ -237,7 +237,7 @@ export async function PATCH(req: NextRequest) {
     if (d.due_date === undefined) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
     await sql`UPDATE tasks SET due_date=${d.due_date} WHERE id=${d.id}`;
     const me0b = await currentUser(req);
-    logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me0b?.name, actorEmail:me0b?.email, summary:`נדחה ל-${d.due_date}` });
+    logAudit({ entityType:"task", entityId:d.id, action:"update", actorId: me0b?.id, actorName:me0b?.name, actorEmail:me0b?.email, summary:`נדחה ל-${d.due_date}` });
     return NextResponse.json({ ok: true });
   }
 
@@ -285,7 +285,7 @@ export async function PATCH(req: NextRequest) {
     await persistNotifyLog(d.id, log);
   }
   const me1 = await currentUser(req);
-  logAudit({ entityType:"task", entityId:d.id, action:"update", actorName:me1?.name||d.assigned_by, summary:`עודכן: ${d.title}` });
+  logAudit({ entityType:"task", entityId:d.id, action:"update", actorId: me1?.id, actorName:me1?.name||d.assigned_by, summary:`עודכן: ${d.title}` });
   return NextResponse.json({ ok: true, notified: added.length });
 }
 
@@ -299,6 +299,6 @@ export async function DELETE(req: NextRequest) {
     }
   }
   await sql`DELETE FROM tasks WHERE id=${id}`;
-  logAudit({ entityType:"task", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
+  logAudit({ entityType:"task", entityId:id, action:"delete", actorId: me?.id, actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
 }

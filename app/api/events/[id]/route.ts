@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   if (d.approve) {
     await sql`UPDATE events SET approved=true, status='marketing' WHERE id=${eid}`;
-    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:"אושר" });
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:"אושר" });
     // Notify the coordinator
     try {
       const rows = await sql`
@@ -96,7 +96,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       leads_collected=${d.leads_collected||0},
       summary=${d.summary||''} 
       WHERE id=${eid}`;
-    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:`תוצאות: ${d.actual_attendees||0} משתתפים, ${d.leads_collected||0} לידים` });
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:`תוצאות: ${d.actual_attendees||0} משתתפים, ${d.leads_collected||0} לידים` });
   } else {
     // Full edit
     await sql`UPDATE events SET
@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       partner_contact_id=${d.partner_contact_id||null},
       approved=${d.approved||false}
       WHERE id=${eid}`;
-    logAudit({ entityType:"event", entityId:eid, action:"update", actorName:me?.name, actorEmail:me?.email, summary:`עודכן: ${d.name}` });
+    logAudit({ entityType:"event", entityId:eid, action:"update", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:`עודכן: ${d.name}` });
   }
   return NextResponse.json({ ok: true });
 }
@@ -122,6 +122,6 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { ok } = await canTouchEvent(req, parseInt(id));
   if (!ok) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
   await sql`DELETE FROM events WHERE id=${parseInt(id)}`;
-  logAudit({ entityType:"event", entityId:parseInt(id), action:"delete", actorName:me?.name, actorEmail:me?.email });
+  logAudit({ entityType:"event", entityId:parseInt(id), action:"delete", actorId: me?.id, actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true });
 }

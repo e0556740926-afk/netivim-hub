@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       RETURNING *`;
     created.push(rows[0]);
     await syncAssignedAndParticipants(rows[0].id, assignees);
-    logAudit({ entityType: "task", entityId: rows[0].id, action: "create", actorName: me?.name, actorEmail: me?.email, summary: `נוצרה מתבנית` });
+    logAudit({ entityType: "task", entityId: rows[0].id, action: "create", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `נוצרה מתבנית` });
   }
   return NextResponse.json({ ok: true, created: created.length, tasks: created });
 }

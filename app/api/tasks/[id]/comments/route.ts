@@ -23,6 +23,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     INSERT INTO task_comments (task_id, author_name, body)
     VALUES (${Number(id)}, ${author}, ${d.body.trim()})
     RETURNING *`;
-  logAudit({ entityType: "task", entityId: Number(id), action: "update", actorName: author, actorEmail: me?.email, summary: "תגובה חדשה" });
+  logAudit({ entityType: "task", entityId: Number(id), action: "update", actorId: me?.id, actorName: author, actorEmail: me?.email, summary: "תגובה חדשה" });
   return NextResponse.json({ comment: rows[0] });
 }

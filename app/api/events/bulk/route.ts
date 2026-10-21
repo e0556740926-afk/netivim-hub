@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (!d.status) return NextResponse.json({ error: "missing status" }, { status: 400 });
     await sql`UPDATE events SET status=${d.status} WHERE id = ANY(${ids})`;
     for (const id of ids) {
-      logAudit({ entityType: "event", entityId: id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
+      logAudit({ entityType: "event", entityId: id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (d.action === "delete") {
     await sql`DELETE FROM events WHERE id = ANY(${ids})`;
     for (const id of ids) {
-      logAudit({ entityType: "event", entityId: id, action: "delete", actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
+      logAudit({ entityType: "event", entityId: id, action: "delete", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }

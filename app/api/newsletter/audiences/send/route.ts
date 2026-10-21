@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       if (res?.ok) sent++;
     }
   }
-  logAudit({ entityType: "organization", entityId: 0, action: "create", actorName: me?.name, actorEmail: me?.email, summary: `דיוור אד-הוק (${channel === "whatsapp" ? "WhatsApp" : "דוא\"ל"}) נשלח ל-${sent}/${valid.length} נמענים: ${d.subject || plainTextSubjectFallback(d.html)}` });
+  logAudit({ entityType: "organization", entityId: 0, action: "create", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `דיוור אד-הוק (${channel === "whatsapp" ? "WhatsApp" : "דוא\"ל"}) נשלח ל-${sent}/${valid.length} נמענים: ${d.subject || plainTextSubjectFallback(d.html)}` });
   return NextResponse.json({ ok: true, sent, total: valid.length, channel });
 }
 

@@ -1,10 +1,11 @@
 import sql from "@/lib/db";
-import { hasColumn } from "@/lib/schema";
+import { hasColumn, ensureColumn } from "@/lib/schema";
 
 interface LogArgs {
-  entityType: "contact" | "lead" | "task" | "event" | "organization" | "custom_field" | "setting";
+  entityType: "contact" | "lead" | "task" | "event" | "organization" | "custom_field" | "setting" | "user";
   entityId: number;
-  action: "create" | "update" | "delete" | "restore" | "view";
+  action: "create" | "update" | "delete" | "restore" | "view" | "login";
+  actorId?: number | null;
   actorName?: string;
   actorEmail?: string;
   summary?: string;
@@ -12,12 +13,28 @@ interface LogArgs {
 
 let tableChecked = false;
 let tableExists = false;
+let actorIdChecked = false;
+let hasActorId = false;
 
 async function ensureTableKnown() {
   if (tableChecked) return tableExists;
   tableExists = await hasColumn("audit_log", "id");
   tableChecked = true;
   return tableExists;
+}
+
+/**
+ * actor_id (users.id) lets the activity feed match a person reliably
+ * even if their display name changes. Added lazily (idempotent DDL)
+ * because the migration may not have been applied; checked once per
+ * warm instance.
+ */
+async function ensureActorId() {
+  if (actorIdChecked) return hasActorId;
+  hasActorId = await ensureColumn("audit_log", "actor_id",
+    "ALTER TABLE audit_log ADD COLUMN IF NOT EXISTS actor_id integer");
+  actorIdChecked = true;
+  return hasActorId;
 }
 
 /**
@@ -28,10 +45,17 @@ async function ensureTableKnown() {
 export async function logAudit(a: LogArgs): Promise<void> {
   try {
     if (!(await ensureTableKnown())) return;
-    await sql`
-      INSERT INTO audit_log (entity_type, entity_id, action, actor_name, actor_email, summary)
-      VALUES (${a.entityType}, ${a.entityId}, ${a.action}, ${a.actorName || ""}, ${a.actorEmail || ""}, ${a.summary || ""})
-    `;
+    if (await ensureActorId()) {
+      await sql`
+        INSERT INTO audit_log (entity_type, entity_id, action, actor_name, actor_email, summary, actor_id)
+        VALUES (${a.entityType}, ${a.entityId}, ${a.action}, ${a.actorName || ""}, ${a.actorEmail || ""}, ${a.summary || ""}, ${a.actorId ?? null})
+      `;
+    } else {
+      await sql`
+        INSERT INTO audit_log (entity_type, entity_id, action, actor_name, actor_email, summary)
+        VALUES (${a.entityType}, ${a.entityId}, ${a.action}, ${a.actorName || ""}, ${a.actorEmail || ""}, ${a.summary || ""})
+      `;
+    }
   } catch (e) {
     console.error("[audit]", e);
   }

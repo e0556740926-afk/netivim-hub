@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "missing target" }, { status: 400 });
     }
     for (const id of ids) {
-      logAudit({ entityType: "contact", entityId: id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: "שיוך קבוצתי" });
+      logAudit({ entityType: "contact", entityId: id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "שיוך קבוצתי" });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     if (!d.status) return NextResponse.json({ error: "missing status" }, { status: 400 });
     await sql`UPDATE contacts SET status=${d.status} WHERE id = ANY(${ids})`;
     for (const id of ids) {
-      logAudit({ entityType: "contact", entityId: id, action: "update", actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
+      logAudit({ entityType: "contact", entityId: id, action: "update", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: `סטטוס קבוצתי → ${d.status}` });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       await sql`DELETE FROM contacts WHERE id = ANY(${ids})`;
     }
     for (const id of ids) {
-      logAudit({ entityType: "contact", entityId: id, action: "delete", actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
+      logAudit({ entityType: "contact", entityId: id, action: "delete", actorId: me?.id, actorName: me?.name, actorEmail: me?.email, summary: "מחיקה קבוצתית" });
     }
     return NextResponse.json({ ok: true, count: ids.length });
   }

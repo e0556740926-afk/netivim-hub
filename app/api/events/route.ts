@@ -48,6 +48,6 @@ export async function POST(req: NextRequest) {
   event.slug = slug;
 
   const me = await currentUser(req);
-  logAudit({ entityType:"event", entityId:event.id, action:"create", actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${event.name}` });
+  logAudit({ entityType:"event", entityId:event.id, action:"create", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${event.name}` });
   return NextResponse.json({ event });
 }

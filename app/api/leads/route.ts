@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   const text = `INSERT INTO leads (${cols.join(", ")}) VALUES (${placeholders}) RETURNING *`;
   const rows = await sql.query(text, vals);
   const me = await currentUser(req);
-  logAudit({ entityType:"lead", entityId:rows[0].id, action:"create", actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
+  logAudit({ entityType:"lead", entityId:rows[0].id, action:"create", actorId: me?.id, actorName:me?.name, actorEmail:me?.email, summary:`נוצר: ${d.name}` });
 
   // Notify whoever owns the public link the lead came through —
   // a coordinator (via coordinator_id) or, now that managers have
@@ -184,7 +184,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "אין הרשאה לערוך ליד זה" }, { status: 403 });
     }
     await sql`UPDATE leads SET status = ${d.status} WHERE id = ${id}`;
-    logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: d.status?`סטטוס: ${d.status}`:"עודכן" });
+    logAudit({ entityType:"lead", entityId:id, action:"update", actorId: me2?.id, actorName:me2?.name, actorEmail:me2?.email, summary: d.status?`סטטוס: ${d.status}`:"עודכן" });
     return NextResponse.json({ ok: true });
   }
 
@@ -234,7 +234,7 @@ export async function PATCH(req: NextRequest) {
   vals.push(id);
   const rows = await sql.query(`UPDATE leads SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`, vals);
   const summary = Object.keys(d).length === 2 && "status" in d ? `סטטוס: ${d.status}` : `עודכנו: ${Object.keys(d).filter(k => k !== "id").join(", ")}`;
-  logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary });
+  logAudit({ entityType:"lead", entityId:id, action:"update", actorId: me2?.id, actorName:me2?.name, actorEmail:me2?.email, summary });
   return NextResponse.json({ ok: true, lead: rows[0] });
 }
 
@@ -251,11 +251,11 @@ export async function DELETE(req: NextRequest) {
   }
   if (await hasColumn("leads", "deleted_at")) {
     await sql`UPDATE leads SET deleted_at=now() WHERE id=${id}`;
-    logAudit({ entityType:"lead", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
+    logAudit({ entityType:"lead", entityId:id, action:"delete", actorId: me?.id, actorName:me?.name, actorEmail:me?.email });
     return NextResponse.json({ ok: true, soft: true });
   }
   await sql`DELETE FROM leads WHERE id=${id}`;
-  logAudit({ entityType:"lead", entityId:id, action:"delete", actorName:me?.name, actorEmail:me?.email });
+  logAudit({ entityType:"lead", entityId:id, action:"delete", actorId: me?.id, actorName:me?.name, actorEmail:me?.email });
   return NextResponse.json({ ok: true, soft: false });
 }
 
