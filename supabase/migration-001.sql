@@ -585,3 +585,34 @@ ALTER TABLE expenses ADD COLUMN IF NOT EXISTS region_tag text;
 -- 2026-10-21: link a lead to the contact/partner who referred it (field-only system).
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS contact_id integer REFERENCES contacts(id);
 CREATE INDEX IF NOT EXISTS leads_contact_id_idx ON leads(contact_id);
+
+-- 2026-10-21: routines (manager rituals with coordinators) + occurrences. Also self-provisioned by lib/routines.ts.
+CREATE TABLE IF NOT EXISTS routines (
+  id serial PRIMARY KEY,
+  name text NOT NULL,
+  description text DEFAULT '',
+  frequency text NOT NULL DEFAULT 'weekly',   -- daily | weekly | monthly
+  weekday int,                                -- 0 = Sunday .. 6 = Saturday (weekly)
+  day_of_month int,                           -- monthly
+  time text,
+  participants int[] DEFAULT '{}',            -- coordinator ids; empty = everyone
+  agenda_template text DEFAULT '',
+  requires_doc boolean DEFAULT false,
+  linked_type text,                           -- NULL | 'weekly_report' | 'meeting'
+  active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS routine_occurrences (
+  id serial PRIMARY KEY,
+  routine_id int REFERENCES routines(id) ON DELETE CASCADE,
+  due_date date NOT NULL,
+  status text NOT NULL DEFAULT 'planned',     -- planned | done | missed | postponed
+  done_at timestamptz,
+  notes text DEFAULT '',
+  tasks_created int[] DEFAULT '{}',
+  attendees int[] DEFAULT '{}',
+  meeting_id int,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (routine_id, due_date)
+);
+CREATE INDEX IF NOT EXISTS routine_occurrences_due_idx ON routine_occurrences(due_date);

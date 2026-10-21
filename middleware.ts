@@ -51,6 +51,7 @@ const PATH_TO_MODULE: [string, string][] = [
   ["/api/tasks", "tasks"],
   ["/api/newsletter/audiences", "newsletters"],
   ["/api/expenses", "budget_main"],
+  ["/api/routines", "reports"],      // manager routines — admins write, coordinators read (reports row: coordinator = O)
   ["/api/audit-log", "audit_log"],
   ["/api/users", "settings_users"],
 ];
