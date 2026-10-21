@@ -35,46 +35,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ leads: [], aggregate: rows, status_only: true });
   }
 
-  const [soft, hasOwner] = await Promise.all([
+  const [soft, hasOwner, hasLeadSource, hasArrivalChannel] = await Promise.all([
     hasColumn("leads", "deleted_at"),
     hasColumn("leads", "owner_name"),
+    hasColumn("leads", "lead_source_id"),
+    hasColumn("leads", "arrival_channel_id"),
   ]);
 
-  let rows;
-  if (cid) {
-    const id = parseInt(cid);
-    rows = soft
-      ? await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.coordinator_id=${id} AND l.deleted_at IS NULL ORDER BY l.created_at DESC`
-      : await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.coordinator_id=${id} ORDER BY l.created_at DESC`;
-  } else if (hasOwner && soft) {
-    rows = await sql`SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.deleted_at IS NULL ORDER BY l.created_at DESC`;
-  } else if (hasOwner) {
-    rows = await sql`SELECT l.*, COALESCE(c.name, l.owner_name) as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
-  } else if (soft) {
-    rows = await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.deleted_at IS NULL ORDER BY l.created_at DESC`;
-  } else {
-    rows = await sql`SELECT l.*, c.name as owner_display FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
-  }
+  // Display labels joined in so the UI doesn't have to resolve ids itself.
+  // Optional joins are gated on hasColumn so a pending migration can't
+  // break the list (project rule #3).
+  const ownerExpr = hasOwner ? "COALESCE(c.name, l.owner_name)" : "c.name";
+  const extraSelect =
+    (hasLeadSource ? ", ls.label AS lead_source_label" : ", NULL AS lead_source_label") +
+    (hasArrivalChannel ? ", ac.label AS arrival_channel_label" : ", NULL AS arrival_channel_label");
+  const extraJoin =
+    (hasLeadSource ? " LEFT JOIN lead_sources ls ON ls.id = l.lead_source_id" : "") +
+    (hasArrivalChannel ? " LEFT JOIN arrival_channels ac ON ac.id = l.arrival_channel_id" : "");
+  const where: string[] = [];
+  const params: any[] = [];
+  if (cid) { params.push(parseInt(cid)); where.push(`l.coordinator_id = $${params.length}`); }
+  if (soft) where.push("l.deleted_at IS NULL");
+  const text = `
+    SELECT l.*, ${ownerExpr} AS owner_display, e.name AS event_name${extraSelect}
+    FROM leads l
+    LEFT JOIN coordinators c ON c.id = l.coordinator_id
+    LEFT JOIN events e ON e.id = l.event_id${extraJoin}
+    ${where.length ? "WHERE " + where.join(" AND ") : ""}
+    ORDER BY l.created_at DESC`;
+  const rows = await sql.query(text, params);
   return NextResponse.json({ leads: rows });
 }
 
-
-function scoreLead(d: any): number {
-  let score = 5;
-  if (d.age) {
-    const age = +d.age;
-    if (age >= 16 && age <= 20) score += 3;
-    else if (age >= 14 && age <= 22) score += 1;
-    else score -= 1;
-  }
-  if (d.interest === 'military') score += 2;
-  else if (d.interest === 'training') score += 1;
-  if (d.source === 'link') score += 1;
-  else if (d.source === 'event') score += 2;
-  const hotCities = ['ירושלים','בני ברק','מודיעין עילית','ביתר עילית'];
-  if (d.city && hotCities.some((c: string) => d.city.includes(c))) score += 1;
-  return Math.max(1, Math.min(10, score));
-}
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
@@ -87,9 +79,7 @@ export async function POST(req: NextRequest) {
       : await sql`SELECT id, name FROM leads WHERE phone = ${d.phone} LIMIT 1`;
     if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
   }
-  const score = scoreLead(d);
-  const [hasScore, hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel] = await Promise.all([
-    hasColumn("leads", "score"),
+  const [hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel] = await Promise.all([
     hasColumn("leads", "id_number"),
     hasColumn("leads", "owner_name"),
     hasColumn("leads", "email"),
@@ -108,7 +98,6 @@ export async function POST(req: NextRequest) {
   // (coordinator leads carry coordinator_id instead). Leads are not
   // managed here — they're entered and passed on to Salesforce.
   if (hasOwnerCol) { cols.push("owner_name"); vals.push(d.owner_name || ""); }
-  if (hasScore)    { cols.push("score");      vals.push(score); }
   if (hasEmail)    { cols.push("email");      vals.push(d.email||''); }
   if (hasIsParent) { cols.push("is_parent");  vals.push(!!d.is_parent); }
   if (hasLeadSource && d.lead_source_id) { cols.push("lead_source_id"); vals.push(d.lead_source_id); }
@@ -169,22 +158,79 @@ export async function POST(req: NextRequest) {
     } catch (e) { console.error("[silfrus sync]", e); }
   }
 
-  return NextResponse.json({ lead: rows[0], score });
+  return NextResponse.json({ lead: rows[0] });
 }
 
+/**
+ * Update a lead. A coordinator may only change the status of their own
+ * leads; an admin may edit every stored field (the admin leads page
+ * opens the full record for editing). Optional columns are written
+ * only when they exist (hasColumn) so a pending migration can't 500.
+ */
 export async function PATCH(req: NextRequest) {
-  const { id, status } = await req.json();
+  const d = await req.json();
+  const id = Number(d.id);
+  if (!id) return NextResponse.json({ error: "missing id" }, { status: 400 });
   const me2 = await currentUser(req);
-  if (me2?.role === "coordinator") {
+  if (!me2) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+
+  if (me2.role === "coordinator") {
     const [own] = await sql`SELECT id FROM coordinators WHERE user_id=${me2.id}`;
     const [lead] = await sql`SELECT coordinator_id FROM leads WHERE id=${id}`;
     if (!own || !lead || lead.coordinator_id !== own.id) {
       return NextResponse.json({ error: "אין הרשאה לערוך ליד זה" }, { status: 403 });
     }
+    await sql`UPDATE leads SET status = ${d.status} WHERE id = ${id}`;
+    logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: d.status?`סטטוס: ${d.status}`:"עודכן" });
+    return NextResponse.json({ ok: true });
   }
-  await sql`UPDATE leads SET status = ${status} WHERE id = ${id}`;
-  logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary: status?`סטטוס: ${status}`:"עודכן" });
-  return NextResponse.json({ ok: true });
+
+  const [hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel] = await Promise.all([
+    hasColumn("leads", "id_number"),
+    hasColumn("leads", "owner_name"),
+    hasColumn("leads", "email"),
+    hasColumn("leads", "is_parent"),
+    hasColumn("leads", "lead_source_id"),
+    hasColumn("leads", "arrival_channel_id"),
+  ]);
+
+  // Only columns present in the request body are touched.
+  const sets: string[] = [];
+  const vals: any[] = [];
+  const set = (col: string, val: any) => { vals.push(val); sets.push(`${col} = $${vals.length}`); };
+  if ("name" in d)           set("name", String(d.name || "").trim());
+  if ("phone" in d)          set("phone", String(d.phone || "").trim());
+  if ("city" in d)           set("city", d.city || "");
+  if ("age" in d)            set("age", d.age === "" || d.age == null ? null : Number(d.age));
+  if ("interest" in d)       set("interest", d.interest || "training");
+  if ("source" in d)         set("source", d.source || "manual");
+  if ("status" in d)         set("status", d.status || "new");
+  if ("event_id" in d)       set("event_id", d.event_id ? Number(d.event_id) : null);
+  if ("notes" in d)          set("notes", d.notes || "");
+  if ("coordinator_id" in d) set("coordinator_id", d.coordinator_id ? Number(d.coordinator_id) : null);
+  if (hasId && "id_number" in d)                 set("id_number", d.id_number || "");
+  if (hasOwnerCol && "owner_name" in d)          set("owner_name", d.owner_name || "");
+  if (hasEmail && "email" in d)                  set("email", d.email || "");
+  if (hasIsParent && "is_parent" in d)           set("is_parent", !!d.is_parent);
+  if (hasLeadSource && "lead_source_id" in d)    set("lead_source_id", d.lead_source_id ? Number(d.lead_source_id) : null);
+  if (hasArrivalChannel && "arrival_channel_id" in d) set("arrival_channel_id", d.arrival_channel_id ? Number(d.arrival_channel_id) : null);
+  if (!sets.length) return NextResponse.json({ error: "nothing to update" }, { status: 400 });
+
+  // Duplicate guard on phone/id change — same rule as creation.
+  if ("phone" in d || ("id_number" in d && hasId)) {
+    const phone = d.phone || "";
+    const idn = hasId ? (d.id_number || "") : "";
+    const dup = idn
+      ? await sql`SELECT id, name FROM leads WHERE id <> ${id} AND (phone = ${phone} OR id_number = ${idn}) LIMIT 1`
+      : phone ? await sql`SELECT id, name FROM leads WHERE id <> ${id} AND phone = ${phone} LIMIT 1` : [];
+    if (dup.length) return NextResponse.json({ error: "כפילות", duplicate: dup[0] }, { status: 409 });
+  }
+
+  vals.push(id);
+  const rows = await sql.query(`UPDATE leads SET ${sets.join(", ")} WHERE id = $${vals.length} RETURNING *`, vals);
+  const summary = Object.keys(d).length === 2 && "status" in d ? `סטטוס: ${d.status}` : `עודכנו: ${Object.keys(d).filter(k => k !== "id").join(", ")}`;
+  logAudit({ entityType:"lead", entityId:id, action:"update", actorName:me2?.name, actorEmail:me2?.email, summary });
+  return NextResponse.json({ ok: true, lead: rows[0] });
 }
 
 /** Soft delete a lead. */
