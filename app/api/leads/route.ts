@@ -36,11 +36,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ leads: [], aggregate: rows, status_only: true });
   }
 
-  const [soft, hasOwner, hasLeadSource, hasArrivalChannel] = await Promise.all([
+  const [soft, hasOwner, hasLeadSource, hasArrivalChannel, hasContact] = await Promise.all([
     hasColumn("leads", "deleted_at"),
     hasColumn("leads", "owner_name"),
     hasColumn("leads", "lead_source_id"),
     hasColumn("leads", "arrival_channel_id"),
+    hasColumn("leads", "contact_id"),
   ]);
 
   // Display labels joined in so the UI doesn't have to resolve ids itself.
@@ -49,10 +50,13 @@ export async function GET(req: NextRequest) {
   const ownerExpr = hasOwner ? "COALESCE(c.name, l.owner_name)" : "c.name";
   const extraSelect =
     (hasLeadSource ? ", ls.label AS lead_source_label" : ", NULL AS lead_source_label") +
-    (hasArrivalChannel ? ", ac.label AS arrival_channel_label" : ", NULL AS arrival_channel_label");
+    (hasArrivalChannel ? ", ac.label AS arrival_channel_label" : ", NULL AS arrival_channel_label") +
+    // Referring partner (signed referral link / manual pick) — label only, for the lead details.
+    (hasContact ? ", pc.name AS partner_name, pc.org AS partner_org" : ", NULL AS partner_name, NULL AS partner_org");
   const extraJoin =
     (hasLeadSource ? " LEFT JOIN lead_sources ls ON ls.id = l.lead_source_id" : "") +
-    (hasArrivalChannel ? " LEFT JOIN arrival_channels ac ON ac.id = l.arrival_channel_id" : "");
+    (hasArrivalChannel ? " LEFT JOIN arrival_channels ac ON ac.id = l.arrival_channel_id" : "") +
+    (hasContact ? " LEFT JOIN contacts pc ON pc.id = l.contact_id" : "");
   const where: string[] = [];
   const params: any[] = [];
   if (cid) { params.push(parseInt(cid)); where.push(`l.coordinator_id = $${params.length}`); }

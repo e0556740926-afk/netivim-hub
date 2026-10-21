@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
+import { accessLevel } from "@/lib/permission-matrix";
 
 /**
  * Bulk operations for a selected set of leads.
@@ -15,6 +16,14 @@ export async function POST(req: NextRequest) {
   if (!ids.length) return NextResponse.json({ error: "no ids" }, { status: 400 });
 
   const me = await currentUser(req);
+  // Bulk changes touch leads across coordinators, so they need org-wide
+  // write access (M/E). Own-scope roles (coordinator, advisor = "O") pass
+  // the middleware write gate but must not reach this route; delete
+  // additionally needs full access (M).
+  if (!me) return NextResponse.json({ error: "לא מורשה" }, { status: 401 });
+  const level = me.role === "admin" ? "M" : accessLevel({ id: me.id, role: me.role }, "leads");
+  if (level !== "M" && level !== "E") return NextResponse.json({ error: "אין הרשאה לפעולה קבוצתית על לידים" }, { status: 403 });
+  if (d.action === "delete" && level !== "M") return NextResponse.json({ error: "אין הרשאה למחיקת לידים" }, { status: 403 });
 
   if (d.action === "assign") {
     if (d.coordinator_id) {

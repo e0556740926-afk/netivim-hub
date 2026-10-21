@@ -36,7 +36,9 @@
 /* Sheets */
 .shell-sheet-back{position:fixed;inset:0;z-index:90;background:#0b271d66;display:flex;align-items:flex-end;justify-content:center}
 .shell-sheet{background:var(--sh-bg);width:100%;max-width:640px;max-height:92dvh;display:flex;flex-direction:column;border-radius:24px 24px 0 0;overflow:hidden;box-shadow:0 -8px 40px #16382626;outline:none;color:var(--sh-ink)}
-.shell-sheet-wide{max-width:760px}
+.shell-sheet-wide{max-width:820px}
+@media(min-width:768px){.shell-sheet-back.shell-sheet-back-side{justify-content:flex-end;align-items:stretch;padding:12px}.shell-sheet.shell-sheet-side{max-width:480px;max-height:none;height:100%;border-radius:20px}}
+@media(min-width:768px) and (prefers-reduced-motion:no-preference){.shell-sheet-side{animation:shell-side .2s ease-out}@keyframes shell-side{from{transform:translateX(-24px);opacity:.6}to{transform:none;opacity:1}}}
 @media(min-width:768px){.shell-sheet-back{align-items:center;padding:24px}.shell-sheet{border-radius:22px;max-height:86dvh}}
 @media(prefers-reduced-motion:no-preference){.shell-sheet{animation:shell-in .18s ease-out}@keyframes shell-in{from{transform:translateY(22px);opacity:.5}to{transform:none;opacity:1}}}
 .shell-sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 18px;background:#fff;border-bottom:1px solid var(--sh-line);flex-shrink:0}

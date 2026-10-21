@@ -1,179 +1,307 @@
 "use client"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import SfStatusBadge from "@/components/ui/SfStatusBadge"
 import Pagination, { usePagination } from "@/components/ui/Pagination"
-import { useSort, Th } from "@/components/ui/SortableTable"
+import { useSort } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
+import { usePathname, useRouter } from "next/navigation"
 import { useQuickAction } from "@/lib/quick-action"
-import EmptyState from "@/components/ui/EmptyState"
-import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/auth-context"
+import { accessLevel, levelAllowsWrite } from "@/lib/permission-matrix"
 import { fd } from "@/lib/utils"
-import Card from "@/components/ui/Card"
-import Button from "@/components/ui/Button"
-import Modal from "@/components/ui/Modal"
-import ExportButton from "@/components/ui/ExportButton"
 import AuditHistory from "@/components/ui/AuditHistory"
-import { SkeletonTable } from "@/components/ui/Skeleton"
 import ErrorState from "@/components/ui/ErrorState"
 import { useToast } from "@/components/ui/Toast"
+import Sheet from "@/components/shell/Sheet"
+import { Icon } from "@/components/shell/icons"
+import "@/components/leads/leads.css"
 
 // Field-only lead handling: leads are entered here (or via personal /
-// source links) and passed on to Salesforce. No scoring, no case
-// management — the record holds exactly what was typed in, and the
-// detail dialog lets a manager see and fix every one of those fields.
-const STATUS_LABEL: Record<string,string> = {
-  new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי"
-}
-const STATUS_COLORS: Record<string,{bg:string,color:string}> = {
-  new:{bg:"#DBEAFE",color:"#1E40AF"},
-  contacted:{bg:"#DCFCE7",color:"#166534"},
-  advanced:{bg:"#EDE9FE",color:"#5B21B6"},
-  irrelevant:{bg:"#FEE2E2",color:"#991B1B"}
-}
-const SOURCE_LABEL: Record<string,string> = { link:"לינק אישי", event:"אירוע", manual:"הזנה ידנית" }
-const INTEREST_LABEL: Record<string,string> = { training:"הכשרה / מסגרת", military:"שירות צבאי", other:"אחר" }
+// source / referral links) and passed on to Salesforce. The record holds
+// exactly what was typed in; the details panel shows and edits every one
+// of those fields. Statuses are the four existing ones — unchanged.
+const STATUS_LABEL: Record<string, string> = { new: "חדש", contacted: "יצרתי קשר", advanced: "עבר לשלב", irrelevant: "לא רלוונטי" }
+const STATUSES = Object.keys(STATUS_LABEL)
+const SOURCE_LABEL: Record<string, string> = { link: "לינק אישי", event: "אירוע", manual: "הזנה ידנית" }
+const INTEREST_LABEL: Record<string, string> = { training: "הכשרה / מסגרת", military: "שירות צבאי", other: "אחר" }
 
-const EMPTY_FORM = { firstName:"", lastName:"", phone:"", email:"", city:"", age:"", idNumber:"", notes:"", coordinator_id:"", owner_name:"", eventId:"", leadSourceId:"", arrivalChannelId:"", isParent:false }
-
+const EMPTY_FORM = { firstName: "", lastName: "", phone: "", email: "", city: "", age: "", idNumber: "", notes: "", coordinator_id: "", owner_name: "", eventId: "", leadSourceId: "", arrivalChannelId: "", isParent: false }
+type NewForm = typeof EMPTY_FORM
 type EditForm = {
-  name:string; phone:string; email:string; city:string; age:string; id_number:string;
-  interest:string; status:string; source:string; event_id:string; lead_source_id:string;
-  arrival_channel_id:string; assign:string; is_parent:boolean; notes:string
+  name: string; phone: string; email: string; city: string; age: string; id_number: string
+  interest: string; status: string; source: string; event_id: string; lead_source_id: string
+  arrival_channel_id: string; assign: string; is_parent: boolean; notes: string
 }
 
-function monthKey(d?: string) { return d ? d.slice(0,7) : "" }
-function waLink(phone?: string) { return `https://wa.me/972${(phone||"").replace(/^0/,"").replace(/-/g,"")}` }
+// Table columns. "name" is always shown; the rest can be toggled. Defaults
+// follow the plan: who handles it, status, where it came from, event, date.
+type ColKey = "owner" | "status" | "source" | "event" | "created" | "city" | "age" | "id_number" | "email"
+const COLS: { key: ColKey; label: string; sort: string; def: boolean }[] = [
+  { key: "owner", label: "אחראי לטיפול", sort: "owner_display", def: true },
+  { key: "status", label: "סטטוס", sort: "status", def: true },
+  { key: "source", label: "מקור וערוץ", sort: "lead_source_label", def: true },
+  { key: "event", label: "אירוע", sort: "event_name", def: true },
+  { key: "created", label: "תאריך יצירה", sort: "created_at", def: true },
+  { key: "city", label: "עיר", sort: "city", def: false },
+  { key: "age", label: "גיל", sort: "age", def: false },
+  { key: "id_number", label: "ת״ז", sort: "id_number", def: false },
+  { key: "email", label: "דוא״ל", sort: "email", def: false },
+]
+const COLS_KEY = "netivim-leads-columns" // column choice only — no personal data
+const DEFAULT_COLS = COLS.filter(c => c.def).map(c => c.key)
+
+const monthKey = (d?: string) => (d ? d.slice(0, 7) : "")
+const waLink = (phone?: string) => `https://wa.me/972${String(phone || "").replace(/^0/, "").replace(/[^0-9]/g, "")}`
+const none = <span className="lw-none">לא צוין</span>
+
+async function api(url: string, method: string, body?: unknown) {
+  let res: Response
+  try { res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined }) }
+  catch { throw Object.assign(new Error("אין חיבור לשרת. הפרטים נשמרו כאן — אפשר לנסות שוב."), { network: true }) }
+  let d: any = {}
+  try { d = await res.json() } catch {}
+  if (!res.ok || d.error) throw Object.assign(new Error(d.error || "הפעולה לא הושלמה. אפשר לנסות שוב."), { data: d, status: res.status })
+  return d
+}
 
 export default function AdminLeads() {
-  const { success, undoable } = useToast()
+  const { user } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { success, error: toastError, undoable } = useToast()
+  const level = user ? (user.role === "admin" ? "M" : accessLevel(user, "leads")) : "NONE"
+  const canWrite = !!user && user.role !== "viewer" && levelAllowsWrite(level)
+  const canBulk = level === "M" || level === "E"
+  const canDelete = level === "M"
+  const canExport = user?.role === "admin" // /api/export is admin-only on the server
+
   const [leads, setLeads] = useState<any[]>([])
+  const [aggregate, setAggregate] = useState<any[] | null>(null)
   const [coords, setCoords] = useState<any[]>([])
+  const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [events, setEvents] = useState<any[]>([])
   const [leadSources, setLeadSources] = useState<any[]>([])
   const [arrivalChannels, setArrivalChannels] = useState<any[]>([])
-  const [adminUsers, setAdminUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState(false)
+  const [staleError, setStaleError] = useState(false)
+
+  // Filters live in the URL (reload/back-safe, shareable).
+  const [q, setQ] = useUrlState("q")
+  const [filterOwner, setFilterOwner] = useUrlState("coord")
+  const [filterStatus, setFilterStatus] = useUrlState("status")
+  const [filterSource, setFilterSource] = useUrlState("source")
+  const [filterMonth, setFilterMonth] = useUrlState("month")
+
+  const [cols, setCols] = useState<ColKey[]>(DEFAULT_COLS)
+  const [colsOpen, setColsOpen] = useState(false)
+  const colsRef = useRef<HTMLDivElement>(null)
+
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkTarget, setBulkTarget] = useState("")
   const [bulkStatus, setBulkStatus] = useState("")
   const [bulkBusy, setBulkBusy] = useState(false)
-  const [loading, setLoading] = useState(true)
-  // "+ הוספה" → ליד חדש opens the existing add form and brings it into view.
-  useQuickAction(["lead"], () => {
-    setErr(""); setDupWarning(null); setShowForm(true)
-    setTimeout(() => document.getElementById("lead-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
-  })
-  const [error, setError] = useState(false)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({...EMPTY_FORM})
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState("")
-  const [dupWarning, setDupWarning] = useState<any>(null)
-  const [liveDupMatches, setLiveDupMatches] = useState<any[]>([])
-  const [filterCoord, setFilterCoord] = useUrlState("coord")
-  const [filterStatus, setFilterStatus] = useUrlState("status")
-  const [filterSource, setFilterSource] = useUrlState("source")
-  const [filterMonth, setFilterMonth] = useUrlState("month")
-  const [q, setQ] = useUrlState("q")
+  const [confirmDelete, setConfirmDelete] = useState<null | { ids: number[]; names: string[] }>(null)
 
-  // Detail dialog
-  const [openLead, setOpenLead] = useState<any>(null)
+  // New lead form — the draft stays in memory if the window is closed.
+  const [formOpen, setFormOpen] = useState(false)
+  const [form, setForm] = useState<NewForm>({ ...EMPTY_FORM })
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
+  const [formAlert, setFormAlert] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [dupBlock, setDupBlock] = useState<any>(null)
+  const [liveDup, setLiveDup] = useState<{ state: "idle" | "pending" | "done" | "failed"; matches: any[] }>({ state: "idle", matches: [] })
+
+  // Details panel
+  const [openId, setOpenId] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
   const [edit, setEdit] = useState<EditForm | null>(null)
   const [editErr, setEditErr] = useState("")
   const [editSaving, setEditSaving] = useState(false)
+  const openLead = openId ? leads.find(l => l.id === openId) || null : null
 
-  async function load() {
-    setLoading(true); setError(false)
+  // ── data ────────────────────────────────────────────────────
+  const load = useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true); else { setLoading(true); setError(false) }
     try {
       const [lr, ua, er, lsr, acr] = await Promise.all([
-        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events"), fetch("/api/admin/lead-sources"), fetch("/api/arrival-channels")
+        fetch("/api/leads"), fetch("/api/users/all"), fetch("/api/events"), fetch("/api/admin/lead-sources"), fetch("/api/arrival-channels"),
       ])
-      const { leads } = await lr.json()
-      const { coordinators, admins } = await ua.json()
-      const { events } = await er.json()
-      const { lead_sources } = await lsr.json()
-      const { arrival_channels } = await acr.json()
-      setLeads(leads||[])
-      setCoords(coordinators||[])
-      setEvents(events||[])
-      setAdminUsers(admins||[])
-      setLeadSources(lead_sources||[])
-      setArrivalChannels(arrival_channels||[])
-    } catch { setError(true) }
-    finally { setLoading(false) }
+      if (!lr.ok) throw new Error()
+      const ld = await lr.json()
+      const ud = ua.ok ? await ua.json() : {}
+      const ed = er.ok ? await er.json() : {}
+      const sd = lsr.ok ? await lsr.json() : {}
+      const cd = acr.ok ? await acr.json() : {}
+      setLeads(ld.leads || [])
+      setAggregate(ld.status_only ? ld.aggregate || [] : null)
+      setCoords(ud.coordinators || []); setAdminUsers(ud.admins || [])
+      setEvents(ed.events || []); setLeadSources(sd.lead_sources || []); setArrivalChannels(cd.arrival_channels || [])
+      setStaleError(false)
+    } catch {
+      if (silent) setStaleError(true); else setError(true)
+    } finally { setLoading(false); setRefreshing(false) }
+  }, [])
+  useEffect(() => { load() }, [load])
+
+  // Column preference (local, no PII)
+  useEffect(() => {
+    try { const v = JSON.parse(localStorage.getItem(COLS_KEY) || "null"); if (Array.isArray(v)) setCols(v.filter((k: string) => COLS.some(c => c.key === k))) } catch {}
+  }, [])
+  function toggleCol(k: ColKey) {
+    setCols(prev => {
+      const next = prev.includes(k) ? prev.filter(x => x !== k) : COLS.map(c => c.key).filter(x => x === k || prev.includes(x))
+      try { localStorage.setItem(COLS_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
   }
-
-  useEffect(()=>{ load() },[])
-  // Deep link from dashboard / coordinator card: /admin/leads?open=<id>
   useEffect(() => {
-    if (typeof window === "undefined" || !leads.length) return
-    const id = Number(new URLSearchParams(window.location.search).get("open"))
-    const l = id ? leads.find((x: any) => x.id === id) : null
-    if (l && !openLead) openDetail(l)
+    if (!colsOpen) return
+    const off = (e: MouseEvent) => { if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false) }
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setColsOpen(false) }
+    document.addEventListener("mousedown", off); document.addEventListener("keydown", key)
+    return () => { document.removeEventListener("mousedown", off); document.removeEventListener("keydown", key) }
+  }, [colsOpen])
+
+  // Deep link: /admin/leads?open=<id>
+  useEffect(() => {
+    if (loading || !leads.length) return
+    const url = new URL(window.location.href)
+    const id = Number(url.searchParams.get("open"))
+    if (!id) return
+    url.searchParams.delete("open")
+    window.history.replaceState(window.history.state, "", url.pathname + url.search)
+    if (leads.some(l => l.id === id)) openDetail(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leads])
+  }, [loading])
 
-  // Live duplicate warning while typing a new lead — non-blocking; the
-  // server still enforces the hard block on submit.
+  // "+ הוספה" (phone shell) → this same form
+  useQuickAction(["lead"], () => openForm(), !loading && canWrite)
+
+  // Live duplicate hint while typing — non-blocking; the server still
+  // blocks on save. A late answer for a value that has since changed is
+  // ignored, and a failed check never claims "no duplicate".
+  const dupSeq = useRef(0)
   useEffect(() => {
-    const phoneReady = form.phone.replace(/\D/g,"").length >= 9
+    const phoneReady = form.phone.replace(/\D/g, "").length >= 9
     const idReady = form.idNumber.length === 9
-    if (!phoneReady && !idReady) { setLiveDupMatches([]); return }
+    if (!formOpen || (!phoneReady && !idReady)) { setLiveDup({ state: "idle", matches: [] }); return }
+    const seq = ++dupSeq.current
+    setLiveDup(s => ({ ...s, state: "pending" }))
     const t = setTimeout(() => {
       const params = new URLSearchParams()
       if (phoneReady) params.set("phone", form.phone)
       if (idReady) params.set("id_number", form.idNumber)
-      fetch(`/api/leads/check-duplicate?${params}`).then(r=>r.json()).then(d=>setLiveDupMatches(d.matches||[])).catch(()=>{})
+      fetch(`/api/leads/check-duplicate?${params}`).then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => { if (seq === dupSeq.current) setLiveDup({ state: "done", matches: d.matches || [] }) })
+        .catch(() => { if (seq === dupSeq.current) setLiveDup({ state: "failed", matches: [] }) })
     }, 500)
     return () => clearTimeout(t)
-  }, [form.phone, form.idNumber])
+  }, [form.phone, form.idNumber, formOpen])
+
+  // ── filtering / counts ──────────────────────────────────────
+  const months = useMemo(() => Array.from(new Set(leads.map(l => monthKey(l.created_at)).filter(Boolean))).sort().reverse(), [leads])
+  const matchesBase = useCallback((l: any) => {
+    const needle = q.trim()
+    if (needle && !((l.name || "") + " " + (l.phone || "") + " " + (l.email || "") + " " + (l.city || "")).includes(needle)) return false
+    if (filterOwner) {
+      if (filterOwner.startsWith("admin_")) { if (l.coordinator_id || l.owner_name !== filterOwner.replace("admin_", "")) return false }
+      else if (String(l.coordinator_id) !== filterOwner) return false
+    }
+    if (filterSource && String(l.lead_source_id) !== filterSource) return false
+    if (filterMonth && monthKey(l.created_at) !== filterMonth) return false
+    return true
+  }, [q, filterOwner, filterSource, filterMonth])
+  const base = useMemo(() => leads.filter(matchesBase), [leads, matchesBase])
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: base.length }
+    for (const s of STATUSES) c[s] = 0
+    for (const l of base) if (c[l.status] !== undefined) c[l.status]++
+    if (aggregate) { c.all = 0; for (const r of aggregate) { c[r.status] = Number(r.n) || 0; c.all += Number(r.n) || 0 } }
+    return c
+  }, [base, aggregate])
+  const filteredRaw = useMemo(() => filterStatus ? base.filter(l => l.status === filterStatus) : base, [base, filterStatus])
+  const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "created_at", "desc")
+  const pg = usePagination(filtered, 50)
+  const hasFilters = !!(q || filterOwner || filterStatus || filterSource || filterMonth)
+  // One URL replace for all filters (several setters in a row would each rebuild from the same stale query).
+  const clearFilters = () => router.replace(pathname, { scroll: false })
+
+  // A changed search/filter clears the selection, so a bulk action never
+  // silently hits rows the user can no longer see. Paging keeps it.
+  const filterKey = [q, filterOwner, filterStatus, filterSource, filterMonth].join("|")
+  useEffect(() => { setSelected(new Set()); pg.setPage(1) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filterKey])
+
+  const ownerLabel = (v: string) => v.startsWith("admin_") ? v.replace("admin_", "") : coords.find(c => String(c.id) === v)?.name || v
+  const chips = [
+    q && { k: "q", label: `חיפוש: ${q}`, clear: () => setQ("") },
+    filterOwner && { k: "owner", label: `אחראי: ${ownerLabel(filterOwner)}`, clear: () => setFilterOwner("") },
+    filterStatus && { k: "status", label: `סטטוס: ${STATUS_LABEL[filterStatus] || filterStatus}`, clear: () => setFilterStatus("") },
+    filterSource && { k: "source", label: `מקור: ${leadSources.find(s => String(s.id) === filterSource)?.label || filterSource}`, clear: () => setFilterSource("") },
+    filterMonth && { k: "month", label: `חודש: ${filterMonth.slice(5, 7)}/${filterMonth.slice(0, 4)}`, clear: () => setFilterMonth("") },
+  ].filter(Boolean) as { k: string; label: string; clear: () => void }[]
+
+  const visibleCols = COLS.filter(c => cols.includes(c.key))
+  const sortCol = [{ sort: "name", label: "שם" }, ...COLS].find(c => c.sort === sortKey)
+  const sortHidden = sortKey && sortKey !== "name" && sortKey !== "phone" && !visibleCols.some(c => c.sort === sortKey)
+  const extraCols = cols.some(k => !DEFAULT_COLS.includes(k))
+
+  // ── actions ─────────────────────────────────────────────────
+  function openForm() {
+    // Any draft typed earlier is kept and shown again.
+    setFormAlert(""); setFormErrors({}); setDupBlock(null)
+    setFormOpen(true)
+  }
+  const formDirty = JSON.stringify(form) !== JSON.stringify(EMPTY_FORM)
 
   async function addLead() {
-    if (!form.firstName||!form.phone) { setErr("שם פרטי וטלפון הם שדות חובה"); return }
-    if (!form.coordinator_id && !form.owner_name) { setErr("יש לבחור את מי לשייך את הליד"); return }
-    if (!form.leadSourceId) { setErr("יש לבחור מקור פנייה"); return }
-    if (!form.arrivalChannelId) { setErr("יש לבחור ערוץ הגעה"); return }
-    setErr(""); setDupWarning(null); setSaving(true)
-    const fullName = `${form.firstName} ${form.lastName}`.trim()
-    const res = await fetch("/api/leads",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({
+    const errs: Record<string, string> = {}
+    if (!form.firstName.trim()) errs.firstName = "יש להזין שם פרטי"
+    if (!form.phone.trim()) errs.phone = "יש להזין טלפון"
+    if (!form.coordinator_id && !form.owner_name) errs.assign = "יש לבחור אחראי לטיפול"
+    if (!form.leadSourceId) errs.leadSourceId = "יש לבחור מקור פנייה"
+    if (!form.arrivalChannelId) errs.arrivalChannelId = "יש לבחור ערוץ הגעה"
+    setFormErrors(errs); setFormAlert(""); setDupBlock(null)
+    const first = ["firstName", "phone", "assign", "leadSourceId", "arrivalChannelId"].find(k => errs[k])
+    if (first) { document.getElementById(`lf-${first}`)?.focus(); return }
+    setSaving(true)
+    try {
+      await api("/api/leads", "POST", {
         coordinator_id: form.coordinator_id ? +form.coordinator_id : null,
-        owner_name: form.owner_name||"",
-        name: fullName,
-        phone: form.phone,
-        email: form.email,
-        city: form.city,
-        age: form.age ? +form.age : null,
-        id_number: form.idNumber,
-        notes: form.notes,
-        is_parent: form.isParent,
-        event_id: form.eventId || null,
-        lead_source_id: +form.leadSourceId,
-        arrival_channel_id: +form.arrivalChannelId,
-        source: form.eventId ? "event" : "manual"
+        owner_name: form.owner_name || "",
+        name: `${form.firstName} ${form.lastName}`.trim(),
+        phone: form.phone, email: form.email, city: form.city,
+        age: form.age ? +form.age : null, id_number: form.idNumber, notes: form.notes,
+        is_parent: form.isParent, event_id: form.eventId || null,
+        lead_source_id: +form.leadSourceId, arrival_channel_id: +form.arrivalChannelId,
+        source: form.eventId ? "event" : "manual",
       })
-    })
-    const d = await res.json()
-    setSaving(false)
-    if (d.error==="כפילות") { setDupWarning(d.duplicate); return }
-    if (d.error) { setErr(d.error); return }
-    setForm({...EMPTY_FORM}); setShowForm(false); load()
-    success("הליד נוסף")
+      setForm({ ...EMPTY_FORM }); setFormOpen(false)
+      success("הליד נוסף")
+      load(true)
+    } catch (e: any) {
+      if (e?.data?.error === "כפילות") { setDupBlock(e.data.duplicate || {}); document.getElementById("lf-phone")?.focus() }
+      else setFormAlert(e.message)
+    } finally { setSaving(false) }
   }
 
-  function openDetail(l: any) {
-    setOpenLead(l); setEditing(false); setEditErr("")
-    setEdit({
-      name: l.name||"", phone: l.phone||"", email: l.email||"", city: l.city||"",
-      age: l.age ?? "", id_number: l.id_number||"", interest: l.interest||"training",
-      status: l.status||"new", source: l.source||"manual",
+  function editFrom(l: any): EditForm {
+    return {
+      name: l.name || "", phone: l.phone || "", email: l.email || "", city: l.city || "",
+      age: l.age ?? "", id_number: l.id_number || "", interest: l.interest || "training",
+      status: l.status || "new", source: l.source || "manual",
       event_id: l.event_id ? String(l.event_id) : "",
       lead_source_id: l.lead_source_id ? String(l.lead_source_id) : "",
       arrival_channel_id: l.arrival_channel_id ? String(l.arrival_channel_id) : "",
-      assign: l.coordinator_id ? "coord_"+l.coordinator_id : l.owner_name ? "admin_"+l.owner_name : "",
-      is_parent: !!l.is_parent, notes: l.notes||"",
-    })
+      assign: l.coordinator_id ? "coord_" + l.coordinator_id : l.owner_name ? "admin_" + l.owner_name : "",
+      is_parent: !!l.is_parent, notes: l.notes || "",
+    }
+  }
+  function openDetail(id: number) {
+    const l = leads.find(x => x.id === id)
+    setOpenId(id); setEditing(false); setEditErr("")
+    if (l) setEdit(editFrom(l))
   }
 
   async function saveEdit() {
@@ -181,507 +309,408 @@ export default function AdminLeads() {
     if (!edit.name.trim() || !edit.phone.trim()) { setEditErr("שם וטלפון הם שדות חובה"); return }
     setEditErr(""); setEditSaving(true)
     const isCoord = edit.assign.startsWith("coord_")
-    const body = {
-      id: openLead.id,
-      name: edit.name, phone: edit.phone, email: edit.email, city: edit.city,
-      age: edit.age === "" ? null : +edit.age, id_number: edit.id_number,
-      interest: edit.interest, status: edit.status, source: edit.source,
-      event_id: edit.event_id || null,
-      lead_source_id: edit.lead_source_id || null,
-      arrival_channel_id: edit.arrival_channel_id || null,
-      coordinator_id: isCoord ? +edit.assign.replace("coord_","") : null,
-      owner_name: edit.assign.startsWith("admin_") ? edit.assign.replace("admin_","") : "",
-      is_parent: edit.is_parent, notes: edit.notes,
-    }
-    const res = await fetch("/api/leads",{ method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) })
-    const d = await res.json()
-    setEditSaving(false)
-    if (d.error==="כפילות") { setEditErr(`טלפון / ת.ז כבר קיימים אצל ${d.duplicate?.name||"ליד אחר"}`); return }
-    if (d.error) { setEditErr(d.error); return }
-    success("הליד עודכן")
-    setEditing(false)
-    await load()
-    // keep the dialog open on the refreshed record
-    setOpenLead((prev: any) => prev ? { ...prev, ...d.lead,
-      owner_display: isCoord ? coords.find(c=>c.id===+edit.assign.replace("coord_",""))?.name : body.owner_name,
-      event_name: events.find(e=>String(e.id)===edit.event_id)?.name || null,
-      lead_source_label: leadSources.find(s=>String(s.id)===edit.lead_source_id)?.label || null,
-      arrival_channel_label: arrivalChannels.find(c=>String(c.id)===edit.arrival_channel_id)?.label || null,
-    } : prev)
+    try {
+      await api("/api/leads", "PATCH", {
+        id: openLead.id,
+        name: edit.name, phone: edit.phone, email: edit.email, city: edit.city,
+        age: edit.age === "" ? null : +edit.age, id_number: edit.id_number,
+        interest: edit.interest, status: edit.status, source: edit.source,
+        event_id: edit.event_id || null, lead_source_id: edit.lead_source_id || null,
+        arrival_channel_id: edit.arrival_channel_id || null,
+        coordinator_id: isCoord ? +edit.assign.replace("coord_", "") : null,
+        owner_name: edit.assign.startsWith("admin_") ? edit.assign.replace("admin_", "") : "",
+        is_parent: edit.is_parent, notes: edit.notes,
+      })
+      success("הליד עודכן"); setEditing(false)
+      await load(true)
+    } catch (e: any) {
+      setEditErr(e?.data?.error === "כפילות" ? `טלפון / ת״ז כבר קיימים אצל ${e.data.duplicate?.name || "ליד אחר"}` : e.message)
+    } finally { setEditSaving(false) }
   }
 
   async function quickStatus(l: any, status: string) {
-    await fetch("/api/leads",{ method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id:l.id, status }) })
-    setLeads(ls => ls.map(x => x.id===l.id ? {...x, status} : x))
-    if (openLead?.id===l.id) setOpenLead((p:any)=>({...p, status}))
+    const prev = l.status
+    setLeads(ls => ls.map(x => x.id === l.id ? { ...x, status } : x))
+    try { await api("/api/leads", "PATCH", { id: l.id, status }) }
+    catch (e: any) { setLeads(ls => ls.map(x => x.id === l.id ? { ...x, status: prev } : x)); toastError(e.message) }
   }
 
   async function deleteLead(l: any) {
-    const res = await fetch("/api/leads",{ method:"DELETE", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id:l.id }) })
-    const d = await res.json()
-    setOpenLead(null)
-    setLeads(ls => ls.filter(x => x.id!==l.id))
-    if (d.soft) {
-      undoable(`${l.name} נמחק`, async () => {
-        await fetch("/api/leads",{ method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ id:l.id, restore:true }) })
-        load()
-      })
-    } else success("הליד נמחק")
+    try {
+      const d = await api("/api/leads", "DELETE", { id: l.id })
+      setOpenId(null)
+      setLeads(ls => ls.filter(x => x.id !== l.id))
+      if (d.soft) undoable(`${l.name} נמחק`, async () => { await api("/api/leads", "PUT", { id: l.id, restore: true }).catch(() => {}); load(true) })
+      else success("הליד נמחק")
+    } catch (e: any) { toastError(e.message) }
   }
 
-  const months = Array.from(new Set(leads.map(l => monthKey(l.created_at)).filter(Boolean))).sort().reverse()
-  const hasFilters = !!(q||filterCoord||filterStatus||filterSource||filterMonth)
-  const clearFilters = () => { setQ(""); setFilterCoord(""); setFilterStatus(""); setFilterSource(""); setFilterMonth("") }
-
-  const filteredRaw = leads.filter(l => {
-    if (q && !((l.name||"")+(l.phone||"")+(l.email||"")+(l.city||"")).includes(q)) return false
-    if (filterCoord) {
-      if (filterCoord.startsWith("admin_")) { if (l.coordinator_id || l.owner_name!==filterCoord.replace("admin_","")) return false }
-      else if (String(l.coordinator_id)!==filterCoord) return false
-    }
-    if (filterStatus && l.status!==filterStatus) return false
-    if (filterSource && String(l.lead_source_id)!==filterSource) return false
-    if (filterMonth && monthKey(l.created_at)!==filterMonth) return false
-    return true
-  })
-  const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "created_at", "desc")
-  const pg = usePagination(filtered, 50)
-
-  const thisMonth = monthKey(new Date().toISOString())
-  const countThisMonth = leads.filter(l => monthKey(l.created_at)===thisMonth).length
-
-  const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
-
-  if (error) return <div className="p-6"><ErrorState retry={load}/></div>
-
-  function assignSelect(value: string, onChange: (v: string) => void, cls = InputClass+" bg-white") {
-    return (
-      <select value={value} onChange={e=>onChange(e.target.value)} className={cls}>
-        <option value="">— ללא שיוך —</option>
-        <optgroup label="רכזים">
-          {coords.map((c:any)=><option key={c.id} value={"coord_"+c.id}>{c.name}</option>)}
-        </optgroup>
-        <optgroup label="מנהלים">
-          {adminUsers.map((a:any)=><option key={a.id} value={"admin_"+a.name}>👑 {a.name}</option>)}
-        </optgroup>
-      </select>
-    )
+  async function bulk(body: any, done: string) {
+    setBulkBusy(true)
+    try {
+      const d = await api("/api/leads/bulk", "POST", { ids: [...selected], ...body })
+      success(`${done} · ${d.count ?? selected.size} לידים`)
+      setSelected(new Set()); setBulkTarget(""); setBulkStatus(""); setConfirmDelete(null)
+      await load(true)
+    } catch (e: any) { toastError(e.message) } // selection is kept so the user can retry
+    finally { setBulkBusy(false) }
   }
 
-  const Field = ({ label, children, span }: { label:string; children:React.ReactNode; span?:boolean }) => (
-    <div className={span ? "sm:col-span-2" : ""}>
-      <div className="text-[11px] font-semibold text-[#64748B] mb-0.5">{label}</div>
-      <div className="text-sm text-[#0D2744] break-words">{children ?? "—"}</div>
-    </div>
+  // ── render helpers ──────────────────────────────────────────
+  function assignOptions(empty: string) {
+    return <>
+      <option value="">{empty}</option>
+      <optgroup label="רכזים">{coords.map((c: any) => <option key={c.id} value={"coord_" + c.id}>{c.name}</option>)}</optgroup>
+      <optgroup label="מנהלים">{adminUsers.map((a: any) => <option key={a.id} value={"admin_" + a.name}>{a.name} · מנהל</option>)}</optgroup>
+    </>
+  }
+  const ownerKind = (l: any) => l.coordinator_id ? "רכז" : l.owner_name ? "מנהל" : ""
+  const selectedOffPage = [...selected].filter(id => !pg.paged.some(l => l.id === id)).length
+  const pageAllSelected = pg.paged.length > 0 && pg.paged.every(l => selected.has(l.id))
+  const pageSomeSelected = pg.paged.some(l => selected.has(l.id))
+  const headCheck = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (headCheck.current) headCheck.current.indeterminate = pageSomeSelected && !pageAllSelected }, [pageSomeSelected, pageAllSelected])
+
+  const SortTh = ({ label, k }: { label: string; k: string }) => (
+    <th scope="col" aria-sort={sortKey === k ? (sortDir === "asc" ? "ascending" : "descending") : "none"}>
+      <button type="button" onClick={() => toggleSort(k)}>
+        {label}{sortKey === k ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+      </button>
+    </th>
   )
+  const statusPill = (l: any) => canWrite ? (
+    <select className={`lw-pill st-${l.status}`} value={l.status} onChange={e => quickStatus(l, e.target.value)} aria-label={`סטטוס של ${l.name}`}>
+      {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+    </select>
+  ) : <span className={`lw-pill st-${l.status}`}>{STATUS_LABEL[l.status] || l.status}</span>
+
+  if (error) return <div className="leads-ws"><ErrorState retry={() => load()} /></div>
+
+  const field = (id: string, label: string, node: React.ReactNode, opts: { full?: boolean; hint?: string } = {}) => (
+    <label className={`lf-field ${opts.full ? "full" : ""}`} data-invalid={!!formErrors[id]} htmlFor={`lf-${id}`}>
+      {label}{node}
+      {formErrors[id] ? <span className="lf-err" id={`lf-${id}-err`}>{formErrors[id]}</span> : opts.hint ? <span className="lf-hint">{opts.hint}</span> : null}
+    </label>
+  )
+  const setF = (k: keyof NewForm, v: any) => { setForm(f => ({ ...f, [k]: v })); if (formErrors[k]) setFormErrors(e => { const n = { ...e }; delete n[k]; return n }) }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-up">
+    <div className="leads-ws">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div className="lw-head">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0D2744]">לידים</h1>
-          <div className="text-sm text-[#64748B] mt-0.5">{leads.length} לידים סה&quot;כ · {countThisMonth} החודש</div>
+          <h1>לידים</h1>
+          <p>כל הפניות, השיוכים ומקורות ההגעה{aggregate ? "" : ` · ${leads.length} לידים`}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <ExportButton type="leads"/>
-          <Button onClick={()=>{setShowForm(v=>!v);setErr("");setDupWarning(null)}}>+ הוסף ליד</Button>
+        <div className="lw-head-actions">
+          {refreshing && <span className="lw-refresh" role="status">מעדכן…</span>}
+          {canExport && <button type="button" className="lw-btn" onClick={() => window.open("/api/export?type=leads", "_blank")} title="קובץ CSV של כל הלידים במערכת — ללא תלות בסינון">ייצוא CSV · כל הלידים</button>}
+          {canWrite && <button type="button" className="lw-btn lw-btn-primary" onClick={openForm}><Icon name="plus" size={18} />הוספת ליד</button>}
         </div>
       </div>
 
-      {/* Add form */}
-      {showForm && (
-        <div id="lead-form" className="scroll-mt-20"><Card className="mb-5 border-2 border-[#00488D]">
-          <div className="p-5">
-            <div className="text-sm font-bold text-[#00488D] mb-4">הוספת ליד חדש</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="text-xs font-semibold block mb-1">שם פרטי *</label>
-                <input value={form.firstName} onChange={e=>setForm(f=>({...f,firstName:e.target.value}))} placeholder="שם פרטי" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">שם משפחה</label>
-                <input value={form.lastName} onChange={e=>setForm(f=>({...f,lastName:e.target.value}))} placeholder="שם משפחה" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">טלפון *</label>
-                <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="050-0000000" type="tel" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">אימייל</label>
-                <input value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="name@example.com" type="email" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">שיוך ל *</label>
-                {assignSelect(
-                  form.coordinator_id ? "coord_"+form.coordinator_id : form.owner_name ? "admin_"+form.owner_name : "",
-                  v => setForm(f => ({ ...f,
-                    coordinator_id: v.startsWith("coord_") ? v.replace("coord_","") : "",
-                    owner_name: v.startsWith("admin_") ? v.replace("admin_","") : "" }))
-                )}
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">עיר</label>
-                <input value={form.city} onChange={e=>setForm(f=>({...f,city:e.target.value}))} placeholder="עיר מגורים" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">גיל</label>
-                <input value={form.age} onChange={e=>setForm(f=>({...f,age:e.target.value}))} placeholder="18" type="number" className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">ת.ז</label>
-                <input value={form.idNumber} onChange={e=>setForm(f=>({...f,idNumber:e.target.value}))} placeholder="000000000" maxLength={9} className={InputClass}/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">מקור פנייה *</label>
-                <select value={form.leadSourceId} onChange={e=>setForm(f=>({...f,leadSourceId:e.target.value}))} className={InputClass+" bg-white"}>
-                  <option value="">— בחר מקור —</option>
-                  {leadSources.filter((s:any)=>s.active).map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">ערוץ הגעה *</label>
-                <select value={form.arrivalChannelId} onChange={e=>setForm(f=>({...f,arrivalChannelId:e.target.value}))} className={InputClass+" bg-white"}>
-                  <option value="">— איך הגיע? —</option>
-                  {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-semibold block mb-1">נאסף באירוע (לא חובה)</label>
-                <select value={form.eventId} onChange={e=>setForm(f=>({...f,eventId:e.target.value}))} className={InputClass+" bg-white"}>
-                  <option value="">— לא באירוע —</option>
-                  {events.filter((e:any)=>["approved","marketing","done"].includes(e.status)).map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
-                </select>
-              </div>
-              <label className="flex items-center gap-2 text-sm mt-5 cursor-pointer">
-                <input type="checkbox" checked={form.isParent} onChange={e=>setForm(f=>({...f,isParent:e.target.checked}))} className="accent-[#00488D] w-4 h-4"/>
-                הפונה הוא הורה
-              </label>
-              <div className="sm:col-span-2">
-                <label className="text-xs font-semibold block mb-1">הערות</label>
-                <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} rows={2} placeholder="מידע נוסף..." className={InputClass+" resize-none"}/>
-              </div>
-            </div>
-            {dupWarning && (
-              <div className="bg-[#FEF3C7] text-[#B45309] rounded-[9px] px-3 py-2.5 text-xs font-semibold mb-3">
-                ⚠️ מספר זה כבר קיים — {dupWarning.name}. הליד לא נוצר.
+      {staleError && <div className="lw-banner" role="alert"><span>העדכון האחרון נכשל — מוצגים הנתונים הקודמים.</span><button type="button" className="lw-link" onClick={() => load(true)}>ניסיון חוזר</button></div>}
+
+      {/* Status bar — the status filter itself */}
+      <div className="lw-status" role="group" aria-label="סינון לפי סטטוס">
+        <button type="button" aria-pressed={!filterStatus} onClick={() => setFilterStatus("")}><span>הכול</span><b>{loading ? "–" : counts.all}</b></button>
+        {STATUSES.map(s => (
+          <button key={s} type="button" aria-pressed={filterStatus === s} onClick={() => setFilterStatus(filterStatus === s ? "" : s)} disabled={!!aggregate}>
+            <span>{STATUS_LABEL[s]}</span><b>{loading ? "–" : counts[s]}</b>
+          </button>
+        ))}
+      </div>
+
+      {aggregate ? (
+        <div className="lw-card"><div className="lw-empty"><b>תצוגה מצרפית</b>לפי ההרשאות שלך מוצגות כמויות לפי סטטוס בלבד, בלי פרטי אנשים.</div></div>
+      ) : <>
+        {/* Toolbar */}
+        <div className="lw-toolbar">
+          <label className="lw-search">
+            <Icon name="search" size={18} />
+            <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש לפי שם, טלפון, עיר או דוא״ל…" aria-label="חיפוש לידים" />
+          </label>
+          <select className="lw-select" value={filterOwner} onChange={e => setFilterOwner(e.target.value)} aria-label="אחראי לטיפול">
+            <option value="">כל האחראים</option>
+            <optgroup label="רכזים">{coords.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}</optgroup>
+            <optgroup label="מנהלים">{adminUsers.map((a: any) => <option key={a.id} value={"admin_" + a.name}>{a.name}</option>)}</optgroup>
+          </select>
+          <select className="lw-select" value={filterSource} onChange={e => setFilterSource(e.target.value)} aria-label="מקור פנייה">
+            <option value="">כל המקורות</option>
+            {leadSources.map((s: any) => <option key={s.id} value={String(s.id)}>{s.label}</option>)}
+          </select>
+          <select className="lw-select" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} aria-label="חודש">
+            <option value="">כל החודשים</option>
+            {months.map(m => <option key={m} value={m}>{m.slice(5, 7)}/{m.slice(0, 4)}</option>)}
+          </select>
+          <div className="lw-cols" ref={colsRef}>
+            <button type="button" className="lw-btn" aria-expanded={colsOpen} aria-haspopup="true" onClick={() => setColsOpen(o => !o)}>עמודות</button>
+            {colsOpen && (
+              <div className="lw-cols-pop" role="group" aria-label="בחירת עמודות">
+                {COLS.map(c => (
+                  <label key={c.key}><input type="checkbox" checked={cols.includes(c.key)} onChange={() => toggleCol(c.key)} />{c.label}</label>
+                ))}
+                <p>הבחירה נשמרת בדפדפן הזה בלבד ואינה משנה את הייצוא.</p>
+                <button type="button" className="lw-link" onClick={() => { setCols(DEFAULT_COLS); try { localStorage.removeItem(COLS_KEY) } catch {} }}>חזרה לברירת המחדל</button>
               </div>
             )}
-            {!dupWarning && liveDupMatches.length > 0 && (
-              <div className="bg-[#FEF3C7] text-[#B45309] rounded-[9px] px-3 py-2.5 text-xs font-semibold mb-3">
-                ⚠️ נמצאה התאמה אפשרית: {liveDupMatches.map((m:any)=>m.name).join(", ")} — בדוק שזה לא אותו אדם לפני שמירה
-              </div>
-            )}
-            {err && <div className="text-xs text-[#960010] mb-3 font-semibold">{err}</div>}
-            <div className="flex gap-2">
-              <Button onClick={addLead} disabled={saving}>{saving?"שומר...":"הוסף ליד"}</Button>
-              <Button variant="secondary" onClick={()=>setShowForm(false)}>ביטול</Button>
-            </div>
           </div>
-        </Card></div>
-      )}
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-4 flex-wrap items-center">
-        <div className="flex items-center gap-2 bg-white border border-[#E2E8F0] rounded-[9px] px-3 py-1.5">
-          <span className="text-[#94A3B8]">🔍</span>
-          <input value={q} onChange={e=>setQ(e.target.value)} placeholder="שם / טלפון / עיר..." className="text-sm outline-none bg-transparent w-36"/>
-          {q&&<button onClick={()=>setQ("")} className="text-[#94A3B8] text-xs">✕</button>}
         </div>
-        <select value={filterCoord} onChange={e=>setFilterCoord(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-          <option value="">כל השיוכים</option>
-          <optgroup label="רכזים">{coords.map(c=><option key={c.id} value={String(c.id)}>{c.name}</option>)}</optgroup>
-          <optgroup label="מנהלים">{adminUsers.map((a:any)=><option key={a.id} value={"admin_"+a.name}>👑 {a.name}</option>)}</optgroup>
-        </select>
-        <select value={filterSource} onChange={e=>setFilterSource(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-          <option value="">כל המקורות</option>
-          {leadSources.map((s:any)=><option key={s.id} value={String(s.id)}>{s.label}</option>)}
-        </select>
-        <select value={filterMonth} onChange={e=>setFilterMonth(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-          <option value="">כל החודשים</option>
-          {months.map(m=><option key={m} value={m}>{m.slice(5,7)}/{m.slice(0,4)}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-          <option value="">כל הסטטוסים</option>
-          {Object.entries(STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-        </select>
-        <span className="text-xs text-[#94A3B8]">{filtered.length} רשומות</span>
-        {hasFilters && <button onClick={clearFilters} className="text-xs text-[#00488D] font-semibold">נקה סינון</button>}
-      </div>
-
-      {/* Bulk actions toolbar */}
-      {selected.size > 0 && (
-        <div className="flex items-center gap-2 flex-wrap bg-[#0D2744] text-white rounded-[10px] px-3.5 py-2.5 mb-3">
-          <span className="text-sm font-semibold">{selected.size} נבחרו</span>
-          <select value={bulkTarget} onChange={e=>setBulkTarget(e.target.value)} className="text-xs px-2 py-1.5 rounded-[7px] bg-white/15 text-white border-none outline-none">
-            <option value="" className="text-black">שייך ל...</option>
-            <optgroup label="רכזים" className="text-black">
-              {coords.map((c:any)=><option key={c.id} value={"coord_"+c.id} className="text-black">{c.name}</option>)}
-            </optgroup>
-            <optgroup label="מנהלים" className="text-black">
-              {adminUsers.map((a:any)=><option key={a.id} value={"admin_"+a.name} className="text-black">👑 {a.name}</option>)}
-            </optgroup>
-          </select>
-          <button disabled={!bulkTarget||bulkBusy} onClick={async ()=>{
-              setBulkBusy(true)
-              const isCoord = bulkTarget.startsWith("coord_")
-              await fetch("/api/leads/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({ ids:[...selected], action:"assign",
-                  coordinator_id: isCoord ? +bulkTarget.replace("coord_","") : undefined,
-                  owner_name: isCoord ? undefined : bulkTarget.replace("admin_","") })})
-              setBulkBusy(false); setSelected(new Set()); setBulkTarget(""); success("השיוך עודכן"); load()
-            }}
-            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white text-[#0D2744] disabled:opacity-40">
-            {bulkBusy?"מעדכן...":"החל שיוך"}
-          </button>
-          <select value={bulkStatus} onChange={e=>setBulkStatus(e.target.value)} className="text-xs px-2 py-1.5 rounded-[7px] bg-white/15 text-white border-none outline-none">
-            <option value="" className="text-black">סטטוס...</option>
-            {Object.entries(STATUS_LABEL).map(([v,l])=><option key={v} value={v} className="text-black">{l}</option>)}
-          </select>
-          <button disabled={!bulkStatus||bulkBusy} onClick={async ()=>{
-              setBulkBusy(true)
-              await fetch("/api/leads/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({ ids:[...selected], action:"status", status: bulkStatus })})
-              setBulkBusy(false); setSelected(new Set()); setBulkStatus(""); success("הסטטוס עודכן"); load()
-            }}
-            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white text-[#0D2744] disabled:opacity-40">
-            החל סטטוס
-          </button>
-          <button disabled={bulkBusy} onClick={async ()=>{
-              if (!confirm(`למחוק ${selected.size} לידים?`)) return
-              setBulkBusy(true)
-              await fetch("/api/leads/bulk",{method:"POST",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({ ids:[...selected], action:"delete" })})
-              setBulkBusy(false); setSelected(new Set()); success("הלידים נמחקו"); load()
-            }}
-            className="px-3 py-1.5 rounded-[7px] text-xs font-bold bg-white/15 hover:bg-white/25">
-            מחק
-          </button>
-          <button onClick={()=>setSelected(new Set())} className="mr-auto text-xs text-white/60 hover:text-white">נקה בחירה</button>
+        <div className="lw-meta">
+          <div className="lw-chips">
+            {chips.map(c => <span key={c.k} className="lw-chip">{c.label}<button type="button" onClick={c.clear} aria-label={`הסרת ${c.label}`}>×</button></span>)}
+            {chips.length > 1 && <button type="button" className="lw-link" onClick={clearFilters}>איפוס מסננים</button>}
+          </div>
+          <span aria-live="polite">{loading ? "טוען…" : `${filtered.length} תוצאות${hasFilters ? ` מתוך ${leads.length}` : ""}`}</span>
         </div>
-      )}
 
-      {/* Table */}
-      {loading ? <SkeletonTable rows={6} cols={6}/> : (
-        <Card>
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+        {/* List */}
+        <div className="lw-card">
+          {sortHidden && <div className="lw-sortnote">ממוין לפי {sortCol?.label || sortKey}, עמודה שאינה מוצגת. <button type="button" className="lw-link" onClick={() => toggleSort("created_at")}>מיון לפי תאריך</button></div>}
+          <div className={`lw-table-wrap ${extraCols ? "is-wide" : ""}`}>
+            <table className="lw-table">
               <thead>
-                <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                  <th className="px-3 py-2.5 w-8">
-                    <input type="checkbox"
-                      checked={pg.paged.length>0 && pg.paged.every(l=>selected.has(l.id))}
-                      onChange={e=>{
-                        const next = new Set(selected)
-                        pg.paged.forEach(l=> e.target.checked ? next.add(l.id) : next.delete(l.id))
-                        setSelected(next)
-                      }}
-                      className="accent-[#00488D] w-3.5 h-3.5"/>
-                  </th>
-                  {[["שם","name"],["טלפון","phone"],["עיר","city"],["גיל","age"],
-                    ["מקור","lead_source_label"],["שיוך","owner_display"],["סטטוס","status"],
-                    ["תאריך","created_at"],["",""]].map(([label,key])=>(
-                    <Th key={label||"actions"} label={label} k={key||undefined} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort}/>
-                  ))}
+                <tr>
+                  {canBulk && <th className="lw-check" scope="col">
+                    <input ref={headCheck} type="checkbox" checked={pageAllSelected} aria-label="בחירת כל הלידים בעמוד הזה"
+                      onChange={e => { const next = new Set(selected); pg.paged.forEach(l => e.target.checked ? next.add(l.id) : next.delete(l.id)); setSelected(next) }} />
+                  </th>}
+                  <SortTh label="שם וטלפון" k="name" />
+                  {visibleCols.map(c => <SortTh key={c.key} label={c.label} k={c.sort} />)}
+                  <th scope="col" aria-label="פעולות" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.length===0 && (
-                  <tr><td colSpan={10}><EmptyState icon="⭐" title={hasFilters?"לא נמצאו לידים":"אין עדיין לידים"} hint={hasFilters?"נסה לשנות את הסינון":"לידים נכנסים מהלינק האישי של הרכזים, מלינקים של מקורות, מאירועים, או בהוספה ידנית"} actionLabel={hasFilters?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)} onClearFilters={hasFilters?clearFilters:undefined}/></td></tr>
+                {loading && Array.from({ length: 6 }).map((_, i) => <tr key={i}><td colSpan={visibleCols.length + 3} className="lw-skel" /></tr>)}
+                {!loading && filtered.length === 0 && (
+                  <tr><td colSpan={visibleCols.length + 3}>
+                    {hasFilters
+                      ? <div className="lw-empty"><b>לא נמצאו לידים מתאימים</b>אפשר לשנות את החיפוש או המסננים.<br /><button type="button" className="lw-link" onClick={clearFilters}>איפוס מסננים</button></div>
+                      : <div className="lw-empty"><b>אין עדיין לידים</b>לידים נכנסים מהלינק האישי של הרכזים, מלינקים של מקורות, מאירועים או בהוספה ידנית.{canWrite && <><br /><button type="button" className="lw-link" onClick={openForm}>+ הוספת ליד ראשון</button></>}</div>}
+                  </td></tr>
                 )}
-                {pg.paged.map(l => {
-                  const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
-                  return (
-                    <tr key={l.id} className={`border-b border-[#F1F5F9] last:border-0 hover:bg-[#F8FAFC] ${selected.has(l.id)?"!bg-[#F0F7FF]":""}`}>
-                      <td className="px-3 py-2.5">
-                        <input type="checkbox" checked={selected.has(l.id)}
-                          onChange={()=>{ const next = new Set(selected); next.has(l.id) ? next.delete(l.id) : next.add(l.id); setSelected(next) }}
-                          className="accent-[#00488D] w-3.5 h-3.5"/>
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div onClick={()=>openDetail(l)} className="font-semibold text-[#0D2744] cursor-pointer hover:underline hover:text-[#00488D]">{l.name}</div>
-                        {l.is_parent && <span className="text-[10px] text-[#B45309] font-semibold">הורה</span>}
-                      </td>
-                      <td className="px-3 py-2.5 text-[#475569]">
-                        <a href={waLink(l.phone)} target="_blank" className="hover:text-[#166534] transition-colors">{l.phone}</a>
-                      </td>
-                      <td className="px-3 py-2.5 text-[#475569]">{l.city||"—"}</td>
-                      <td className="px-3 py-2.5 text-[#475569]">{l.age||"—"}</td>
-                      <td className="px-3 py-2.5 text-xs text-[#475569]">{l.lead_source_label||SOURCE_LABEL[l.source]||"—"}</td>
-                      <td className="px-3 py-2.5 text-xs text-[#475569]">{l.owner_display||"—"}</td>
-                      <td className="px-3 py-2.5">
-                        <select value={l.status} onChange={e=>quickStatus(l, e.target.value)}
-                          style={{background:sc.bg,color:sc.color}} className="px-2 py-0.5 rounded-full text-xs font-semibold border-none outline-none cursor-pointer">
-                          {Object.entries(STATUS_LABEL).map(([v,lab])=><option key={v} value={v} className="text-black bg-white">{lab}</option>)}
-                        </select>
-                        <div className="mt-1"><SfStatusBadge lead={l}/></div>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs text-[#94A3B8] whitespace-nowrap">{fd(l.created_at?.slice(0,10))}</td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex gap-1">
-                          <button onClick={()=>openDetail(l)} className="px-2 py-1 rounded-[6px] text-xs bg-[#DBEAFE] text-[#1E40AF] font-semibold hover:bg-[#BFDBFE] whitespace-nowrap">פרטים</button>
-                          <a href={waLink(l.phone)} target="_blank" className="px-2 py-1 rounded-[6px] text-xs bg-[#DCFCE7] text-[#166534] font-semibold hover:bg-[#BBF7D0]">↗</a>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {!loading && pg.paged.map(l => (
+                  <tr key={l.id} className={selected.has(l.id) ? "is-selected" : ""}>
+                    {canBulk && <td className="lw-check">
+                      <input type="checkbox" checked={selected.has(l.id)} aria-label={`בחירת ${l.name}`}
+                        onChange={() => { const next = new Set(selected); next.has(l.id) ? next.delete(l.id) : next.add(l.id); setSelected(next) }} />
+                    </td>}
+                    <td>
+                      <button type="button" className="lw-name" onClick={() => openDetail(l.id)} title={l.name}>{l.name}{l.is_parent && <span className="lw-tag">הורה</span>}</button>
+                      <span className="lw-sub lw-ltr">{l.phone || "—"}</span>
+                    </td>
+                    {visibleCols.map(c => <td key={c.key}>{cell(c.key, l)}</td>)}
+                    <td>
+                      <div className="lw-actions">
+                        {l.phone && <a className="lw-iconlink wa" href={waLink(l.phone)} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp אל ${l.name}`}>WhatsApp</a>}
+                        <button type="button" className="lw-iconlink" onClick={() => openDetail(l.id)}>פרטים</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          <div className="hidden md:block">
-            <Pagination {...pg} onChange={pg.setPage}/>
-          </div>
 
-          {/* Mobile: cards */}
-          <div className="md:hidden divide-y divide-[#F1F5F9]">
-            {filtered.length === 0 && (
-              <EmptyState icon="⭐" title={hasFilters?"לא נמצאו לידים":"אין עדיין לידים"}
-                hint={hasFilters?"נסה לשנות את הסינון":"לידים נכנסים מהלינק האישי של הרכזים, מאירועים, או בהוספה ידנית"}
-                actionLabel={hasFilters?undefined:"+ הוסף ליד"} onAction={()=>setShowForm(true)}
-                onClearFilters={hasFilters?clearFilters:undefined}/>
-            )}
-            {pg.paged.map(l => {
-              const sc = STATUS_COLORS[l.status]||{bg:"#F3F4F6",color:"#374151"}
-              return (
-                <div key={l.id} className="p-3.5" onClick={()=>openDetail(l)}>
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-[#0D2744]">{l.name}</div>
-                      <div className="text-xs text-[#64748B] mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
-                        <span>{l.phone}</span>
-                        {l.city && <span>{l.city}</span>}
-                        {l.age && <span>גיל {l.age}</span>}
-                      </div>
-                      <div className="text-xs text-[#94A3B8] mt-0.5">
-                        {l.owner_display||"ללא שיוך"} · {l.lead_source_label||SOURCE_LABEL[l.source]||""} · {fd(l.created_at?.slice(0,10))}
-                      </div>
-                    </div>
-<div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span style={{background:sc.bg,color:sc.color}} className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0">
-                      {STATUS_LABEL[l.status]||l.status}
-                    </span>
-                    <SfStatusBadge lead={l}/>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-2.5" onClick={e=>e.stopPropagation()}>
-                    <a href={waLink(l.phone)} target="_blank" className="flex-1 text-center py-1.5 rounded-[8px] text-xs font-semibold bg-[#DCFCE7] text-[#166534]">↗ וואטסאפ</a>
-                    <button onClick={()=>openDetail(l)} className="flex-1 py-1.5 rounded-[8px] text-xs font-semibold bg-[#DBEAFE] text-[#1E40AF]">פרטים ועריכה</button>
-                  </div>
+          {/* Phone list */}
+          <div className="lw-mlist">
+            {loading && Array.from({ length: 4 }).map((_, i) => <div key={i} className="lw-skel" />)}
+            {!loading && filtered.length === 0 && <div className="lw-empty"><b>{hasFilters ? "לא נמצאו לידים מתאימים" : "אין עדיין לידים"}</b>{hasFilters && <button type="button" className="lw-link" onClick={clearFilters}>איפוס מסננים</button>}</div>}
+            {!loading && pg.paged.map(l => (
+              <div key={l.id} className="lw-mitem">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <button type="button" className="lw-name" onClick={() => openDetail(l.id)}>{l.name}{l.is_parent && <span className="lw-tag">הורה</span>}</button>
+                  <span className="lw-sub lw-ltr" style={{ textAlign: "right" }}>{l.phone}</span>
+                  <span className="lw-sub" style={{ whiteSpace: "normal" }}>{l.owner_display || "ללא שיוך"} · {l.lead_source_label || "מקור לא צוין"} · {fd(l.created_at?.slice(0, 10))}</span>
                 </div>
-              )
-            })}
-            <Pagination {...pg} onChange={pg.setPage}/>
+                <div className="lw-mitem-side">
+                  {statusPill(l)}
+                  <SfStatusBadge lead={l} />
+                  {l.phone && <a className="lw-iconlink wa" href={waLink(l.phone)} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+                </div>
+              </div>
+            ))}
           </div>
-        </Card>
+          <Pagination {...pg} onChange={p => { pg.setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }) }} />
+        </div>
+      </>}
+
+      {/* Bulk bar — appears only with a selection, floats so the layout doesn't jump */}
+      {canBulk && selected.size > 0 && (
+        <div className="lw-bulk" role="region" aria-label="פעולות על הלידים שנבחרו">
+          <strong>{selected.size} נבחרו</strong>
+          {selectedOffPage > 0 && <small>({selectedOffPage} בעמודים אחרים)</small>}
+          <select value={bulkTarget} onChange={e => setBulkTarget(e.target.value)} aria-label="שיוך לאחראי">{assignOptions("שיוך ל…")}</select>
+          <button type="button" className="lw-btn" disabled={!bulkTarget || bulkBusy}
+            onClick={() => { const isCoord = bulkTarget.startsWith("coord_"); bulk({ action: "assign", coordinator_id: isCoord ? +bulkTarget.replace("coord_", "") : undefined, owner_name: isCoord ? undefined : bulkTarget.replace("admin_", "") }, `השיוך עודכן ל${isCoord ? coords.find(c => "coord_" + c.id === bulkTarget)?.name : bulkTarget.replace("admin_", "")}`) }}>
+            {bulkBusy ? "מעדכן…" : "החלת שיוך"}
+          </button>
+          <select value={bulkStatus} onChange={e => setBulkStatus(e.target.value)} aria-label="סטטוס">
+            <option value="">סטטוס…</option>
+            {STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+          </select>
+          <button type="button" className="lw-btn" disabled={!bulkStatus || bulkBusy} onClick={() => bulk({ action: "status", status: bulkStatus }, `הסטטוס עודכן ל"${STATUS_LABEL[bulkStatus]}"`)}>החלת סטטוס</button>
+          {canDelete && <button type="button" className="lw-btn lw-btn-ghost" disabled={bulkBusy}
+            onClick={() => setConfirmDelete({ ids: [...selected], names: leads.filter(l => selected.has(l.id)).slice(0, 3).map(l => l.name) })}>מחיקה…</button>}
+          <span className="lw-spacer" />
+          <button type="button" className="lw-btn lw-btn-ghost" onClick={() => setSelected(new Set())}>ביטול בחירה</button>
+        </div>
       )}
 
-      {/* Detail / edit dialog — every stored field, exactly as entered */}
-      <Modal
-        open={!!openLead}
-        onClose={()=>setOpenLead(null)}
-        title={openLead?.name || ""}
-        subtitle={openLead ? `נוצר ${fd(openLead.created_at?.slice(0,10))} · ${SOURCE_LABEL[openLead.source]||openLead.source||""}` : undefined}
-        width="680px"
-        footer={openLead && (
-          editing ? (
-            <div className="flex gap-2 w-full justify-between items-center">
-              <div className="text-xs text-[#960010] font-semibold">{editErr}</div>
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={()=>{ setEditing(false); setEditErr(""); openDetail(openLead) }}>ביטול</Button>
-                <Button onClick={saveEdit} disabled={editSaving}>{editSaving?"שומר...":"שמור שינויים"}</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2 w-full justify-between items-center">
-              <button onClick={()=>{ if (confirm(`למחוק את ${openLead.name}?`)) deleteLead(openLead) }} className="text-xs text-[#960010] font-semibold hover:underline">מחק ליד</button>
-              <div className="flex gap-2">
-                <a href={waLink(openLead.phone)} target="_blank" className="px-3 py-2 rounded-[9px] text-sm font-semibold bg-[#DCFCE7] text-[#166534]">↗ וואטסאפ</a>
-                <Button onClick={()=>setEditing(true)}>✎ עריכה</Button>
-              </div>
-            </div>
-          )
-        )}
-      >
-        {openLead && !editing && (
-          <div className="space-y-5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-              <Field label="שם מלא">{openLead.name}</Field>
-              <Field label="טלפון"><a href={waLink(openLead.phone)} target="_blank" className="text-[#00488D] hover:underline">{openLead.phone}</a></Field>
-              <Field label="אימייל">{openLead.email || "—"}</Field>
-              <Field label="עיר">{openLead.city || "—"}</Field>
-              <Field label="גיל">{openLead.age || "—"}</Field>
-              <Field label="ת.ז">{openLead.id_number || "—"}</Field>
-              <Field label="תחום עניין">{INTEREST_LABEL[openLead.interest]||openLead.interest||"—"}</Field>
-              <Field label="סטטוס">
-                <span style={{background:(STATUS_COLORS[openLead.status]||{bg:"#F3F4F6"}).bg,color:(STATUS_COLORS[openLead.status]||{color:"#374151"}).color}} className="px-2 py-0.5 rounded-full text-xs font-semibold">{STATUS_LABEL[openLead.status]||openLead.status}</span>
-              </Field>
-              <Field label="סטטוס בסילפרוס">{openLead.sf_status ? <SfStatusBadge lead={openLead} detailed/> : <span className="text-[#94A3B8]">עוד לא סונכרן</span>}</Field>
-              <Field label="שיוך">{openLead.owner_display || "ללא שיוך"}</Field>
-              <Field label="מקור פנייה">{openLead.lead_source_label || "—"}</Field>
-              <Field label="ערוץ הגעה">{openLead.arrival_channel_label || "—"}</Field>
-              <Field label="דרך הכניסה למערכת">{SOURCE_LABEL[openLead.source]||openLead.source||"—"}</Field>
-              <Field label="נאסף באירוע">{openLead.event_name || "—"}</Field>
-              <Field label="הפונה הוא הורה">{openLead.is_parent ? "כן" : "לא"}</Field>
-              <Field label="נוצר בתאריך">{fd(openLead.created_at?.slice(0,10))}</Field>
-              <Field label="הערות" span>{openLead.notes ? <span className="whitespace-pre-wrap">{openLead.notes}</span> : "—"}</Field>
-            </div>
-            <AuditHistory entityType="lead" entityId={openLead.id}/>
-          </div>
-        )}
+      {/* Bulk delete confirmation */}
+      <Sheet open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`מחיקת ${confirmDelete?.ids.length || 0} לידים`} labelledBy="lw-del-title"
+        footer={<>
+          <button type="button" className="lw-btn lw-btn-danger-solid" disabled={bulkBusy} onClick={() => bulk({ action: "delete" }, "הלידים נמחקו")}>{bulkBusy ? "מוחק…" : `מחיקת ${confirmDelete?.ids.length || 0} לידים`}</button>
+          <button type="button" className="lw-btn" onClick={() => setConfirmDelete(null)}>ביטול</button>
+        </>}>
+        <p style={{ margin: 0, lineHeight: 1.8, fontSize: 14 }}>
+          הלידים יוסרו מהרשימה ומהדוחות.{" "}
+          {confirmDelete?.names.length ? <>ביניהם: <b>{confirmDelete.names.join(", ")}</b>{confirmDelete.ids.length > confirmDelete.names.length ? ` ועוד ${confirmDelete.ids.length - confirmDelete.names.length}` : ""}.</> : null}
+        </p>
+      </Sheet>
 
-        {openLead && editing && edit && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="text-xs font-semibold block mb-1">שם מלא *</label>
-              <input value={edit.name} onChange={e=>setEdit(f=>f&&({...f,name:e.target.value}))} className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">טלפון *</label>
-              <input value={edit.phone} onChange={e=>setEdit(f=>f&&({...f,phone:e.target.value}))} type="tel" className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">אימייל</label>
-              <input value={edit.email} onChange={e=>setEdit(f=>f&&({...f,email:e.target.value}))} type="email" className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">עיר</label>
-              <input value={edit.city} onChange={e=>setEdit(f=>f&&({...f,city:e.target.value}))} className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">גיל</label>
-              <input value={edit.age} onChange={e=>setEdit(f=>f&&({...f,age:e.target.value}))} type="number" className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">ת.ז</label>
-              <input value={edit.id_number} onChange={e=>setEdit(f=>f&&({...f,id_number:e.target.value}))} maxLength={9} className={InputClass}/></div>
-            <div><label className="text-xs font-semibold block mb-1">תחום עניין</label>
-              <select value={edit.interest} onChange={e=>setEdit(f=>f&&({...f,interest:e.target.value}))} className={InputClass+" bg-white"}>
-                {Object.entries(INTEREST_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select></div>
-            <div><label className="text-xs font-semibold block mb-1">סטטוס</label>
-              <select value={edit.status} onChange={e=>setEdit(f=>f&&({...f,status:e.target.value}))} className={InputClass+" bg-white"}>
-                {Object.entries(STATUS_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select></div>
-            <div><label className="text-xs font-semibold block mb-1">שיוך</label>
-              {assignSelect(edit.assign, v=>setEdit(f=>f&&({...f,assign:v})))}</div>
-            <div><label className="text-xs font-semibold block mb-1">מקור פנייה</label>
-              <select value={edit.lead_source_id} onChange={e=>setEdit(f=>f&&({...f,lead_source_id:e.target.value}))} className={InputClass+" bg-white"}>
-                <option value="">— ללא —</option>
-                {leadSources.map((s:any)=><option key={s.id} value={s.id}>{s.coordinator_id?"רכז: ":""}{s.label}</option>)}
-              </select></div>
-            <div><label className="text-xs font-semibold block mb-1">ערוץ הגעה</label>
-              <select value={edit.arrival_channel_id} onChange={e=>setEdit(f=>f&&({...f,arrival_channel_id:e.target.value}))} className={InputClass+" bg-white"}>
-                <option value="">— ללא —</option>
-                {arrivalChannels.map((c:any)=><option key={c.id} value={c.id}>{c.label}</option>)}
-              </select></div>
-            <div><label className="text-xs font-semibold block mb-1">דרך הכניסה למערכת</label>
-              <select value={edit.source} onChange={e=>setEdit(f=>f&&({...f,source:e.target.value}))} className={InputClass+" bg-white"}>
-                {Object.entries(SOURCE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
-              </select></div>
-            <div><label className="text-xs font-semibold block mb-1">נאסף באירוע</label>
-              <select value={edit.event_id} onChange={e=>setEdit(f=>f&&({...f,event_id:e.target.value}))} className={InputClass+" bg-white"}>
-                <option value="">— לא באירוע —</option>
-                {events.map((ev:any)=><option key={ev.id} value={ev.id}>{ev.name}{ev.date?` (${ev.date.slice(8,10)}.${ev.date.slice(5,7)})`:""}</option>)}
-              </select></div>
-            <label className="flex items-center gap-2 text-sm mt-5 cursor-pointer">
-              <input type="checkbox" checked={edit.is_parent} onChange={e=>setEdit(f=>f&&({...f,is_parent:e.target.checked}))} className="accent-[#00488D] w-4 h-4"/>
-              הפונה הוא הורה
-            </label>
-            <div className="sm:col-span-2"><label className="text-xs font-semibold block mb-1">הערות</label>
-              <textarea value={edit.notes} onChange={e=>setEdit(f=>f&&({...f,notes:e.target.value}))} rows={3} className={InputClass+" resize-none"}/></div>
+      {/* New lead */}
+      <Sheet open={formOpen} onClose={() => setFormOpen(false)} wide title="ליד חדש" subtitle="כל השדות המסומנים בכוכבית הם חובה" labelledBy="lw-form-title"
+        footer={<>
+          <button type="button" className="lw-btn lw-btn-primary" onClick={addLead} disabled={saving}>{saving ? "שומר…" : "שמירת ליד"}</button>
+          <button type="button" className="lw-btn" onClick={() => setFormOpen(false)}>סגירה</button>
+        </>}>
+        <form onSubmit={e => { e.preventDefault(); addLead() }} noValidate>
+          {formDirty && !saving && !formAlert && !dupBlock && Object.keys(formErrors).length === 0 && (
+            <div className="lf-draft"><span>הטיוטה נשמרת כל עוד הדף פתוח, גם אם סוגרים את החלון.</span><button type="button" className="lw-link" onClick={() => { setForm({ ...EMPTY_FORM }); setFormErrors({}) }}>ניקוי הטופס</button></div>
+          )}
+          {formAlert && <div className="lf-alert" role="alert">{formAlert}</div>}
+          <fieldset className="lf-section">
+            <legend>פרטי אדם</legend>
+            <div className="lf-grid">
+              {field("firstName", "שם פרטי *", <input id="lf-firstName" value={form.firstName} onChange={e => setF("firstName", e.target.value)} aria-invalid={!!formErrors.firstName} aria-describedby={formErrors.firstName ? "lf-firstName-err" : undefined} autoComplete="off" />)}
+              {field("lastName", "שם משפחה", <input id="lf-lastName" value={form.lastName} onChange={e => setF("lastName", e.target.value)} autoComplete="off" />)}
+              {field("phone", "טלפון *", <input id="lf-phone" className="lw-ltr" style={{ textAlign: "right" }} value={form.phone} onChange={e => setF("phone", e.target.value)} type="tel" inputMode="tel" placeholder="050-0000000" aria-invalid={!!formErrors.phone} />)}
+              {field("idNumber", "ת״ז", <input id="lf-idNumber" value={form.idNumber} onChange={e => setF("idNumber", e.target.value)} inputMode="numeric" maxLength={9} placeholder="000000000" />)}
+              {field("age", "גיל", <input id="lf-age" value={form.age} onChange={e => setF("age", e.target.value)} type="number" inputMode="numeric" />)}
+              {field("city", "עיר", <input id="lf-city" value={form.city} onChange={e => setF("city", e.target.value)} />)}
+              {field("email", "דוא״ל", <input id="lf-email" className="lw-ltr" style={{ textAlign: "right" }} value={form.email} onChange={e => setF("email", e.target.value)} type="email" />)}
+              <label className="lf-check"><input type="checkbox" checked={form.isParent} onChange={e => setF("isParent", e.target.checked)} />הפונה הוא הורה</label>
+            </div>
+            {dupBlock && <div className="lf-dup block" role="alert"><b>הליד לא נוצר:</b> הטלפון או הת״ז כבר קיימים{dupBlock.name ? ` אצל ${dupBlock.name}` : ""}. אפשר לתקן את הפרטים ולשמור שוב.</div>}
+            {!dupBlock && liveDup.state === "pending" && <div className="lf-dup pending" role="status">בודק אם הפונה כבר קיים…</div>}
+            {!dupBlock && liveDup.state === "done" && liveDup.matches.length > 0 && <div className="lf-dup warn" role="status">התאמה אפשרית: {liveDup.matches.map((m: any) => m.name).join(", ")}. כדאי לוודא שזה לא אותו אדם לפני שמירה.</div>}
+            {!dupBlock && liveDup.state === "failed" && <div className="lf-dup pending" role="status">לא ניתן היה לבדוק כפילות כרגע. המערכת תבדוק שוב בשמירה.</div>}
+          </fieldset>
+          <fieldset className="lf-section">
+            <legend>אחריות ומקור</legend>
+            <div className="lf-grid">
+              {field("assign", "אחראי לטיפול *",
+                <select id="lf-assign" value={form.coordinator_id ? "coord_" + form.coordinator_id : form.owner_name ? "admin_" + form.owner_name : ""} aria-invalid={!!formErrors.assign}
+                  onChange={e => { const v = e.target.value; setForm(f => ({ ...f, coordinator_id: v.startsWith("coord_") ? v.replace("coord_", "") : "", owner_name: v.startsWith("admin_") ? v.replace("admin_", "") : "" })); setFormErrors(er => { const n = { ...er }; delete n.assign; return n }) }}>
+                  {assignOptions("— בחירת רכז או מנהל —")}
+                </select>, { hint: "מי מטפל בפנייה. זה לא מקור הפנייה." })}
+              {field("leadSourceId", "מקור פנייה *",
+                <select id="lf-leadSourceId" value={form.leadSourceId} onChange={e => setF("leadSourceId", e.target.value)} aria-invalid={!!formErrors.leadSourceId}>
+                  <option value="">— בחירת מקור —</option>
+                  {leadSources.filter((s: any) => s.active).map((s: any) => <option key={s.id} value={s.id}>{s.coordinator_id ? "רכז: " : ""}{s.label}</option>)}
+                </select>)}
+              {field("arrivalChannelId", "ערוץ הגעה *",
+                <select id="lf-arrivalChannelId" value={form.arrivalChannelId} onChange={e => setF("arrivalChannelId", e.target.value)} aria-invalid={!!formErrors.arrivalChannelId}>
+                  <option value="">— איך הגיע? —</option>
+                  {arrivalChannels.map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>)}
+              {field("eventId", "נאסף באירוע",
+                <select id="lf-eventId" value={form.eventId} onChange={e => setF("eventId", e.target.value)}>
+                  <option value="">— לא באירוע —</option>
+                  {events.filter((e: any) => ["approved", "marketing", "done"].includes(e.status)).map((ev: any) => <option key={ev.id} value={ev.id}>{ev.name}{ev.date ? ` (${ev.date.slice(8, 10)}.${ev.date.slice(5, 7)})` : ""}</option>)}
+                </select>, { hint: "לא חובה" })}
+            </div>
+          </fieldset>
+          <fieldset className="lf-section" style={{ marginBottom: 0 }}>
+            <legend>מידע נוסף</legend>
+            {field("notes", "הערות", <textarea id="lf-notes" value={form.notes} onChange={e => setF("notes", e.target.value)} rows={3} />, { full: true })}
+          </fieldset>
+        </form>
+      </Sheet>
+
+      {/* Details — side panel; the list stays behind it with the same filters and scroll */}
+      <Sheet open={!!openId} onClose={() => { setOpenId(null); setEditing(false) }} variant="side" labelledBy="lw-detail-title"
+        title={openLead?.name || "פרטי ליד"}
+        subtitle={openLead ? `נוצר ${fd(openLead.created_at?.slice(0, 10))} · ${SOURCE_LABEL[openLead.source] || "דרך כניסה לא ידועה"}` : undefined}
+        headerExtra={openLead && !editing ? (
+          <div className="ld-top">
+            {statusPill(openLead)}
+            <SfStatusBadge lead={openLead} />
           </div>
+        ) : undefined}
+        footer={openLead ? (editing ? <>
+          <button type="button" className="lw-btn lw-btn-primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? "שומר…" : "שמירת שינויים"}</button>
+          <button type="button" className="lw-btn" onClick={() => { setEditing(false); setEditErr(""); setEdit(editFrom(openLead)) }}>ביטול</button>
+        </> : <>
+          {openLead.phone && <a className="lw-btn" href={waLink(openLead.phone)} target="_blank" rel="noopener noreferrer" style={{ color: "#1d6a3f" }}>WhatsApp</a>}
+          {canWrite && <button type="button" className="lw-btn lw-btn-primary" onClick={() => { setEdit(editFrom(openLead)); setEditing(true) }}>עריכה</button>}
+          {canWrite && <button type="button" className="lw-btn lw-btn-danger" onClick={() => { if (confirm(`למחוק את ${openLead.name}? אפשר לבטל מיד אחרי המחיקה.`)) deleteLead(openLead) }}>מחיקה</button>}
+        </>) : undefined}>
+        {!openLead && <div className="lw-empty"><b>הליד לא נמצא</b>ייתכן שנמחק או שאין לך הרשאה לראות אותו.</div>}
+        {openLead && !editing && <>
+          <section className="ld-sec" aria-labelledby="ld-contact">
+            <h3 id="ld-contact">פרטי קשר</h3>
+            <div className="ld-row"><span>טלפון</span><b className="lw-ltr">{openLead.phone ? <a href={`tel:${openLead.phone}`} style={{ color: "inherit" }}>{openLead.phone}</a> : none}</b></div>
+            <div className="ld-row"><span>דוא״ל</span><b className="lw-ltr">{openLead.email || none}</b></div>
+            <div className="ld-row"><span>עיר</span><b>{openLead.city || none}</b></div>
+            <div className="ld-row"><span>גיל</span><b>{openLead.age || none}</b></div>
+            <div className="ld-row"><span>ת״ז</span><b className="lw-ltr">{openLead.id_number || none}</b></div>
+            <div className="ld-row"><span>הפונה הוא הורה</span><b>{openLead.is_parent ? "כן" : "לא"}</b></div>
+          </section>
+          <section className="ld-sec" aria-labelledby="ld-owner">
+            <h3 id="ld-owner">אחריות ומקור</h3>
+            <div className="ld-row"><span>אחראי לטיפול</span><b>{openLead.owner_display ? `${openLead.owner_display} · ${ownerKind(openLead)}` : <span className="lw-none">ללא שיוך</span>}</b></div>
+            <div className="ld-row"><span>מקור פנייה</span><b>{openLead.lead_source_label || none}</b></div>
+            <div className="ld-row"><span>ערוץ הגעה</span><b>{openLead.arrival_channel_label || none}</b></div>
+            <div className="ld-row"><span>אירוע</span><b>{openLead.event_name || none}</b></div>
+            <div className="ld-row"><span>שותף מפנה</span><b>{openLead.partner_name ? `${openLead.partner_name}${openLead.partner_org ? ` · ${openLead.partner_org}` : ""}` : none}</b></div>
+            <div className="ld-row"><span>דרך הכניסה למערכת</span><b>{SOURCE_LABEL[openLead.source] || none}</b></div>
+            <div className="ld-row"><span>תחום עניין</span><b>{INTEREST_LABEL[openLead.interest] || openLead.interest || none}</b></div>
+          </section>
+          <section className="ld-sec" aria-labelledby="ld-notes">
+            <h3 id="ld-notes">הערות</h3>
+            {openLead.notes ? <p className="ld-notes">{openLead.notes}</p> : <p className="ld-notes lw-none">אין הערות</p>}
+          </section>
+          <section className="ld-sec ld-history" aria-label="היסטוריית שינויים"><AuditHistory entityType="lead" entityId={openLead.id} /></section>
+        </>}
+        {openLead && editing && edit && (
+          <form onSubmit={e => { e.preventDefault(); saveEdit() }} noValidate>
+            {editErr && <div className="lf-alert" role="alert">{editErr}</div>}
+            <div className="lf-grid">
+              <label className="lf-field full">שם מלא *<input value={edit.name} onChange={e => setEdit(f => f && ({ ...f, name: e.target.value }))} /></label>
+              <label className="lf-field">טלפון *<input className="lw-ltr" style={{ textAlign: "right" }} value={edit.phone} onChange={e => setEdit(f => f && ({ ...f, phone: e.target.value }))} type="tel" /></label>
+              <label className="lf-field">ת״ז<input value={edit.id_number} onChange={e => setEdit(f => f && ({ ...f, id_number: e.target.value }))} maxLength={9} inputMode="numeric" /></label>
+              <label className="lf-field">דוא״ל<input className="lw-ltr" style={{ textAlign: "right" }} value={edit.email} onChange={e => setEdit(f => f && ({ ...f, email: e.target.value }))} type="email" /></label>
+              <label className="lf-field">עיר<input value={edit.city} onChange={e => setEdit(f => f && ({ ...f, city: e.target.value }))} /></label>
+              <label className="lf-field">גיל<input value={edit.age} onChange={e => setEdit(f => f && ({ ...f, age: e.target.value }))} type="number" /></label>
+              <label className="lf-field">סטטוס<select value={edit.status} onChange={e => setEdit(f => f && ({ ...f, status: e.target.value }))}>{STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></label>
+              <label className="lf-field full">אחראי לטיפול<select value={edit.assign} onChange={e => setEdit(f => f && ({ ...f, assign: e.target.value }))}>{assignOptions("— ללא שיוך —")}</select></label>
+              <label className="lf-field">מקור פנייה<select value={edit.lead_source_id} onChange={e => setEdit(f => f && ({ ...f, lead_source_id: e.target.value }))}><option value="">— ללא —</option>{leadSources.map((s: any) => <option key={s.id} value={s.id}>{s.coordinator_id ? "רכז: " : ""}{s.label}</option>)}</select></label>
+              <label className="lf-field">ערוץ הגעה<select value={edit.arrival_channel_id} onChange={e => setEdit(f => f && ({ ...f, arrival_channel_id: e.target.value }))}><option value="">— ללא —</option>{arrivalChannels.map((c: any) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
+              <label className="lf-field">נאסף באירוע<select value={edit.event_id} onChange={e => setEdit(f => f && ({ ...f, event_id: e.target.value }))}><option value="">— לא באירוע —</option>{events.map((ev: any) => <option key={ev.id} value={ev.id}>{ev.name}{ev.date ? ` (${ev.date.slice(8, 10)}.${ev.date.slice(5, 7)})` : ""}</option>)}</select></label>
+              <label className="lf-field">דרך הכניסה למערכת<select value={edit.source} onChange={e => setEdit(f => f && ({ ...f, source: e.target.value }))}>{Object.entries(SOURCE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+              <label className="lf-field">תחום עניין<select value={edit.interest} onChange={e => setEdit(f => f && ({ ...f, interest: e.target.value }))}>{Object.entries(INTEREST_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+              <label className="lf-check"><input type="checkbox" checked={edit.is_parent} onChange={e => setEdit(f => f && ({ ...f, is_parent: e.target.checked }))} />הפונה הוא הורה</label>
+              <label className="lf-field full">הערות<textarea value={edit.notes} onChange={e => setEdit(f => f && ({ ...f, notes: e.target.value }))} rows={4} /></label>
+            </div>
+          </form>
         )}
-      </Modal>
+      </Sheet>
     </div>
   )
+
+  function cell(k: ColKey, l: any): React.ReactNode {
+    switch (k) {
+      case "owner": return l.owner_display ? <><span>{l.owner_display}</span><span className="lw-sub">{ownerKind(l)}</span></> : <span className="lw-none">ללא שיוך</span>
+      case "status": return <>{statusPill(l)}<div style={{ marginTop: 4 }}><SfStatusBadge lead={l} /></div></>
+      case "source": return <><span>{l.lead_source_label || none}</span><span className="lw-sub">{l.arrival_channel_label || "ערוץ לא צוין"}</span></>
+      case "event": return l.event_name ? <span>{l.event_name}</span> : none
+      case "created": return <span className="lw-ltr" style={{ whiteSpace: "nowrap" }}>{fd(l.created_at?.slice(0, 10))}</span>
+      case "city": return l.city || none
+      case "age": return l.age || none
+      case "id_number": return l.id_number ? <span className="lw-ltr">{l.id_number}</span> : none
+      case "email": return l.email ? <span className="lw-ltr">{l.email}</span> : none
+    }
+  }
 }

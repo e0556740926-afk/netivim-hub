@@ -9,7 +9,7 @@ import { Icon } from "./icons"
  * close. Not a native <dialog> on purpose — existing page modals
  * (components/ui/Modal, z-100) must be able to stack above it.
  */
-export default function Sheet({ open, onClose, title, subtitle, children, footer, labelledBy, wide }: {
+export default function Sheet({ open, onClose, title, subtitle, children, footer, labelledBy, wide, variant = "sheet", headerExtra }: {
   open: boolean
   onClose: () => void
   title: string
@@ -18,6 +18,9 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
   footer?: React.ReactNode
   labelledBy?: string
   wide?: boolean
+  /** "side": a panel docked to the left edge from tablet width up (details next to a list). */
+  variant?: "sheet" | "side"
+  headerExtra?: React.ReactNode
 }) {
   const panel = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
@@ -59,12 +62,13 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
   if (!open) return null
   const titleId = labelledBy || "shell-sheet-title"
   return (
-    <div className="shell-sheet-back" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} dir="rtl">
-      <div ref={panel} className={`shell-sheet ${wide ? "shell-sheet-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+    <div className={`shell-sheet-back ${variant === "side" ? "shell-sheet-back-side" : ""}`} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} dir="rtl">
+      <div ref={panel} className={`shell-sheet ${wide ? "shell-sheet-wide" : ""} ${variant === "side" ? "shell-sheet-side" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <header className="shell-sheet-head">
           <div className="min-w-0">
             <h2 id={titleId}>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
+            {headerExtra}
           </div>
           <button type="button" className="shell-iconbtn" onClick={onClose} aria-label="סגירה">
             <Icon name="close" size={18} />

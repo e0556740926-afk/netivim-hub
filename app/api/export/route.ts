@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
+import { hasColumn } from "@/lib/schema";
 
 const TASK_STATUS: Record<string,string> = { todo:"לביצוע", inprogress:"בתהליך", waiting:"ממתין לתשובה", done:"בוצע" };
 const LEAD_STATUS: Record<string,string> = { new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי" };
@@ -69,7 +70,10 @@ export async function GET(req: NextRequest) {
     rows = await sql`SELECT name,org,role,phone,email,type,status,potential,last_contact,owner,notes FROM contacts ORDER BY name`;
     headers = ["שם","ארגון","תפקיד","טלפון","דואל","סוג","סטטוס","פוטנציאל","קשר אחרון","רכז","הערות"];
   } else if (type === "leads") {
-    rows = await sql`SELECT l.name,l.phone,l.age,l.city,l.interest,l.source,l.status,l.created_at,c.name as coordinator FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
+    // Deleted (soft) leads are not part of the export — the list never shows them either.
+    rows = (await hasColumn("leads", "deleted_at"))
+      ? await sql`SELECT l.name,l.phone,l.age,l.city,l.interest,l.source,l.status,l.created_at,c.name as coordinator FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id WHERE l.deleted_at IS NULL ORDER BY l.created_at DESC`
+      : await sql`SELECT l.name,l.phone,l.age,l.city,l.interest,l.source,l.status,l.created_at,c.name as coordinator FROM leads l LEFT JOIN coordinators c ON c.id=l.coordinator_id ORDER BY l.created_at DESC`;
     headers = ["שם","טלפון","גיל","עיר","עניין","מקור","סטטוס","תאריך","רכז"];
   } else if (type === "events") {
     rows = await sql`SELECT name,date,time,location,status,budget_planned,target_attendees,actual_attendees,leads_collected,approved,summary FROM events ORDER BY date`;
