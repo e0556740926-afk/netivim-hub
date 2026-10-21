@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { fd, pct, leadColor } from "@/lib/utils"
 import Speedometer from "@/components/ui/Speedometer"
 import { SkeletonCard } from "@/components/ui/Skeleton"
+import SfStatusBadge from "@/components/ui/SfStatusBadge"
 
 const STATUS_CYCLE: Record<string,string> = {
   new:"contacted", contacted:"advanced", advanced:"irrelevant", irrelevant:"new"
@@ -302,6 +303,7 @@ export default function CoordLeads() {
                       className="px-2 py-0.5 rounded-full text-xs font-bold cursor-pointer whitespace-nowrap">
                       {STATUS_LABEL[l.status]||l.status}
                     </span>
+                    <SfStatusBadge lead={l}/>
                     <a href={`https://wa.me/972${l.phone?.replace(/^0/,"").replace(/-/g,"")}`} target="_blank"
                       className="text-[10px] text-[#166534] font-semibold">↗ וואטסאפ</a>
                   </div>

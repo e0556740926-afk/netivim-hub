@@ -623,3 +623,19 @@ CREATE TABLE IF NOT EXISTS routine_occurrences (
   UNIQUE (routine_id, due_date)
 );
 CREATE INDEX IF NOT EXISTS routine_occurrences_due_idx ON routine_occurrences(due_date);
+
+-- ═══ Salesforce (סילפרוס) status sync — 2026-10-21 ═══
+-- A field lead lives in Salesforce as a Consultation_Process__c ("תהליך ייעוץ").
+-- These columns mirror its process status back onto the lead here.
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_record_id text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_status text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sub_status text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_advisor text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_framework text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_referral_destination text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_inactive_reason text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_light text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_updated_at timestamptz;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_synced_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leads_sf_record_id ON leads(sf_record_id) WHERE sf_record_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS integration_state (key text PRIMARY KEY, value text, updated_at timestamptz DEFAULT now());

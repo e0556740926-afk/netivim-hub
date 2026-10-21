@@ -1,4 +1,5 @@
 "use client"
+import SfStatusBadge from "@/components/ui/SfStatusBadge"
 import Pagination, { usePagination } from "@/components/ui/Pagination"
 import { useSort, Th } from "@/components/ui/SortableTable"
 import { useUrlState } from "@/lib/use-url-state"
@@ -507,6 +508,7 @@ export default function AdminLeads() {
                           style={{background:sc.bg,color:sc.color}} className="px-2 py-0.5 rounded-full text-xs font-semibold border-none outline-none cursor-pointer">
                           {Object.entries(STATUS_LABEL).map(([v,lab])=><option key={v} value={v} className="text-black bg-white">{lab}</option>)}
                         </select>
+                        <div className="mt-1"><SfStatusBadge lead={l}/></div>
                       </td>
                       <td className="px-3 py-2.5 text-xs text-[#94A3B8] whitespace-nowrap">{fd(l.created_at?.slice(0,10))}</td>
                       <td className="px-3 py-2.5">
@@ -549,9 +551,12 @@ export default function AdminLeads() {
                         {l.owner_display||"ללא שיוך"} · {l.lead_source_label||SOURCE_LABEL[l.source]||""} · {fd(l.created_at?.slice(0,10))}
                       </div>
                     </div>
+<div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <span style={{background:sc.bg,color:sc.color}} className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0">
                       {STATUS_LABEL[l.status]||l.status}
                     </span>
+                    <SfStatusBadge lead={l}/>
+                    </div>
                   </div>
                   <div className="flex gap-2 mt-2.5" onClick={e=>e.stopPropagation()}>
                     <a href={waLink(l.phone)} target="_blank" className="flex-1 text-center py-1.5 rounded-[8px] text-xs font-semibold bg-[#DCFCE7] text-[#166534]">↗ וואטסאפ</a>
@@ -605,6 +610,7 @@ export default function AdminLeads() {
               <Field label="סטטוס">
                 <span style={{background:(STATUS_COLORS[openLead.status]||{bg:"#F3F4F6"}).bg,color:(STATUS_COLORS[openLead.status]||{color:"#374151"}).color}} className="px-2 py-0.5 rounded-full text-xs font-semibold">{STATUS_LABEL[openLead.status]||openLead.status}</span>
               </Field>
+              <Field label="סטטוס בסילפרוס">{openLead.sf_status ? <SfStatusBadge lead={openLead} detailed/> : <span className="text-[#94A3B8]">עוד לא סונכרן</span>}</Field>
               <Field label="שיוך">{openLead.owner_display || "ללא שיוך"}</Field>
               <Field label="מקור פנייה">{openLead.lead_source_label || "—"}</Field>
               <Field label="ערוץ הגעה">{openLead.arrival_channel_label || "—"}</Field>
