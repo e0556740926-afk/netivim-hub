@@ -6,7 +6,7 @@ import { normalizePhoneKey, sendWhatsApp } from "@/lib/whatsapp";
 import { syncAssignedAndParticipants } from "@/lib/task-assignment";
 import { notifyAssignees, persistNotifyLog } from "@/lib/task-notify";
 import { CITIES, padId, type LeadDraft, type Person } from "./parse";
-import { getBotSettings } from "./settings";
+import { supportPhone } from "./settings";
 import type { BotDeps, BotUser, Draft, EventRow, LeadRow, TaskRow } from "./bot";
 
 /** Real (DB + network) implementation of BotDeps. */
@@ -240,8 +240,7 @@ export function makeBotDeps(opts: { userPhone: string; instancePhone?: string | 
     },
 
     async notifySupport(user, context) {
-      const s = await getBotSettings();
-      const to = s.support_phone || process.env.BOT_SUPPORT_PHONE || opts.instancePhone || "";
+      const to = await supportPhone();
       if (!to) return false;
       const msg = [
         "🙋 *בקשת תמיכה מהבוט*",

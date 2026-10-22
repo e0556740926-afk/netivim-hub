@@ -6,7 +6,7 @@ import { handleMessage } from "@/lib/whatsapp-bot/bot";
 import { findUserByPhone, makeBotDeps } from "@/lib/whatsapp-bot/bot-db";
 import { maskIdsInText } from "@/lib/whatsapp-bot/parse";
 import { sendBotReply } from "@/lib/whatsapp-bot/send";
-import { getBotSettings } from "@/lib/whatsapp-bot/settings";
+import { getBotSettings, supportPhone } from "@/lib/whatsapp-bot/settings";
 import { renderAsText } from "@/lib/whatsapp-bot/render";
 import { extractInput } from "@/lib/whatsapp-bot/extract";
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         await logMessage(phoneKey, "out", sent.mode === "buttons" ? r.text + (r.buttons?.length ? `\n[${r.buttons.map(b => b.label).join(" | ")}]` : "") : renderAsText(r),
           sent.id || null, "בוט", sent.ok ? "sent" : "failed", sent.mode === "buttons" ? "button" : "text", sent.error ? { error: String(sent.error).slice(0, 300) } : null);
         if (sent.disabledButtons) {
-          const to = settings.support_phone || process.env.BOT_SUPPORT_PHONE || (ownWid ? ownWid.replace("@c.us", "") : "");
+          const to = await supportPhone(settings);
           if (to) await sendWhatsApp(to, "⚠️ *בוט נתיבים:* כפתורי הוואטסאפ נכשלו 3 פעמים ברצף וכובו אוטומטית. הבוט ממשיך לעבוד עם טקסט ממוספר. אפשר להדליק אותם שוב במסך ההגדרות.");
         }
       }

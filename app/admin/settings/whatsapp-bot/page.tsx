@@ -73,6 +73,15 @@ export default function WhatsAppBotSettings() {
     else setError("השמירה נכשלה")
   }
 
+  const [hook, setHook] = useState("")
+  async function connectWebhook() {
+    setHook("מחבר…")
+    const r = await fetch("/api/admin/whatsapp-bot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "connect_webhook" }) })
+    const d = await r.json()
+    setHook(d.ok ? "✓ חובר" : `נכשל: ${d.error || ""}`)
+    if (d.ok) load()
+  }
+
   async function sendTest() {
     setTest("שולח…")
     const r = await fetch("/api/admin/whatsapp-bot", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "test" }) })
@@ -106,6 +115,15 @@ export default function WhatsAppBotSettings() {
       {error && <div style={{ color: T.bad, fontSize: 13, marginBottom: 10 }}>{error}</div>}
 
       <div style={card}>
+        <Row title="המספר של הבוט" sub={data.instance
+          ? (data.instance.webhookOk
+            ? <span style={{ color: T.ok }}>מחובר למערכת — הודעות נכנסות מגיעות לבוט.</span>
+            : <span style={{ color: T.warn }}>המספר עוד לא מחובר לבוט (webhook). לחצו "חבר" — פעם אחת אחרי החלפת מספר.</span>)
+          : "לא הצלחתי לקרוא את הגדרות Green API."}>
+          {data.instance?.phone && <span style={{ fontSize: 13, direction: "ltr" }}>{localPhone(data.instance.phone)}</span>}
+          {hook && <span style={{ fontSize: 12, color: hook.startsWith("✓") ? T.ok : T.slate }}>{hook}</span>}
+          {data.instance && !data.instance.webhookOk && <button onClick={connectWebhook} style={{ border: `1px solid ${T.blue}`, color: "#fff", background: T.blue, borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>חבר</button>}
+        </Row>
         <Row title="הבוט פעיל" sub="כבוי = הבוט לא עונה (ההודעות עדיין נרשמות).">
           <Toggle on={s.enabled} onChange={v => save({ enabled: v })} />
         </Row>
@@ -121,7 +139,7 @@ export default function WhatsAppBotSettings() {
           </select>
           <Toggle on={s.reminders_enabled} onChange={v => save({ reminders_enabled: v })} />
         </Row>
-        <Row title="מספר לבקשות תמיכה" sub="כפתור תמיכה בבוט שולח לכאן הודעה. ריק = המספר המחובר לבוט.">
+        <Row title="מספר לבקשות תמיכה" sub="כפתור תמיכה בבוט שולח לכאן הודעה. ריק = מנהל המערכת הראשון שיש לו טלפון.">
           <input value={support} onChange={e => setSupport(e.target.value)} onBlur={() => support !== (s.support_phone || "") && save({ support_phone: support })}
             placeholder="05X-XXXXXXX" inputMode="tel" style={{ width: 140, border: `1px solid ${T.border}`, borderRadius: 6, padding: "6px 8px", fontSize: 13, direction: "ltr", textAlign: "right" }} />
         </Row>

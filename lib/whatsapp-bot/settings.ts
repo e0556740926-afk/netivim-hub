@@ -153,3 +153,20 @@ export async function recordButtonResult(ok: boolean, s: BotSettings): Promise<b
     return false;
   }
 }
+
+/**
+ * Where support requests and bot alerts go: the number set on the settings
+ * screen, else BOT_SUPPORT_PHONE, else the first active admin with a phone.
+ * Never the bot's own number — that would just message itself.
+ */
+export async function supportPhone(s?: BotSettings): Promise<string> {
+  const settings = s || (await getBotSettings());
+  if (settings.support_phone) return settings.support_phone;
+  if (process.env.BOT_SUPPORT_PHONE) return process.env.BOT_SUPPORT_PHONE;
+  try {
+    const [u] = await sql`SELECT phone FROM users WHERE role = 'admin' AND status = 'active' AND COALESCE(phone,'') <> '' ORDER BY id LIMIT 1`;
+    return u?.phone || "";
+  } catch {
+    return "";
+  }
+}
