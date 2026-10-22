@@ -2,9 +2,10 @@
 import { ST, MONTHS_HE } from "./shared"
 import { Icon } from "@/components/shell/icons"
 
-export default function EventCard({e,spent,isEditing,isResults,selected,onToggleSelect,onEdit,onResults,onApprove,onManage,onDuplicate,onDelete,showCoordinator}:{
+export default function EventCard({e,spent,isEditing,isResults,selected,onToggleSelect,onEdit,onResults,onApprove,onManage,onRegistration,onDuplicate,onDelete,showCoordinator}:{
  e:any;spent:number;isEditing:boolean;isResults:boolean;selected?:boolean;onToggleSelect?:()=>void
  onEdit:()=>void;onResults:()=>void;onApprove?:()=>void;onManage:()=>void;onDuplicate:()=>void;onDelete:()=>void;showCoordinator?:boolean
+ onRegistration?:()=>void
 }){
  const budget=Number(e.budget_planned)||0,bp=budget>0?Math.round(spent/budget*100):0
  const leads=e.leads_from_event>0?e.leads_from_event:(e.leads_collected||0)
@@ -35,6 +36,7 @@ export default function EventCard({e,spent,isEditing,isResults,selected,onToggle
   <footer className="ui-event-actions">
    <button className="ui-btn ui-btn-sm" onClick={onEdit} aria-pressed={isEditing}>עריכת אירוע</button>
    <button className="ui-btn ui-btn-sm ui-btn-primary" onClick={onManage}><Icon name="people" size={15}/> נרשמים וספקים{e.checked_in_count>0?` · ${e.checked_in_count} הגיעו`:""}</button>
+   {onRegistration&&<button className="ui-btn ui-btn-sm" onClick={onRegistration}>טופס רישום ↗</button>}
    <button className="ui-btn ui-btn-sm" onClick={onResults} aria-pressed={isResults}>עדכון תוצאות</button>
    {onApprove&&pending&&<button className="ui-btn ui-btn-sm" onClick={onApprove}>✓ אישור אירוע</button>}
    <button className="ui-btn ui-btn-sm" onClick={onDuplicate}>שכפול</button>

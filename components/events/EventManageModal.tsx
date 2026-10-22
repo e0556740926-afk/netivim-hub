@@ -5,19 +5,21 @@ import Button from "@/components/ui/Button"
 import Modal from "@/components/ui/Modal"
 import { useToast } from "@/components/ui/Toast"
 import { EMPTY_ATTENDEE, EMPTY_VENDOR, VENDOR_CATEGORIES, InputClass } from "./shared"
+import EventRegistrationBuilder from './EventRegistrationBuilder'
 
 /**
  * Attendees + vendors management for one event. Owns its own fetching so
  * the admin and coordinator screens only pass the event and a reload
  * callback (counts shown on the card change when attendees change).
  */
-export default function EventManageModal({ event, onClose, onChanged }: {
+export default function EventManageModal({ event, onClose, onChanged, initialTab='attendees' }: {
   event: any | null
   onClose: () => void
   onChanged: () => void
+  initialTab?:'attendees'|'registration'
 }) {
   const { success, error: showError } = useToast()
-  const [tab, setTab] = useState<"attendees"|"vendors">("attendees")
+  const [tab, setTab] = useState<"attendees"|"vendors"|"registration">(initialTab)
   const [attendees, setAttendees] = useState<any[]>([])
   const [vendors, setVendors] = useState<any[]>([])
   const [newAttendee, setNewAttendee] = useState({...EMPTY_ATTENDEE})
@@ -36,7 +38,7 @@ export default function EventManageModal({ event, onClose, onChanged }: {
     try { const [a,v]=await Promise.all([uiRequest(`/api/events/${id}/attendees`),uiRequest(`/api/events/${id}/vendors`)]);if(version===loadVersion.current){setAttendees(a.attendees||[]);setVendors(v.vendors||[])} }
     catch {if(version===loadVersion.current)setLoadError(true)}finally{if(version===loadVersion.current)setLoading(false)}
   }
-  useEffect(()=>{setAttendees([]);setVendors([]);setTab("attendees");setNewAttendee({...EMPTY_ATTENDEE});setNewVendor({...EMPTY_VENDOR});setConfirmDelete(null);if(id)reload();return()=>{loadVersion.current++}},[id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{setAttendees([]);setVendors([]);setTab(initialTab);setNewAttendee({...EMPTY_ATTENDEE});setNewVendor({...EMPTY_VENDOR});setConfirmDelete(null);if(id)reload();return()=>{loadVersion.current++}},[id,initialTab]) // eslint-disable-line react-hooks/exhaustive-deps
   async function act(run:()=>Promise<void>) {
     if(busy)return
     setBusy(true)
@@ -60,15 +62,16 @@ export default function EventManageModal({ event, onClose, onChanged }: {
   })}
 
   return (
-    <><Modal open={event!==null} onClose={()=>{if(!busy)onClose()}} title={`נרשמים וספקים · ${event?.name||""}`} width="700px">
+    <><Modal open={event!==null} onClose={()=>{if(!busy)onClose()}} title={`ניהול אירוע · ${event?.name||""}`} width={tab==='registration'?'1050px':'700px'}>
       {loadError&&<div className="ui-error" role="alert">לא ניתן לטעון את הרשומות. <button className="underline" onClick={reload}>ניסיון נוסף</button></div>}
       {loading&&<p className="ui-note mb-3" role="status">טוען רשומות…</p>}
       <div className="flex gap-2 p-1 bg-[#f4f6f2] rounded-[10px] mb-3">
         <button onClick={()=>setTab("attendees")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==="attendees"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>נרשמים ({attendees.length})</button>
         <button onClick={()=>setTab("vendors")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==="vendors"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>ספקים ({vendors.length})</button>
+        <button onClick={()=>setTab('registration')} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==='registration'?'bg-white text-[#193d33] shadow-sm':'text-[#63756b]'}`}>טופס רישום</button>
       </div>
 
-      {tab === "attendees" ? <>
+      {tab==='registration'&&event?<EventRegistrationBuilder key={event.id} event={event}/>:tab === "attendees" ? <>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-3">
           <input value={newAttendee.name} onChange={e=>setNewAttendee(a=>({...a,name:e.target.value}))} placeholder="שם *" className={InputClass}/>
           <input value={newAttendee.phone} onChange={e=>setNewAttendee(a=>({...a,phone:e.target.value}))} placeholder="טלפון" className={InputClass}/>
@@ -82,6 +85,8 @@ export default function EventManageModal({ event, onClose, onChanged }: {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold">{a.name}</div>
                   <div className="text-xs text-[#94A3B8]">{a.phone}{a.waitlisted?" · ברשימת המתנה":a.checked_in?" · הגיע/ה ✓":""}</div>
+                  {a.source==='registration'&&<div className="text-xs text-[#28634e]">נרשם דרך הטופס · {a.created_at?new Date(a.created_at).toLocaleString('he-IL'):''}</div>}
+                  {a.registration_fields?.length>0&&<details className="er-attendee-answers"><summary>פרטי ההרשמה</summary><dl>{a.registration_fields.map((f:any)=><div key={f.id}><dt>{f.label}</dt><dd>{typeof a.registration_answers?.[f.id]==='boolean'?(a.registration_answers[f.id]?'כן':'לא'):String(a.registration_answers?.[f.id]||'—')}</dd></div>)}</dl></details>}
                 </div>
                 {a.waitlisted && <button disabled={busy} onClick={()=>promoteAttendee(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#28634e] text-[#28634e]">קדם</button>}
                 <button disabled={busy} aria-label={`מחיקת המשתתף ${a.name}`} onClick={()=>setConfirmDelete({kind:"attendee",id:a.id,name:a.name})} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] text-[#94A3B8] hover:text-[#a74450]">✕</button>

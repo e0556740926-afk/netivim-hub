@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "@/lib/db";
 import { canTouchEvent } from "@/lib/event-access";
+import { registrationReady, registrationFailure } from '@/lib/event-registration-server';
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -21,6 +22,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const eid = parseInt(id);
   const d = await req.json();
   if (!d.name?.trim()) return NextResponse.json({ error: "שם הוא שדה חובה" }, { status: 400 });
+
+  if(await registrationReady()){
+    try{
+      const [result]=await sql`SELECT * FROM register_event_attendee(${eid},${d.name.trim()},${d.phone||''},${d.email||''},'manual',null::uuid,null::jsonb,null::jsonb,0,false)`;
+      const [attendee]=await sql`SELECT * FROM event_attendees WHERE id=${result.attendee_id} AND event_id=${eid}`;
+      return NextResponse.json({attendee,waitlisted:result.is_waitlisted});
+    }catch(e){return registrationFailure(e)}
+  }
 
   const evRows = await sql`SELECT capacity FROM events WHERE id=${eid} LIMIT 1`;
   const capacity: number | null = (evRows[0] as any)?.capacity || null;
@@ -46,14 +55,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   if (!d.id) return NextResponse.json({ error: "missing id" }, { status: 400 });
 
   if (d.promote) {
-    await sql`UPDATE event_attendees SET waitlisted=false WHERE id=${d.id}`;
+    await sql`UPDATE event_attendees SET waitlisted=false WHERE id=${d.id} AND event_id=${parseInt(eventIdParam)}`;
     return NextResponse.json({ ok: true });
   }
   if (typeof d.checked_in === "boolean") {
-    await sql`UPDATE event_attendees SET checked_in=${d.checked_in}, checked_in_at=${d.checked_in ? new Date().toISOString() : null} WHERE id=${d.id}`;
+    await sql`UPDATE event_attendees SET checked_in=${d.checked_in}, checked_in_at=${d.checked_in ? new Date().toISOString() : null} WHERE id=${d.id} AND event_id=${parseInt(eventIdParam)}`;
     return NextResponse.json({ ok: true });
   }
-  await sql`UPDATE event_attendees SET name=${d.name}, phone=${d.phone||''}, email=${d.email||''} WHERE id=${d.id}`;
+  await sql`UPDATE event_attendees SET name=${d.name}, phone=${d.phone||''}, email=${d.email||''} WHERE id=${d.id} AND event_id=${parseInt(eventIdParam)}`;
   return NextResponse.json({ ok: true });
 }
 
@@ -61,6 +70,6 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   const { id: eventIdParam } = await ctx.params;
   if (!(await canTouchEvent(req, parseInt(eventIdParam))).ok) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
   const { id } = await req.json();
-  await sql`DELETE FROM event_attendees WHERE id=${id}`;
+  await sql`DELETE FROM event_attendees WHERE id=${id} AND event_id=${parseInt(eventIdParam)}`;
   return NextResponse.json({ ok: true });
 }

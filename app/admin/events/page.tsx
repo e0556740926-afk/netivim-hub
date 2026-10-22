@@ -42,6 +42,7 @@ export default function EventsPage() {
 
   // Attendees/vendors management
   const [manageId, setManageId] = useState<number|null>(null)
+  const [manageTab,setManageTab]=useState<"attendees"|"registration">("attendees")
 
   // Insights
   const [showInsights, setShowInsights] = useState(false)
@@ -163,7 +164,7 @@ export default function EventsPage() {
       <div className="ui-event-filters"><input className="ui-input" type="search" aria-label="חיפוש אירוע" placeholder="חיפוש אירוע, מיקום או רכז…" value={search} onChange={e=>setSearch(e.target.value)}/><span className="ui-note">{filtered.length} אירועים בתצוגה</span></div>
 
       <EventInsightsModal open={showInsights} onClose={()=>setShowInsights(false)} insights={insights}/>
-      <EventManageModal event={manageEvent} onClose={()=>setManageId(null)} onChanged={load}/>
+      <EventManageModal initialTab={manageTab} event={manageEvent} onClose={()=>setManageId(null)} onChanged={load}/>
       <EventFormModal open={showNew || editId !== null} onClose={()=>{if(!saving){setEditId(null);setShowNew(false)}}}
         editEvent={editEvent} form={form} setForm={setForm} contacts={contacts} saving={saving} onSave={saveEdit}/>
       <EventResultsModal event={resultsEvent} results={results} setResults={setResults} saving={saving} onSave={saveResults} onClose={()=>{if(!saving)setResultsId(null)}}/>
@@ -219,7 +220,8 @@ export default function EventsPage() {
                 onEdit={()=>editId===e.id?setEditId(null):openEdit(e)}
                 onResults={()=>resultsId===e.id?setResultsId(null):openResults(e)}
                 onApprove={()=>approve(e.id)}
-                onManage={()=>setManageId(e.id)}
+                onManage={()=>{setManageTab("attendees");setManageId(e.id)}}
+              onRegistration={()=>{setManageTab("registration");setManageId(e.id)}}
                 onDuplicate={()=>duplicateEvent(e)}
                 onDelete={()=>deleteEvent(e.id)}
                 showCoordinator/>

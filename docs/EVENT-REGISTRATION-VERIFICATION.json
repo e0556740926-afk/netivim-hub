@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-22",
+  "tests": {
+    "passed": 132,
+    "new": 40
+  },
+  "typescript": "passed",
+  "schema": {
+    "project": "wandering-meadow-23191871",
+    "testBranch": "br-solitary-sea-ax6p0c72",
+    "productionBranch": "br-cool-shape-axjtgipq",
+    "productionMigrationApplied": true,
+    "productionAttendeesBefore": 0,
+    "productionAttendeesAfter": 0,
+    "productionFormsAfter": 0
+  },
+  "databaseChecks": [
+    "Migration applied twice in isolated branch",
+    "Duplicate phone with different formatting creates one attendee",
+    "Capacity overflow becomes waitlist",
+    "Manual registration shares capacity lock",
+    "Concurrent registrations for one place produce 1 confirmed and 1 waitlisted",
+    "Stale form version rejected by database",
+    "Closed registration rejected by database"
+  ],
+  "limits": [
+    "Next build blocked before compilation by Windows canonicalization permission",
+    "No browser layout verification or production form submissions"
+  ],
+  "gitPushPerformed": false
+}

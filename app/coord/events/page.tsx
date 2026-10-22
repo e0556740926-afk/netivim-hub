@@ -40,6 +40,7 @@ export default function CoordEvents() {
   const [resultsId, setResultsId] = useState<number|null>(null)
   const [results, setResults] = useState({...EMPTY_RESULTS})
   const [manageId, setManageId] = useState<number|null>(null)
+  const [manageTab,setManageTab]=useState<"attendees"|"registration">("attendees")
 
   const [showInsights, setShowInsights] = useState(false)
   const [insights, setInsights] = useState<any>(null)
@@ -149,7 +150,7 @@ export default function CoordEvents() {
     {!coordId && <div className="text-xs text-[#946014] bg-[#faf1e3] rounded-[8px] px-3 py-2 mt-2 mb-3">המשתמש שלך לא מקושר לרשומת רכז — פנה למנהל.</div>}
 
     <EventInsightsModal open={showInsights} onClose={()=>setShowInsights(false)} insights={insights} mode="coord"/>
-    <EventManageModal event={manageEvent} onClose={()=>setManageId(null)} onChanged={load}/>
+    <EventManageModal initialTab={manageTab} event={manageEvent} onClose={()=>setManageId(null)} onChanged={load}/>
     <EventFormModal open={showNew || editId !== null} onClose={()=>{if(!saving){setEditId(null);setShowNew(false)}}}
       editEvent={editEvent} form={form} setForm={setForm} contacts={contacts} saving={saving} onSave={saveEdit} mode="coord"/>
     <EventResultsModal event={resultsEvent} results={results} setResults={setResults} saving={saving} onSave={saveResults} onClose={()=>{if(!saving)setResultsId(null)}}/>
@@ -188,7 +189,8 @@ export default function CoordEvents() {
           onToggleSelect={()=>{ const next=new Set(selected); next.has(e.id)?next.delete(e.id):next.add(e.id); setSelected(next) }}
           onEdit={()=>editId===e.id?setEditId(null):openEdit(e)}
           onResults={()=>resultsId===e.id?setResultsId(null):openResults(e)}
-          onManage={()=>setManageId(e.id)}
+          onManage={()=>{setManageTab("attendees");setManageId(e.id)}}
+              onRegistration={()=>{setManageTab("registration");setManageId(e.id)}}
           onDuplicate={()=>duplicateEvent(e)}
           onDelete={()=>deleteEvent(e.id)}/>
       ))}
