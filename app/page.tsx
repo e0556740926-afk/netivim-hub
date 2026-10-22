@@ -15,8 +15,8 @@ export default function RootPage() {
   }, [user, loading])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8]">
-      <div className="text-[#64748B] text-sm">טוען...</div>
+    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f2]">
+      <div className="text-[#63756b] text-sm">טוען...</div>
     </div>
   )
 }

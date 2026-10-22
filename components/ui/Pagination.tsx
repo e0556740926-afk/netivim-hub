@@ -68,8 +68,8 @@ export default function Pagination({
   const btn = "min-w-[32px] h-8 px-2 rounded-[8px] text-xs font-semibold transition-colors"
 
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-[#E2E8F0] flex-wrap">
-      <div className="text-xs text-[#64748B]">
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5 border-t border-[#e1e8df] flex-wrap">
+      <div className="text-xs text-[#63756b]">
         מציג {from}–{to} מתוך {total}
       </div>
       <div className="flex items-center gap-1">
@@ -77,7 +77,7 @@ export default function Pagination({
           onClick={() => onChange(page - 1)}
           disabled={page === 1}
           aria-label="עמוד קודם"
-          className={`${btn} border border-[#E2E8F0] text-[#475569] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F0F7FF]`}
+          className={`${btn} border border-[#e1e8df] text-[#63756b] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#edf4eb]`}
         >
           ›
         </button>
@@ -91,8 +91,8 @@ export default function Pagination({
               aria-current={n === page ? "page" : undefined}
               className={
                 n === page
-                  ? `${btn} bg-[#0D2744] text-white`
-                  : `${btn} border border-[#E2E8F0] text-[#475569] hover:bg-[#F0F7FF]`
+                  ? `${btn} bg-[#193d33] text-white`
+                  : `${btn} border border-[#e1e8df] text-[#63756b] hover:bg-[#edf4eb]`
               }
             >
               {n}
@@ -103,7 +103,7 @@ export default function Pagination({
           onClick={() => onChange(page + 1)}
           disabled={page === pageCount}
           aria-label="עמוד הבא"
-          className={`${btn} border border-[#E2E8F0] text-[#475569] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#F0F7FF]`}
+          className={`${btn} border border-[#e1e8df] text-[#63756b] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#edf4eb]`}
         >
           ‹
         </button>

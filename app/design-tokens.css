@@ -1,0 +1,11 @@
+/* Netivim shared foundation. All workspace skins reference this palette. */
+:root {
+ --ui-bg:#f4f6f2;--ui-paper:#fff;--ui-ink:#193d33;--ui-muted:#63756b;
+ --ui-line:#e1e8df;--ui-brand:#28634e;--ui-brand-hover:#1d4e3d;
+ --ui-tint:#eaf1e7;--ui-nav:#143b31;--ui-gold:#ba9258;
+ --ui-danger:#a74450;--ui-warning:#946014;--ui-info:#356990;
+ --ui-radius:16px;--ui-shadow:0 6px 24px #193d3306;
+ --sh-navy:var(--ui-nav);--sh-green:var(--ui-brand);--sh-green-dark:var(--ui-brand-hover);
+ --sh-ink:var(--ui-ink);--sh-muted:var(--ui-muted);--sh-line:var(--ui-line);
+ --sh-bg:var(--ui-bg);--sh-tint:var(--ui-tint);--sh-red:var(--ui-danger);--sh-amber:var(--ui-warning);
+}

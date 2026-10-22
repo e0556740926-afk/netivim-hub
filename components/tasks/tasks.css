@@ -6,9 +6,9 @@
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   font-variant-numeric: tabular-nums;
 }
-.tasks-ws ::selection { background: #DBEAFE; color: #0D2744; }
-.tasks-ws :focus-visible { outline: 2px solid #00488D; outline-offset: 2px; border-radius: 8px; }
-.tasks-ws input, .tasks-ws textarea { caret-color: #00488D; }
+.tasks-ws ::selection { background: #eaf1e7; color: #193d33; }
+.tasks-ws :focus-visible { outline: 2px solid #28634e; outline-offset: 2px; border-radius: 8px; }
+.tasks-ws input, .tasks-ws textarea { caret-color: #28634e; }
 
 /* Pressables answer the finger. */
 .tasks-ws .press { transition: transform 140ms var(--ease-out), background-color 140ms ease, color 140ms ease, border-color 140ms ease; }
@@ -20,16 +20,16 @@
 
 /* Completion: the check fills, the title strikes through, then the row leaves. */
 .tasks-ws .check {
-  width: 22px; height: 22px; border-radius: 999px; border: 1.5px solid #CBD5E1; background: #fff;
+  width: 22px; height: 22px; border-radius: 999px; border: 1.5px solid #c6d2c7; background: #fff;
   display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer;
   transition: background-color 160ms var(--ease-out), border-color 160ms var(--ease-out), transform 160ms var(--ease-out);
 }
 .tasks-ws .check svg { opacity: 0; transform: scale(0.6); transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) {
-  .tasks-ws .check:hover { border-color: #00488D; }
+  .tasks-ws .check:hover { border-color: #28634e; }
   .tasks-ws .check:hover svg { opacity: 0.45; transform: scale(1); }
 }
-.tasks-ws .check.on { background: #166534; border-color: #166534; }
+.tasks-ws .check.on { background: #28634e; border-color: #28634e; }
 .tasks-ws .check.on svg { opacity: 1; transform: scale(1); }
 .tasks-ws .title { transition: color 180ms ease, text-decoration-color 180ms ease; text-decoration: line-through transparent; text-decoration-thickness: 1.5px; }
 .tasks-ws .title.done { color: #94A3B8; text-decoration-color: #94A3B8; }

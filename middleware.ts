@@ -14,6 +14,7 @@ const PUBLIC_API = [
   "/api/calendar.ics",      // secured by its own secret token in the path
   "/api/coord/slug",        // needed by the public lead form to resolve a slug
   "/api/lead-sources/slug", // needed by the public source-distribution link to resolve a slug
+  "/api/events/by-slug",   // public event form: GET resolves only public event metadata
   "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
   "/api/integrations/salesforce/status", // called by Make.com — authenticated by SF_SYNC_SECRET inside the route

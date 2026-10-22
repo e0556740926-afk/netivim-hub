@@ -56,14 +56,14 @@ export default function GlobalSearch() {
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full right-0 left-0 mt-1 mx-3 bg-white rounded-[11px] shadow-xl border border-[#E2E8F0] overflow-hidden z-50 max-h-72 overflow-y-auto">
+        <div className="absolute top-full right-0 left-0 mt-1 mx-3 bg-white rounded-[11px] shadow-xl border border-[#e1e8df] overflow-hidden z-50 max-h-72 overflow-y-auto">
           {results.map((r,i) => (
             <div key={i} onClick={()=>go(r)}
-              className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-[#F0F7FF] cursor-pointer border-b border-[#F1F5F9] last:border-0 transition-colors">
+              className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-[#edf4eb] cursor-pointer border-b border-[#edf1e9] last:border-0 transition-colors">
               <span className="text-base flex-shrink-0">{TYPE_ICON[r.type]||"📋"}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-[#0D2744] truncate">{r.name}</div>
-                {r.subtitle && <div className="text-xs text-[#64748B] truncate">{r.subtitle}</div>}
+                <div className="text-sm font-semibold text-[#193d33] truncate">{r.name}</div>
+                {r.subtitle && <div className="text-xs text-[#63756b] truncate">{r.subtitle}</div>}
               </div>
               <span className="text-xs text-[#94A3B8] flex-shrink-0">{TYPE_LABEL[r.type]}</span>
             </div>
@@ -71,7 +71,7 @@ export default function GlobalSearch() {
         </div>
       )}
       {open && q.length >= 2 && results.length === 0 && !loading && (
-        <div className="absolute top-full right-0 left-0 mt-1 mx-3 bg-white rounded-[11px] shadow-xl border border-[#E2E8F0] px-4 py-3 text-sm text-[#94A3B8] z-50">
+        <div className="absolute top-full right-0 left-0 mt-1 mx-3 bg-white rounded-[11px] shadow-xl border border-[#e1e8df] px-4 py-3 text-sm text-[#94A3B8] z-50">
           לא נמצאו תוצאות עבור "{q}"
         </div>
       )}

@@ -1,5 +1,6 @@
 "use client"
-import { usePathname, useRouter } from "next/navigation"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useEffect, useState } from "react"
 import Image from "next/image"
@@ -7,136 +8,67 @@ import GlobalSearch from "./GlobalSearch"
 import PushNotificationToggle from "@/components/ui/PushNotificationToggle"
 import PersonalLinkPopup from "./PersonalLinkPopup"
 import ViewAsControl from "./ViewAsControl"
+import { Icon, type IconName } from "@/components/shell/icons"
+import { ROLE_LABEL } from "@/components/shell/AppShell"
 
-type Item = { label: string; path: string; dot: string; badgeKey?: string }
-type Group = { key: "field" | "manage"; label: string; dot: string; items: Item[] }
-
-// Field-only system: everything that isn't field work (advisors team,
-// cases, institutions, call center, executive dashboards, statistics,
-// report builder) was removed — see git tag archive/full-crm-2026-10-21.
-const GROUPS: Group[] = [
-  {
-    key: "field", label: "שטח וקהילה", dot: "#34D399",
-    items: [
-      { label: "לידים", path: "/admin/leads", dot: "#34D399" },
-      { label: "אנשי קשר ושותפים", path: "/admin/contacts", dot: "#A78BFA" },
-      { label: "אירועים", path: "/admin/events", dot: "#F472B6", badgeKey: "pending" },
-      { label: "ניהול רכזים", path: "/admin/reports", dot: "#34D399", badgeKey: "missingReports" },
-      { label: "שגרות", path: "/admin/routines", dot: "#2DD4BF" },
-      { label: "לוח מובילים", path: "/admin/leaderboard", dot: "#FBBF24" },
-    ],
-  },
-  {
-    key: "manage", label: "ניהול", dot: "#FBBF24",
-    items: [
-      { label: "משימות", path: "/admin/tasks", dot: "#60A5FA", badgeKey: "late" },
-      { label: "לוח שנה", path: "/admin/calendar", dot: "#60A5FA" },
-      { label: "ניוזלטר", path: "/admin/newsletter", dot: "#C9A84C" },
-      { label: "מרכז דיוורים", path: "/admin/messaging", dot: "#C9A84C" },
-      { label: "הגדרות", path: "/admin/settings", dot: "#94A3B8" },
-    ],
-  },
+type Item={label:string;path:string;icon:IconName;badgeKey?:string}
+// Keep the current field-only navigation; archived CRM modules stay archived.
+const GROUPS:{key:string;label:string;items:Item[]}[]=[
+ {key:"field",label:"שטח וקהילה",items:[
+  {label:"לידים",path:"/admin/leads",icon:"lead"},
+  {label:"אנשי קשר ושותפים",path:"/admin/contacts",icon:"people"},
+  {label:"אירועים",path:"/admin/events",icon:"event",badgeKey:"pending"},
+  {label:"ניהול רכזים",path:"/admin/reports",icon:"team",badgeKey:"missingReports"},
+  {label:"שגרות",path:"/admin/routines",icon:"repeat"},
+  {label:"לוח מובילים",path:"/admin/leaderboard",icon:"trophy"},
+ ]},
+ {key:"manage",label:"כלי ניהול",items:[
+  {label:"משימות",path:"/admin/tasks",icon:"task",badgeKey:"late"},
+  {label:"לוח שנה",path:"/admin/calendar",icon:"calendar"},
+  {label:"ניוזלטר",path:"/admin/newsletter",icon:"mail"},
+  {label:"מרכז דיוורים",path:"/admin/messaging",icon:"send"},
+  {label:"הגדרות",path:"/admin/settings",icon:"settings"},
+ ]},
 ]
-
-export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const path = usePathname()
-  const router = useRouter()
-  const { user, logout } = useAuth()
-  const [badges, setBadges] = useState<Record<string,number>>({})
-  const [open, setOpen] = useState<Record<string, boolean>>({ field: true, manage: true })
-
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch("/api/dashboard")
-        const d = await res.json()
-        const today = new Date().toISOString().slice(0,10)
-        const pending = (d.events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval").length
-        const late = (d.tasks||[]).filter((t:any)=>t.status!=="done"&&t.due_date&&t.due_date<today).length
-        const reported = new Set((d.reports||[]).map((r:any)=>r.coordinator_id)).size
-        const missing = Math.max(0,(d.coordinators||[]).length-reported)
-        setBadges({ pending, late, missingReports:missing })
-      } catch {}
-    }
-    load()
-    const i = setInterval(load, 60000)
-    return () => clearInterval(i)
-  }, [])
-
-  function navigate(p: string) {
-    router.push(p)
-    onClose?.()
-  }
-
-  return (
-    <aside className="w-[220px] flex-shrink-0 bg-[#0D2744] flex flex-col h-screen overflow-y-auto">
-      <div className="px-4 py-4 border-b border-white/10 flex items-center justify-between">
-        <div>
-          <Image src="/netivim-logo.png" alt="נתיבים" width={120} height={38} className="brightness-0 invert" priority/>
-          <div className="text-[#60A5FA] text-[10px] mt-1 tracking-wide">מערכת ניהול שטח</div>
-        </div>
-        {onClose && (
-          <button onClick={onClose} className="md:hidden w-7 h-7 rounded-lg bg-white/10 text-white flex items-center justify-center text-sm hover:bg-white/20">✕</button>
-        )}
-      </div>
-
-      <GlobalSearch/>
-      <nav className="flex-1 px-2 py-3 flex flex-col gap-1">
-        <div onClick={() => navigate("/admin/dashboard")}
-          className={`flex items-center gap-2.5 px-3 py-3 rounded-[9px] cursor-pointer text-sm font-bold mb-1 ${
-            path === "/admin/dashboard" ? "bg-white/15 text-white" : "text-white/90 hover:bg-white/8"
-          }`}>
-          <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:"#60A5FA"}}/>
-          <span className="flex-1">דשבורד שטח</span>
-        </div>
-        <div className="h-px bg-white/10 my-1"/>
-        {GROUPS.map(g => (
-          <div key={g.key}>
-            <div onClick={() => setOpen(o => ({ ...o, [g.key]: !o[g.key] }))}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-[9px] cursor-pointer text-sm font-bold text-white/90 hover:bg-white/8">
-              <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{background:g.dot}}/>
-              <span className="flex-1">{g.label}</span>
-              <span className="text-white/40 text-xs">{open[g.key] ? "︿" : "﹀"}</span>
-            </div>
-            {open[g.key] && (
-              <div className="flex flex-col gap-0.5 pr-3 mb-1">
-                {g.items.map(n => (
-                  <div key={n.path} onClick={() => navigate(n.path)}
-                    className={`flex items-center gap-2.5 px-3 py-2 rounded-[9px] cursor-pointer text-[13px] transition-all ${
-                      (path === n.path || (n.path !== "/admin/newsletter" && path.startsWith(n.path + "/"))) ? "bg-white/15 text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"
-                    }`}>
-                    <span className="w-1.5 h-1.5 rounded-sm flex-shrink-0 opacity-80" style={{background:n.dot}}/>
-                    <span className="flex-1">{n.label}</span>
-                    {n.badgeKey && badges[n.badgeKey] > 0 && (
-                      <span className="w-5 h-5 rounded-full bg-[#960010] text-white text-[10px] flex items-center justify-center font-bold">
-                        {badges[n.badgeKey]}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </nav>
-
-      <div className="p-3 border-t border-white/10 space-y-2">
-        <ViewAsControl/>
-        <PersonalLinkPopup/>
-        <PushNotificationToggle/>
-        <div className="flex items-center gap-2.5 p-2.5 bg-white/8 rounded-[10px]">
-          <div className="w-8 h-8 rounded-full bg-[#60A5FA] text-[#0D2744] flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {user?.name?.split(" ").map((w:string)=>w[0]).join("")}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-semibold truncate">{user?.name}</div>
-            <div className="text-white/50 text-[10px]">
-              {user?.role==="admin" ? "מנהל" : user?.role==="coordinator"?"רכז":"צופה"}
-            </div>
-          </div>
-          <button onClick={logout} className="text-white/40 hover:text-white/80 text-xs transition-colors">יציאה</button>
-        </div>
-      </div>
-    </aside>
-  )
+export default function Sidebar({onClose}:{onClose?:()=>void}){
+ const path=usePathname(),{user,logout}=useAuth()
+ const [badges,setBadges]=useState<Record<string,number>>({})
+ const [open,setOpen]=useState<Record<string,boolean>>({field:true,manage:true})
+ useEffect(()=>{
+  let disposed=false
+  async function load(){try{
+   const res=await fetch("/api/dashboard");if(!res.ok)return
+   const d=await res.json(),today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"})
+   if(disposed)return
+   setBadges({pending:(d.events||[]).filter((e:any)=>!e.approved&&e.status==="pending_approval").length,
+    late:(d.tasks||[]).filter((t:any)=>t.status!=="done"&&t.due_date&&String(t.due_date).slice(0,10)<today).length,
+    missingReports:Math.max(0,(d.coordinators||[]).length-new Set((d.reports||[]).map((r:any)=>r.coordinator_id)).size)})
+  }catch{/* Badges are secondary; never block navigation on a failed refresh. */}}
+  load();const timer=setInterval(load,60000);return()=>{disposed=true;clearInterval(timer)}
+ },[])
+ function nav(item:Item){const active=path===item.path||path.startsWith(item.path+"/");return <Link key={item.path} href={item.path} onClick={onClose} className="ui-nav-link" aria-current={active?"page":undefined}>
+  <Icon name={item.icon} size={18}/><span>{item.label}</span>{item.badgeKey&&badges[item.badgeKey]>0&&<span className="ui-nav-badge">{badges[item.badgeKey]>99?"99+":badges[item.badgeKey]}</span>}
+ </Link>}
+ return <aside className="netivim-sidebar" aria-label="סרגל ניהול">
+  <div className="px-5 pt-7 pb-5 flex items-center justify-between">
+   <Link href="/admin/dashboard" onClick={onClose}><Image src="/netivim-logo.png" alt="נתיבים — דשבורד" width={122} height={39} className="brightness-0 invert" priority/><span className="block text-[10px] text-white/50 mt-2">מקום אחד. כל עבודת השטח.</span></Link>
+   {onClose&&<button type="button" onClick={onClose} aria-label="סגור ניווט" className="w-10 h-10 bg-white/10 rounded-lg">×</button>}
+  </div>
+  <GlobalSearch/>
+  <nav className="px-3 py-2" aria-label="ניווט ראשי">
+   {nav({label:"דשבורד שטח",path:"/admin/dashboard",icon:"home"})}
+   {GROUPS.map(g=><section key={g.key}>
+    <button type="button" className="ui-nav-group" aria-expanded={open[g.key]} aria-controls={`nav-${g.key}`} onClick={()=>setOpen(s=>({...s,[g.key]:!s[g.key]}))}><span>{g.label}</span><span aria-hidden="true">{open[g.key]?"−":"+"}</span></button>
+    <div id={`nav-${g.key}`} hidden={!open[g.key]}>{g.items.map(nav)}</div>
+   </section>)}
+  </nav>
+  <div className="ui-nav-footer">
+   <ViewAsControl/><PersonalLinkPopup/><PushNotificationToggle/>
+   <div className="flex items-center gap-2.5 p-2.5 bg-white/5 rounded-xl">
+    <span className="w-9 h-9 rounded-xl bg-[#dbe6ce] text-[#193d33] flex items-center justify-center text-xs font-bold shrink-0">{user?.name?.split(" ").filter(Boolean).map((w:string)=>w[0]).slice(0,2).join("")}</span>
+    <div className="flex-1 min-w-0"><div className="text-xs font-semibold truncate">{user?.name}</div><small className="text-[10px] text-white/50">{ROLE_LABEL[user?.role||""]||user?.role}</small></div>
+    <button onClick={logout} type="button" aria-label="יציאה מהמערכת" className="text-white/60 hover:text-white min-h-10 text-[11px]">יציאה</button>
+   </div>
+  </div>
+ </aside>
 }

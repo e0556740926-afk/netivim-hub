@@ -20,10 +20,10 @@ const EMPTY_ISSUE = { subject: "", intro: "", blocks: [{ title: "", text: "" }],
 
 const STATUS_LABEL: Record<string,string> = { draft: "טיוטה", scheduled: "מתוזמן", sent: "נשלח", failed: "נכשל" }
 const STATUS_COLOR: Record<string,{bg:string,color:string}> = {
-  draft: { bg:"#F3F4F6", color:"#374151" },
-  scheduled: { bg:"#FEF3C7", color:"#B45309" },
-  sent: { bg:"#DCFCE7", color:"#166534" },
-  failed: { bg:"#FEE2E2", color:"#991B1B" },
+  draft: { bg:"#F3F4F6", color:"#193d33" },
+  scheduled: { bg:"#faf1e3", color:"#946014" },
+  sent: { bg:"#eaf1e7", color:"#28634e" },
+  failed: { bg:"#faeeed", color:"#a74450" },
 }
 function fdt(d: string | null) {
   if (!d) return "—"
@@ -353,40 +353,40 @@ export default function AdminNewsletterPage() {
     <div className="p-4 md:p-6 lg:p-8 fade-up">
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0D2744]">ניוזלטר להורים</h1>
-          <div className="text-sm text-[#64748B] mt-0.5">רשימת תפוצה, כתיבה ושליחת גיליונות</div>
+          <h1 className="text-2xl font-extrabold text-[#193d33]">ניוזלטר להורים</h1>
+          <div className="text-sm text-[#63756b] mt-0.5">רשימת תפוצה, כתיבה ושליחת גיליונות</div>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <a href="/admin/messaging" className="text-sm font-semibold text-[#00488D] self-center">מרכז דיוורים — קהלים נוספים ←</a>
+          <a href="/admin/messaging" className="text-sm font-semibold text-[#28634e] self-center">מרכז דיוורים — קהלים נוספים ←</a>
           <a href="/newsletter/archive" target="_blank" rel="noreferrer"
-            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC] flex items-center">
+            className="px-4 py-2 border border-[#e1e8df] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#f7f9f5] flex items-center">
             📰 ארכיון ציבורי
           </a>
           <a href="/api/export?type=newsletter" target="_blank" rel="noreferrer"
-            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC] flex items-center">
+            className="px-4 py-2 border border-[#e1e8df] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#f7f9f5] flex items-center">
             ⬇ ייצוא CSV
           </a>
           <button onClick={() => setShowAdd(true)}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
+            className="px-4 py-2 border border-[#e1e8df] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#f7f9f5]">
             + הוסף הורה
           </button>
           <button onClick={() => setShowImport(true)}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
+            className="px-4 py-2 border border-[#e1e8df] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#f7f9f5]">
             📥 ייבוא מאקסל
           </button>
           <button onClick={() => setShowHistory(true)}
-            className="px-4 py-2 border border-[#E2E8F0] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#F8FAFC]">
+            className="px-4 py-2 border border-[#e1e8df] bg-white rounded-[10px] text-sm font-semibold hover:bg-[#f7f9f5]">
             📜 גיליונות {issues.length > 0 && `(${issues.length})`}
           </button>
           <button onClick={openNew}
-            className="px-4 py-2 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold hover:bg-[#00488D] transition-colors">
+            className="px-4 py-2 bg-[#193d33] text-white rounded-[10px] text-sm font-bold hover:bg-[#28634e] transition-colors">
             ✉ כתוב גיליון חדש
           </button>
         </div>
       </div>
 
       {!available && (
-        <div className="bg-[#FEF3C7] text-[#B45309] rounded-[10px] px-4 py-3 text-sm mb-4">
+        <div className="bg-[#faf1e3] text-[#946014] rounded-[10px] px-4 py-3 text-sm mb-4">
           הפיצ'ר ממתין לעדכון מסד נתונים שטרם הופעל.
         </div>
       )}
@@ -396,7 +396,7 @@ export default function AdminNewsletterPage() {
         const draftCount = issues.filter((i:any)=>i.status==="draft").length
         if (!scheduledCount && !draftCount) return null
         return (
-          <div className="bg-[#EFF6FF] text-[#00488D] rounded-[10px] px-4 py-3 text-sm mb-4 flex items-center gap-2">
+          <div className="bg-[#edf4eb] text-[#28634e] rounded-[10px] px-4 py-3 text-sm mb-4 flex items-center gap-2">
             <span>🗓️</span>
             <span>
               {scheduledCount > 0 && <>{scheduledCount} גיליונות מתוזמנים</>}
@@ -415,8 +415,8 @@ export default function AdminNewsletterPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <KPICard label="נרשמים פעילים" value={stats?.total || 0}/>
-          <KPICard label="נרשמו החודש" value={stats?.thisMonth || 0} color="#166534"/>
-          <KPICard label="הוסרו" value={stats?.unsubscribed || 0} color={stats?.unsubscribed > 0 ? "#960010" : "#0D2744"}/>
+          <KPICard label="נרשמו החודש" value={stats?.thisMonth || 0} color="#28634e"/>
+          <KPICard label="הוסרו" value={stats?.unsubscribed || 0} color={stats?.unsubscribed > 0 ? "#a74450" : "#193d33"}/>
           <KPICard label="גיליונות שנשלחו" value={issues.filter((i:any)=>i.sent_at).length}/>
         </div>
 
@@ -430,10 +430,10 @@ export default function AdminNewsletterPage() {
                 return (
                   <div key={c.channel} className="flex items-center gap-3">
                     <div className="w-32 text-sm font-medium truncate">{c.channel}</div>
-                    <div className="flex-1 h-2 bg-[#F0F4F8] rounded-full overflow-hidden">
-                      <div style={{ width: `${pct}%` }} className="h-full bg-[#00488D] rounded-full"/>
+                    <div className="flex-1 h-2 bg-[#f4f6f2] rounded-full overflow-hidden">
+                      <div style={{ width: `${pct}%` }} className="h-full bg-[#28634e] rounded-full"/>
                     </div>
-                    <div className="w-16 text-left text-sm font-bold text-[#0D2744]">{c.count}</div>
+                    <div className="w-16 text-left text-sm font-bold text-[#193d33]">{c.count}</div>
                   </div>
                 )
               })}
@@ -443,25 +443,25 @@ export default function AdminNewsletterPage() {
 
         {/* Subscribers list */}
         <Card>
-          <div className="p-4 border-b border-[#E2E8F0] flex items-center justify-between flex-wrap gap-2">
+          <div className="p-4 border-b border-[#e1e8df] flex items-center justify-between flex-wrap gap-2">
             <div className="text-sm font-bold">רשימת נרשמים ({filtered.length})</div>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש..."
-              className="px-3 py-1.5 border border-[#E2E8F0] rounded-[8px] text-sm w-48 focus:outline-none focus:border-[#00488D]"/>
+              className="px-3 py-1.5 border border-[#e1e8df] rounded-[8px] text-sm w-48 focus:outline-none focus:border-[#28634e]"/>
           </div>
           {filtered.length === 0 ? (
             <EmptyState icon="📬" title="אין עדיין נרשמים" hint="שתף את הלינק הכללי או שהרכזים ישתפו את הלינקים האישיים שלהם"/>
           ) : (
-            <div className="divide-y divide-[#F1F5F9]">
+            <div className="divide-y divide-[#edf1e9]">
               {filtered.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-3 px-4 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold">{s.name}</div>
-                    <div className="text-xs text-[#64748B]">{s.email}</div>
+                    <div className="text-xs text-[#63756b]">{s.email}</div>
                   </div>
                   <div className="text-xs text-[#94A3B8]">{s.coordinator_name || "כללי"}{s.area ? ` · ${s.area}` : ""}</div>
                   <div className="text-xs text-[#94A3B8] w-24 text-left">{fd(s.created_at)}</div>
                   <button onClick={() => unsubscribe(s.id, s.name)}
-                    className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
+                    className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] hover:bg-[#FFF0F0] hover:text-[#a74450]">✕</button>
                 </div>
               ))}
             </div>
@@ -481,19 +481,19 @@ export default function AdminNewsletterPage() {
           <div className="w-full space-y-2">
             <div className="flex gap-2">
               <button onClick={sendIssue} disabled={sending || savingDraft || testSending}
-                className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+                className="flex-1 py-2.5 bg-[#193d33] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
                 {sending ? "שולח..." : "שלח עכשיו"}
               </button>
               <button onClick={saveDraft} disabled={sending || savingDraft || testSending}
-                className="flex-1 py-2.5 border border-[#00488D] text-[#00488D] rounded-[10px] text-sm font-bold disabled:opacity-50">
+                className="flex-1 py-2.5 border border-[#28634e] text-[#28634e] rounded-[10px] text-sm font-bold disabled:opacity-50">
                 {savingDraft ? "שומר..." : scheduling ? "תזמן" : "שמור טיוטה"}
               </button>
             </div>
             <div className="flex gap-2 items-center">
               <input value={testTo} onChange={e=>setTestTo(e.target.value)} placeholder="מייל לבדיקה (ריק = המייל שלי)"
-                className="flex-1 px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs focus:outline-none focus:border-[#00488D]"/>
+                className="flex-1 px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-xs focus:outline-none focus:border-[#28634e]"/>
               <button onClick={sendTest} disabled={testSending}
-                className="px-3 py-2 border border-[#E2E8F0] rounded-[9px] text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 whitespace-nowrap">
+                className="px-3 py-2 border border-[#e1e8df] rounded-[9px] text-xs font-semibold hover:bg-[#f7f9f5] disabled:opacity-50 whitespace-nowrap">
                 {testSending ? "שולח..." : "📧 שלח בדיקה"}
               </button>
               <button onClick={resetCompose} className="px-3 py-2 text-xs text-[#94A3B8]">ביטול</button>
@@ -503,13 +503,13 @@ export default function AdminNewsletterPage() {
       >
         <div className="space-y-3">
           {/* Mode toggle */}
-          <div className="flex gap-2 p-1 bg-[#F0F4F8] rounded-[10px]">
+          <div className="flex gap-2 p-1 bg-[#f4f6f2] rounded-[10px]">
             <button onClick={() => setComposeMode("template")}
-              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="template"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>
+              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="template"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>
               תבנית פשוטה
             </button>
             <button onClick={() => setComposeMode("html")}
-              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="html"?"bg-white text-[#0D2744] shadow-sm":"text-[#64748B]"}`}>
+              className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${composeMode==="html"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>
               HTML מוכן (Canva ועוד)
             </button>
           </div>
@@ -518,7 +518,7 @@ export default function AdminNewsletterPage() {
             <label className="text-xs font-semibold block mb-1">כותרת הגיליון *</label>
             <input value={issue.subject} onChange={e => setIssue(i => ({ ...i, subject: e.target.value }))}
               placeholder="לדוגמה: עדכון חודשי — ספטמבר 2026"
-              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+              className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -526,13 +526,13 @@ export default function AdminNewsletterPage() {
               <label className="text-xs font-semibold block mb-1">שם השולח (לא חובה)</label>
               <input value={issue.fromName} onChange={e => setIssue(i => ({ ...i, fromName: e.target.value }))}
                 placeholder="למשל: צוות נתיבים"
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
             </div>
             <div>
               <label className="text-xs font-semibold block mb-1">Reply-To (לא חובה)</label>
               <input value={issue.replyTo} onChange={e => setIssue(i => ({ ...i, replyTo: e.target.value }))} type="email" dir="ltr"
                 placeholder="office@netivim.org"
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
             </div>
           </div>
 
@@ -540,7 +540,7 @@ export default function AdminNewsletterPage() {
             <div>
               <label className="text-xs font-semibold block mb-1">קהל יעד</label>
               <select value={issue.segmentArea} onChange={e => setIssue(i => ({ ...i, segmentArea: e.target.value }))}
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+                className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
                 <option value="">כל הנרשמים הפעילים</option>
                 {areas.map((a:string) => <option key={a} value={a}>רק אזור: {a}</option>)}
               </select>
@@ -552,7 +552,7 @@ export default function AdminNewsletterPage() {
               </label>
               {scheduling && (
                 <input type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                  className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
               )}
             </div>
           </div>
@@ -563,24 +563,24 @@ export default function AdminNewsletterPage() {
               <input ref={htmlFileInputRef} type="file" accept=".html,text/html" className="hidden"
                 onChange={e => e.target.files?.[0] && onHtmlFileSelected(e.target.files[0])}/>
               <button type="button" onClick={() => htmlFileInputRef.current?.click()}
-                className="w-full py-3 border-2 border-dashed border-[#CBD5E1] rounded-[10px] text-sm font-semibold text-[#374151] hover:border-[#00488D] hover:bg-[#F0F7FF] transition-colors flex items-center justify-center gap-2 mb-2">
+                className="w-full py-3 border-2 border-dashed border-[#c6d2c7] rounded-[10px] text-sm font-semibold text-[#193d33] hover:border-[#28634e] hover:bg-[#edf4eb] transition-colors flex items-center justify-center gap-2 mb-2">
                 📁 {htmlFileName || "בחר קובץ HTML (מיוצא מ-Canva)"}
               </button>
               {htmlFileName && (
-                <div className="text-xs text-[#166534] mb-2 text-center">✓ הקובץ נטען — אפשר לערוך למטה במידת הצורך</div>
+                <div className="text-xs text-[#28634e] mb-2 text-center">✓ הקובץ נטען — אפשר לערוך למטה במידת הצורך</div>
               )}
               <div className="text-xs text-[#94A3B8] text-center mb-2">— או הדבק ישירות —</div>
               <textarea value={customHtml} onChange={e => setCustomHtml(e.target.value)} rows={8}
                 placeholder="הדבק כאן HTML שיוצא מ-Canva או כל כלי עיצוב אחר..."
                 dir="ltr"
-                className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#00488D]"/>
+                className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#28634e]"/>
               {customHtml.trim() && findRelativeImages(customHtml).length > 0 && (
-                <div className="text-xs text-[#991B1B] bg-[#FEE2E2] rounded-[8px] px-3 py-2.5 mt-2">
+                <div className="text-xs text-[#a74450] bg-[#faeeed] rounded-[8px] px-3 py-2.5 mt-2">
                   ⚠️ נמצאו {findRelativeImages(customHtml).length} תמונות עם כתובת יחסית (למשל <code dir="ltr">{findRelativeImages(customHtml)[0]}</code>) — הן <b>לא יוצגו</b> במייל בפועל.
                   <div className="mt-1 font-normal">בקנווה: יש לבחור <b>Share ← Email</b> ולא <b>Download</b>, כדי לקבל קישורי תמונה מלאים.</div>
                 </div>
               )}
-              <div className="text-xs text-[#94A3B8] bg-[#F0F7FF] rounded-[8px] px-3 py-2 mt-2">
+              <div className="text-xs text-[#94A3B8] bg-[#edf4eb] rounded-[8px] px-3 py-2 mt-2">
                 קישור הסרה מתווסף אוטומטית בסוף המייל, גם אם לא כלול בתוכן שהדבקת.
               </div>
             </div>
@@ -590,7 +590,7 @@ export default function AdminNewsletterPage() {
             <label className="text-xs font-semibold block mb-1">פתיחה</label>
             <textarea value={issue.intro} onChange={e => setIssue(i => ({ ...i, intro: e.target.value }))} rows={3}
               placeholder="כמה מילות פתיחה חמות... אפשר לכתוב שלום {{{first_name}}}, לפנייה אישית"
-              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#00488D]"/>
+              className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#28634e]"/>
             <div className="text-[11px] text-[#94A3B8] mt-1">
               {"{{{first_name}}}"} יוחלף בשם הפרטי — מובטח בשליחה לאזור/בדיקה, ותלוי בתמיכת Resend בשליחה לכל הרשימה.
             </div>
@@ -604,22 +604,22 @@ export default function AdminNewsletterPage() {
                   <button onClick={addEventBlock} className="text-xs font-bold text-[#5B21B6]">🎪 הוסף אירוע קרוב</button>
                 )}
                 {issue.blocks.length < 4 && (
-                  <button onClick={addBlock} className="text-xs font-bold text-[#00488D]">+ הוסף קטע</button>
+                  <button onClick={addBlock} className="text-xs font-bold text-[#28634e]">+ הוסף קטע</button>
                 )}
               </div>
             </div>
             {issue.blocks.map((b, idx) => (
-              <div key={idx} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[10px] p-3 space-y-2">
+              <div key={idx} className="bg-[#f7f9f5] border border-[#e1e8df] rounded-[10px] p-3 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#64748B]">קטע {idx + 1}</span>
+                  <span className="text-xs font-semibold text-[#63756b]">קטע {idx + 1}</span>
                   {issue.blocks.length > 1 && (
-                    <button onClick={() => removeBlock(idx)} className="text-xs text-[#94A3B8] hover:text-[#960010]">הסר</button>
+                    <button onClick={() => removeBlock(idx)} className="text-xs text-[#94A3B8] hover:text-[#a74450]">הסר</button>
                   )}
                 </div>
                 <input value={b.title} onChange={e => updateBlock(idx, "title", e.target.value)}
-                  placeholder="כותרת הקטע" className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[8px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                  placeholder="כותרת הקטע" className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[8px] text-sm focus:outline-none focus:border-[#28634e]"/>
                 <textarea value={b.text} onChange={e => updateBlock(idx, "text", e.target.value)} rows={3}
-                  placeholder="תוכן הקטע..." className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[8px] text-sm resize-none focus:outline-none focus:border-[#00488D]"/>
+                  placeholder="תוכן הקטע..." className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[8px] text-sm resize-none focus:outline-none focus:border-[#28634e]"/>
               </div>
             ))}
           </div>
@@ -627,10 +627,10 @@ export default function AdminNewsletterPage() {
           <div>
             <label className="text-xs font-semibold block mb-1">סיום</label>
             <textarea value={issue.closing} onChange={e => setIssue(i => ({ ...i, closing: e.target.value }))} rows={2}
-              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#00488D]"/>
+              className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm resize-none focus:outline-none focus:border-[#28634e]"/>
           </div>
 
-          <div className="text-xs text-[#94A3B8] bg-[#F0F7FF] rounded-[8px] px-3 py-2">
+          <div className="text-xs text-[#94A3B8] bg-[#edf4eb] rounded-[8px] px-3 py-2">
             עיצוב הגיליון קבוע — לוגו, כותרת וקישור הסרה מתווספים אוטומטית. אתה ממלא רק את התוכן.
           </div>
           </>
@@ -648,12 +648,12 @@ export default function AdminNewsletterPage() {
               const st = STATUS_COLOR[i.status] || STATUS_COLOR.draft
               const canEdit = i.status === "draft" || i.status === "scheduled"
               return (
-                <div key={i.id} className="border border-[#E2E8F0] rounded-[10px] p-3">
+                <div key={i.id} className="border border-[#e1e8df] rounded-[10px] p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold truncate">{i.subject}</div>
                     <span style={st} className="text-xs px-2 py-0.5 rounded-full font-semibold flex-shrink-0">{STATUS_LABEL[i.status] || i.status}</span>
                   </div>
-                  <div className="text-xs text-[#64748B] mt-1">
+                  <div className="text-xs text-[#63756b] mt-1">
                     {i.status === "scheduled" ? `מתוזמן ל-${fdt(i.scheduled_at)}` : i.status === "sent" ? fdt(i.sent_at) : `נוצר ${fdt(i.created_at)}`}
                     {i.segment_area && ` · אזור: ${i.segment_area}`}
                     {i.status === "sent" && ` · ${i.recipients || 0} נמענים`}
@@ -662,30 +662,30 @@ export default function AdminNewsletterPage() {
 
                   {i.status === "sent" && (i.recipients > 0) && (
                     <div className="flex gap-3 mt-2 text-xs">
-                      <span className="text-[#00488D] font-semibold">👁 {i.unique_opens || 0} פתיחות ({pct(i.unique_opens||0, i.recipients)})</span>
-                      <span className="text-[#166534] font-semibold">🔗 {i.unique_clicks || 0} הקלקות ({pct(i.unique_clicks||0, i.recipients)})</span>
-                      {i.bounced > 0 && <span className="text-[#B45309] font-semibold">⚠ {i.bounced} החזרות</span>}
-                      {i.complained > 0 && <span className="text-[#991B1B] font-semibold">🚩 {i.complained} תלונות</span>}
+                      <span className="text-[#28634e] font-semibold">👁 {i.unique_opens || 0} פתיחות ({pct(i.unique_opens||0, i.recipients)})</span>
+                      <span className="text-[#28634e] font-semibold">🔗 {i.unique_clicks || 0} הקלקות ({pct(i.unique_clicks||0, i.recipients)})</span>
+                      {i.bounced > 0 && <span className="text-[#946014] font-semibold">⚠ {i.bounced} החזרות</span>}
+                      {i.complained > 0 && <span className="text-[#a74450] font-semibold">🚩 {i.complained} תלונות</span>}
                     </div>
                   )}
 
                   <div className="flex gap-1.5 mt-2 flex-wrap">
                     {i.status === "sent" && (
                       <a href={`/newsletter/archive/${i.id}`} target="_blank" rel="noreferrer"
-                        className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">👁 צפה</a>
+                        className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] hover:bg-[#f7f9f5]">👁 צפה</a>
                     )}
                     {canEdit && (
-                      <button onClick={() => openFromIssue(i, false)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">✎ ערוך</button>
+                      <button onClick={() => openFromIssue(i, false)} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] hover:bg-[#f7f9f5]">✎ ערוך</button>
                     )}
                     {canEdit && (
-                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#00488D] text-[#00488D] hover:bg-[#F0F7FF]">שלח עכשיו</button>
+                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#28634e] text-[#28634e] hover:bg-[#edf4eb]">שלח עכשיו</button>
                     )}
-                    <button onClick={() => openFromIssue(i, true)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">⧉ שכפל</button>
+                    <button onClick={() => openFromIssue(i, true)} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] hover:bg-[#f7f9f5]">⧉ שכפל</button>
                     {canEdit && (
-                      <button onClick={() => deleteIssue(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">🗑 מחק</button>
+                      <button onClick={() => deleteIssue(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] hover:bg-[#FFF0F0] hover:text-[#a74450]">🗑 מחק</button>
                     )}
                     {i.status === "failed" && (
-                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#B45309] text-[#B45309] hover:bg-[#FEF3C7]">נסה שוב</button>
+                      <button onClick={() => sendNow(i.id)} className="text-xs px-2 py-1 rounded-[6px] border border-[#946014] text-[#946014] hover:bg-[#faf1e3]">נסה שוב</button>
                     )}
                   </div>
                 </div>
@@ -702,22 +702,22 @@ export default function AdminNewsletterPage() {
         title="+ הוסף הורה"
         footer={<>
           <button onClick={addParent} disabled={addSaving}
-            className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+            className="flex-1 py-2.5 bg-[#193d33] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
             {addSaving ? "מוסיף..." : "הוסף"}
           </button>
-          <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">ביטול</button>
+          <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 border border-[#e1e8df] rounded-[10px] text-sm">ביטול</button>
         </>}
       >
         <div className="space-y-3">
           <div>
             <label className="text-xs font-semibold block mb-1">שם מלא *</label>
             <input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+              className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
           </div>
           <div>
             <label className="text-xs font-semibold block mb-1">מייל *</label>
             <input value={addForm.email} onChange={e => setAddForm(f => ({ ...f, email: e.target.value }))} type="email"
-              className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/>
+              className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
           </div>
         </div>
       </Modal>
@@ -731,10 +731,10 @@ export default function AdminNewsletterPage() {
         width="520px"
         footer={csvPreview.length > 0 ? <>
           <button onClick={confirmImport} disabled={importSaving}
-            className="flex-1 py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
+            className="flex-1 py-2.5 bg-[#193d33] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">
             {importSaving ? "מייבא..." : `ייבא ${csvPreview.length} שורות`}
           </button>
-          <button onClick={() => { setCsvText(""); setCsvPreview([]); setCsvFileName("") }} className="px-4 py-2.5 border border-[#E2E8F0] rounded-[10px] text-sm">נקה</button>
+          <button onClick={() => { setCsvText(""); setCsvPreview([]); setCsvFileName("") }} className="px-4 py-2.5 border border-[#e1e8df] rounded-[10px] text-sm">נקה</button>
         </> : undefined}
       >
         <div className="space-y-3">
@@ -742,27 +742,27 @@ export default function AdminNewsletterPage() {
             <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden"
               onChange={e => e.target.files?.[0] && onFileSelected(e.target.files[0])}/>
             <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 border-2 border-dashed border-[#CBD5E1] rounded-[10px] text-sm font-semibold text-[#374151] hover:border-[#00488D] hover:bg-[#F0F7FF] transition-colors flex items-center justify-center gap-2">
+              className="w-full py-3 border-2 border-dashed border-[#c6d2c7] rounded-[10px] text-sm font-semibold text-[#193d33] hover:border-[#28634e] hover:bg-[#edf4eb] transition-colors flex items-center justify-center gap-2">
               📁 {csvFileName || "בחר קובץ CSV"}
             </button>
             {csvFileName && (
-              <div className="text-xs text-[#166534] mt-1.5 text-center">✓ הקובץ נטען — {csvPreview.length} שורות זוהו</div>
+              <div className="text-xs text-[#28634e] mt-1.5 text-center">✓ הקובץ נטען — {csvPreview.length} שורות זוהו</div>
             )}
           </div>
           <div className="text-xs text-[#94A3B8] text-center">— או —</div>
           <textarea value={csvText} onChange={e => onCsvChange(e.target.value)} rows={5}
             placeholder={"שם,מייל\nישראל ישראלי,israel@example.com"}
             dir="ltr"
-            className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#00488D]"/>
+            className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-xs font-mono resize-none focus:outline-none focus:border-[#28634e]"/>
 
           {csvPreview.length > 0 && (
             <div>
               <div className="text-xs font-semibold mb-1.5">תצוגה מקדימה ({csvPreview.length} שורות)</div>
-              <div className="max-h-40 overflow-y-auto border border-[#E2E8F0] rounded-[9px]">
+              <div className="max-h-40 overflow-y-auto border border-[#e1e8df] rounded-[9px]">
                 {csvPreview.slice(0, 20).map((r, i) => (
-                  <div key={i} className="flex justify-between px-3 py-1.5 text-xs border-b border-[#F1F5F9] last:border-0">
+                  <div key={i} className="flex justify-between px-3 py-1.5 text-xs border-b border-[#edf1e9] last:border-0">
                     <span className="font-medium">{r.name}</span>
-                    <span className="text-[#64748B]">{r.email}</span>
+                    <span className="text-[#63756b]">{r.email}</span>
                   </div>
                 ))}
                 {csvPreview.length > 20 && (

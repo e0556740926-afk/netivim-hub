@@ -23,9 +23,9 @@ export default function LeadsBarChart({ data, height = 180 }: { data: Point[]; h
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-4 text-[11px] text-[#64748B] mb-2">
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#CBD5E1] inline-block" />יעד</span>
-        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#00488D] inline-block" />בפועל</span>
+      <div className="flex items-center gap-4 text-[11px] text-[#63756b] mb-2">
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#c6d2c7] inline-block" />יעד</span>
+        <span className="inline-flex items-center gap-1.5"><i className="w-2.5 h-2.5 rounded-[2px] bg-[#28634e] inline-block" />בפועל</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto select-none" role="group" aria-label="לידים לפי חודש, יעד מול בפועל" onMouseLeave={() => setHover(null)}>
         {ticks.map(t => (
@@ -41,21 +41,21 @@ export default function LeadsBarChart({ data, height = 180 }: { data: Point[]; h
           const m = Number(d.month.slice(5)) - 1
           return (
             <g key={d.month} role="button" tabIndex={0} aria-label={`${MONTH_HE[m]} ${d.month.slice(0,4)}: בפועל ${d.actual}, יעד ${d.planned || "לא הוגדר"}`} onFocus={() => setHover(i)} onBlur={() => setHover(null)} onClick={() => setHover(hover === i ? null : i)} onKeyDown={e => { if(e.key === "Enter" || e.key === " ") { e.preventDefault();setHover(i) } }} onMouseEnter={() => setHover(i)} style={{ cursor: "pointer" }}>
-              <rect x={padL + group * i} y={padT} width={group} height={innerH} fill={on ? "#F8FAFC" : "transparent"} />
-              <rect x={cx - barW - gap / 2} y={y(d.planned)} width={barW} height={Math.max(0, innerH - (y(d.planned) - padT))} rx={3} fill="#CBD5E1" />
+              <rect x={padL + group * i} y={padT} width={group} height={innerH} fill={on ? "#f7f9f5" : "transparent"} />
+              <rect x={cx - barW - gap / 2} y={y(d.planned)} width={barW} height={Math.max(0, innerH - (y(d.planned) - padT))} rx={3} fill="#c6d2c7" />
               <rect x={cx + gap / 2} y={y(d.actual)} width={barW} height={Math.max(0, innerH - (y(d.actual) - padT))} rx={3}
-                fill={d.planned > 0 && d.actual >= d.planned ? "#166534" : "#00488D"}
+                fill={d.planned > 0 && d.actual >= d.planned ? "#28634e" : "#28634e"}
                 style={{ transition: "y 300ms cubic-bezier(.23,1,.32,1), height 300ms cubic-bezier(.23,1,.32,1)" }} />
               {(isLast || on) && d.actual > 0 && (
-                <text x={cx + gap / 2 + barW / 2} y={y(d.actual) - 4} fontSize={10} fontWeight={700} fill="#0D2744" textAnchor="middle">{d.actual}</text>
+                <text x={cx + gap / 2 + barW / 2} y={y(d.actual) - 4} fontSize={10} fontWeight={700} fill="#193d33" textAnchor="middle">{d.actual}</text>
               )}
-              <text x={cx} y={H - 8} fontSize={10} fill={isLast ? "#0D2744" : "#64748B"} fontWeight={isLast ? 700 : 400} textAnchor="middle">{MONTH_HE[m] || d.month}</text>
+              <text x={cx} y={H - 8} fontSize={10} fill={isLast ? "#193d33" : "#63756b"} fontWeight={isLast ? 700 : 400} textAnchor="middle">{MONTH_HE[m] || d.month}</text>
             </g>
           )
         })}
       </svg>
       {hover !== null && data[hover] && (
-        <div className="absolute top-6 right-2 bg-[#0D2744] text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg pointer-events-none">
+        <div className="absolute top-6 right-2 bg-[#193d33] text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg pointer-events-none">
           <div className="font-bold">{MONTH_HE[Number(data[hover].month.slice(5)) - 1]} {data[hover].month.slice(0, 4)}</div>
           <div>בפועל {data[hover].actual} · יעד {data[hover].planned || "—"}</div>
         </div>

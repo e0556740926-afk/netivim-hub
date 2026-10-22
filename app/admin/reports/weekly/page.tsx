@@ -18,7 +18,7 @@ function fd(d: string|null) {
 }
 
 function ScoreMeter({ score }: { score: number }) {
-  const color = score >= 80 ? "#166534" : score >= 50 ? "#B45309" : "#960010"
+  const color = score >= 80 ? "#28634e" : score >= 50 ? "#946014" : "#a74450"
   return (
     <div style={{ display:"flex", alignItems:"center", gap:12 }}>
       <div style={{ width:80, height:80, borderRadius:"50%", border:`6px solid ${color}`,
@@ -26,7 +26,7 @@ function ScoreMeter({ score }: { score: number }) {
         fontSize:22, fontWeight:900, color }}>
         {score}
       </div>
-      <div style={{ fontSize:11, color:"#64748B" }}>
+      <div style={{ fontSize:11, color:"#63756b" }}>
         <div>מתוך 100</div>
         <div style={{ color, fontWeight:700 }}>
           {score >= 80 ? "מצוין 🌟" : score >= 60 ? "טוב 👍" : score >= 40 ? "בסיסי" : "טעון שיפור"}
@@ -61,39 +61,38 @@ function WeeklyReportContent() {
   const { coordinator: c, week: w, leads, interactions, tasks, report, events, contacts, score } = data
 
   return (
-    <>
+    <article className="ui-print-report">
       <style>{`
         @page { size: A4; margin: 18mm 15mm; }
         @media print {
           .no-print { display: none !important; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .ui-print-report {background:#fff;font-family:inherit;direction:rtl;color:#193d33;}
           .page-break { page-break-before: always; }
         }
-        * { box-sizing: border-box; }
         body { margin:0; padding:0; background:#fff; font-family: "Segoe UI", Arial, sans-serif; direction:rtl; color:#1E293B; }
-        table { border-collapse: collapse; width:100%; }
-        th { background:#0D2744; color:#fff; padding:7px 10px; font-size:11px; text-align:right; }
-        td { padding:6px 10px; font-size:11px; border-bottom:1px solid #F1F5F9; }
-        tr:last-child td { border-bottom:none; }
-        tr:nth-child(even) td { background:#F8FAFC; }
-        .section { margin-bottom:20px; border:1px solid #E2E8F0; border-radius:10px; overflow:hidden; }
-        .section-title { background:#F0F4F8; padding:10px 14px; font-size:13px; font-weight:700; color:#0D2744; border-bottom:1px solid #E2E8F0; }
-        .badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; }
-        .kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
-        .kpi { background:#F0F7FF; border:1px solid #BFDBFE; border-radius:10px; padding:12px; text-align:center; }
-        .kpi-num { font-size:28px; font-weight:900; color:#0D2744; line-height:1; }
-        .kpi-label { font-size:10px; color:#64748B; margin-top:3px; }
-        .empty { padding:16px; text-align:center; color:#94A3B8; font-size:12px; }
+        .ui-print-report table { border-collapse: collapse; width:100%; }
+        .ui-print-report th { background:#193d33; color:#fff; padding:7px 10px; font-size:11px; text-align:right; }
+        .ui-print-report td { padding:6px 10px; font-size:11px; border-bottom:1px solid #edf1e9; }
+        .ui-print-report tr:last-child td { border-bottom:none; }
+        .ui-print-report tr:nth-child(even) td { background:#f7f9f5; }
+        .ui-print-report .section { margin-bottom:20px; border:1px solid #e1e8df; border-radius:10px; overflow:hidden; }
+        .ui-print-report .section-title { background:#f4f6f2; padding:10px 14px; font-size:13px; font-weight:700; color:#193d33; border-bottom:1px solid #e1e8df; }
+        .ui-print-report .badge { display:inline-block; padding:2px 8px; border-radius:99px; font-size:10px; font-weight:700; }
+        .ui-print-report .kpi-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
+        .ui-print-report .kpi { background:#edf4eb; border:1px solid #c8dac7; border-radius:10px; padding:12px; text-align:center; }
+        .ui-print-report .kpi-num { font-size:28px; font-weight:900; color:#193d33; line-height:1; }
+        .ui-print-report .kpi-label { font-size:10px; color:#63756b; margin-top:3px; }
+        .ui-print-report .empty { padding:16px; text-align:center; color:#94A3B8; font-size:12px; }
       `}</style>
 
       {/* Print button */}
       <div className="no-print" style={{ position:"fixed", top:16, left:16, zIndex:99, display:"flex", gap:8 }}>
         <button onClick={() => window.print()}
-          style={{ padding:"10px 20px", background:"#0D2744", color:"#fff", border:"none", borderRadius:9, fontWeight:700, cursor:"pointer", fontSize:13 }}>
+          style={{ padding:"10px 20px", background:"#193d33", color:"#fff", border:"none", borderRadius:9, fontWeight:700, cursor:"pointer", fontSize:13 }}>
           🖨 הדפס / שמור PDF
         </button>
         <button onClick={() => window.close()}
-          style={{ padding:"10px 14px", background:"#F0F4F8", border:"1px solid #E2E8F0", borderRadius:9, cursor:"pointer", fontSize:13 }}>
+          style={{ padding:"10px 14px", background:"#f4f6f2", border:"1px solid #e1e8df", borderRadius:9, cursor:"pointer", fontSize:13 }}>
           סגור
         </button>
       </div>
@@ -101,29 +100,29 @@ function WeeklyReportContent() {
       <div style={{ maxWidth:900, margin:"0 auto", padding:"28px 24px" }}>
 
         {/* HEADER */}
-        <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, paddingBottom:18, borderBottom:"3px solid #0D2744" }}>
+        <div className="ui-print-heading" style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:24, paddingBottom:18, borderBottom:"3px solid #193d33" }}>
           <div>
-            <div style={{ fontSize:11, color:"#64748B", marginBottom:4 }}>ארגון נתיבים</div>
-            <div style={{ fontSize:24, fontWeight:900, color:"#0D2744" }}>דו"ח שבועי — {c.name}</div>
-            <div style={{ fontSize:13, color:"#64748B", marginTop:4 }}>
+            <div style={{ fontSize:11, color:"#63756b", marginBottom:4 }}>ארגון נתיבים</div>
+            <div style={{ fontSize:24, fontWeight:900, color:"#193d33" }}>דו"ח שבועי — {c.name}</div>
+            <div style={{ fontSize:13, color:"#63756b", marginTop:4 }}>
               {fd(w.start)} – {fd(w.end)}
               {c.area && <span> &nbsp;·&nbsp; אזור: {c.area}</span>}
             </div>
             <div style={{ fontSize:11, color:"#94A3B8", marginTop:2 }}>הופק: {fd(new Date().toISOString().slice(0,10))}</div>
           </div>
           <div style={{ textAlign:"left" }}>
-            <div style={{ fontSize:11, color:"#64748B", marginBottom:8 }}>ציון שבועי</div>
+            <div style={{ fontSize:11, color:"#63756b", marginBottom:8 }}>ציון שבועי</div>
             <ScoreMeter score={score.total}/>
           </div>
         </div>
 
         {/* KPIs */}
         <div className="kpi-grid">
-          <div className="kpi"><div className="kpi-num" style={{color:"#00488D"}}>{leads.length}</div><div className="kpi-label">לידים חדשים</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#28634e"}}>{leads.length}</div><div className="kpi-label">לידים חדשים</div></div>
           <div className="kpi"><div className="kpi-num" style={{color:"#5B21B6"}}>{interactions.length}</div><div className="kpi-label">אינטראקציות</div></div>
-          <div className="kpi"><div className="kpi-num" style={{color:"#166534"}}>{tasks.done.length}</div><div className="kpi-label">משימות שבוצעו</div></div>
-          <div className="kpi"><div className="kpi-num" style={{color:tasks.late.length>0?"#960010":"#166534"}}>{tasks.late.length}</div><div className="kpi-label">משימות באיחור</div></div>
-          <div className="kpi"><div className="kpi-num" style={{color:"#B45309"}}>{events.length}</div><div className="kpi-label">אירועים</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#28634e"}}>{tasks.done.length}</div><div className="kpi-label">משימות שבוצעו</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:tasks.late.length>0?"#a74450":"#28634e"}}>{tasks.late.length}</div><div className="kpi-label">משימות באיחור</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#946014"}}>{events.length}</div><div className="kpi-label">אירועים</div></div>
         </div>
 
         {/* SCORE BREAKDOWN */}
@@ -132,10 +131,10 @@ function WeeklyReportContent() {
           <div style={{padding:"12px 14px",display:"grid",gridTemplateColumns:"repeat(auto-fit, minmax(120px, 1fr))",gap:10}}>
             {[["לידים",score.leads,30],["אינטראקציות",score.interactions,30],["משימות",score.tasks,20],["דיווח",score.report,20]].map(([l,v,m])=>(
               <div key={l as string} style={{textAlign:"center"}}>
-                <div style={{fontSize:13,fontWeight:700,color:"#0D2744"}}>{v}/{m}</div>
-                <div style={{fontSize:10,color:"#64748B"}}>{l}</div>
-                <div style={{height:4,background:"#E2E8F0",borderRadius:2,marginTop:4,overflow:"hidden"}}>
-                  <div style={{width:`${Math.round(+v/+m*100)}%`,height:"100%",background:"#00488D",borderRadius:2}}/>
+                <div style={{fontSize:13,fontWeight:700,color:"#193d33"}}>{v}/{m}</div>
+                <div style={{fontSize:10,color:"#63756b"}}>{l}</div>
+                <div style={{height:4,background:"#e1e8df",borderRadius:2,marginTop:4,overflow:"hidden"}}>
+                  <div style={{width:`${Math.round(+v/+m*100)}%`,height:"100%",background:"#28634e",borderRadius:2}}/>
                 </div>
               </div>
             ))}
@@ -155,10 +154,10 @@ function WeeklyReportContent() {
                       <td style={{fontWeight:600}}>{l.name}</td>
                       <td>{l.phone}</td>
                       <td>{l.age||"—"}</td>
-                      <td style={{fontWeight:700,color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>{l.score??"—"}</td>
+                      <td style={{fontWeight:700,color:l.score>=8?"#28634e":l.score>=5?"#946014":"#94A3B8"}}>{l.score??"—"}</td>
                       <td>{l.source==="link"?"לינק אישי":l.source==="event"?"אירוע":"ידני"}</td>
-                      <td><span className="badge" style={{background:l.status==="contacted"?"#DCFCE7":l.status==="advanced"?"#EDE9FE":"#DBEAFE",color:l.status==="contacted"?"#166534":l.status==="advanced"?"#5B21B6":"#1E40AF"}}>{STATUS_LABEL[l.status]||l.status}</span></td>
-                      <td style={{color:"#64748B",maxWidth:180}}>{l.notes||"—"}</td>
+                      <td><span className="badge" style={{background:l.status==="contacted"?"#eaf1e7":l.status==="advanced"?"#EDE9FE":"#eaf1e7",color:l.status==="contacted"?"#28634e":l.status==="advanced"?"#5B21B6":"#28634e"}}>{STATUS_LABEL[l.status]||l.status}</span></td>
+                      <td style={{color:"#63756b",maxWidth:180}}>{l.notes||"—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,8 +179,8 @@ function WeeklyReportContent() {
                       <td style={{fontWeight:600}}>{i.contact_name||"—"}</td>
                       <td>{i.contact_org||"—"}</td>
                       <td>{INT_ICON[i.type]} {INT_LABEL[i.type]||i.type}</td>
-                      <td style={{color:"#374151",maxWidth:200}}>{i.summary}</td>
-                      <td style={{color:"#00488D",maxWidth:150}}>{i.next_step||"—"}</td>
+                      <td style={{color:"#193d33",maxWidth:200}}>{i.summary}</td>
+                      <td style={{color:"#28634e",maxWidth:150}}>{i.next_step||"—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -193,10 +192,10 @@ function WeeklyReportContent() {
         <div className="section">
           <div className="section-title">✅ משימות</div>
           <div style={{padding:"8px 14px 4px",display:"flex",gap:16}}>
-            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#166534"}}>✓ בוצעו: {tasks.done.length}</span></span>
-            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#1E40AF"}}>⏳ בתהליך: {tasks.inProgress.length}</span></span>
-            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#960010"}}>🔴 באיחור: {tasks.late.length}</span></span>
-            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#64748B"}}>📋 לביצוע: {tasks.todo.length}</span></span>
+            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#28634e"}}>✓ בוצעו: {tasks.done.length}</span></span>
+            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#28634e"}}>⏳ בתהליך: {tasks.inProgress.length}</span></span>
+            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#a74450"}}>🔴 באיחור: {tasks.late.length}</span></span>
+            <span style={{fontSize:11}}><span style={{fontWeight:700,color:"#63756b"}}>📋 לביצוע: {tasks.todo.length}</span></span>
           </div>
           {tasks.all.length === 0
             ? <div className="empty">אין משימות</div>
@@ -205,8 +204,8 @@ function WeeklyReportContent() {
                 <tbody>
                   {[...tasks.late, ...tasks.inProgress, ...tasks.done, ...tasks.todo].map((t:any) => {
                     const isLate = tasks.late.find((x:any)=>x.id===t.id)
-                    const statusColor = t.status==="done"?"#166534":isLate?"#960010":t.status==="inprogress"?"#1E40AF":"#64748B"
-                    const statusBg = t.status==="done"?"#DCFCE7":isLate?"#FEE2E2":t.status==="inprogress"?"#DBEAFE":"#F3F4F6"
+                    const statusColor = t.status==="done"?"#28634e":isLate?"#a74450":t.status==="inprogress"?"#28634e":"#63756b"
+                    const statusBg = t.status==="done"?"#eaf1e7":isLate?"#faeeed":t.status==="inprogress"?"#eaf1e7":"#F3F4F6"
                     const statusLabel = t.status==="done"?"בוצע":isLate?"באיחור":t.status==="inprogress"?"בתהליך":t.status==="waiting"?"ממתין":"לביצוע"
                     return (
                       <tr key={t.id}>
@@ -214,7 +213,7 @@ function WeeklyReportContent() {
                         <td>{TASK_TYPE[t.type]||t.type}</td>
                         <td style={{whiteSpace:"nowrap"}}>{t.due_date?fd(t.due_date.toISOString?.()?.slice(0,10)||t.due_date):"—"}</td>
                         <td><span className="badge" style={{background:statusBg,color:statusColor}}>{statusLabel}</span></td>
-                        <td style={{color:"#64748B",maxWidth:180}}>{t.details||"—"}</td>
+                        <td style={{color:"#63756b",maxWidth:180}}>{t.details||"—"}</td>
                       </tr>
                     )
                   })}
@@ -236,7 +235,7 @@ function WeeklyReportContent() {
                   <td>{e.location||"—"}</td>
                   <td>{e.status}</td>
                   <td>{e.actual_attendees||e.target_attendees||"—"}</td>
-                  <td style={{color:"#00488D",fontWeight:700}}>{e.leads_collected||0}</td>
+                  <td style={{color:"#28634e",fontWeight:700}}>{e.leads_collected||0}</td>
                 </tr>
               ))}
             </tbody>
@@ -266,19 +265,19 @@ function WeeklyReportContent() {
         <div className="section">
           <div className="section-title">📝 דיווח שבועי {report ? "✓" : "— לא הוגש"}</div>
           {!report
-            ? <div className="empty" style={{color:"#960010"}}>הרכז לא הגיש דיווח שבועי לתקופה זו</div>
+            ? <div className="empty" style={{color:"#a74450"}}>הרכז לא הגיש דיווח שבועי לתקופה זו</div>
             : <div style={{padding:"14px"}}>
                 <div style={{marginBottom:12}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#0D2744",marginBottom:4}}>הישגים:</div>
-                  <div style={{fontSize:12,color:"#374151",background:"#F8FAFC",padding:"8px 12px",borderRadius:8,border:"1px solid #E2E8F0"}}>{report.achievements||"—"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#193d33",marginBottom:4}}>הישגים:</div>
+                  <div style={{fontSize:12,color:"#193d33",background:"#f7f9f5",padding:"8px 12px",borderRadius:8,border:"1px solid #e1e8df"}}>{report.achievements||"—"}</div>
                 </div>
                 <div style={{marginBottom:12}}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#0D2744",marginBottom:4}}>אתגרים:</div>
-                  <div style={{fontSize:12,color:"#374151",background:"#F8FAFC",padding:"8px 12px",borderRadius:8,border:"1px solid #E2E8F0"}}>{report.challenges||"—"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#193d33",marginBottom:4}}>אתגרים:</div>
+                  <div style={{fontSize:12,color:"#193d33",background:"#f7f9f5",padding:"8px 12px",borderRadius:8,border:"1px solid #e1e8df"}}>{report.challenges||"—"}</div>
                 </div>
                 <div>
-                  <div style={{fontSize:11,fontWeight:700,color:"#0D2744",marginBottom:4}}>תכנון שבוע הבא:</div>
-                  <div style={{fontSize:12,color:"#374151",background:"#F8FAFC",padding:"8px 12px",borderRadius:8,border:"1px solid #E2E8F0"}}>{report.next_week_plan||"—"}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#193d33",marginBottom:4}}>תכנון שבוע הבא:</div>
+                  <div style={{fontSize:12,color:"#193d33",background:"#f7f9f5",padding:"8px 12px",borderRadius:8,border:"1px solid #e1e8df"}}>{report.next_week_plan||"—"}</div>
                 </div>
               </div>
           }
@@ -289,18 +288,18 @@ function WeeklyReportContent() {
           <div className="section-title">✍️ הערות מנהל (למילוי ידני)</div>
           <div style={{padding:"14px"}}>
             {[1,2,3].map(i => (
-              <div key={i} style={{borderBottom:"1px solid #CBD5E1",marginBottom:20,paddingBottom:4}}/>
+              <div key={i} style={{borderBottom:"1px solid #c6d2c7",marginBottom:20,paddingBottom:4}}/>
             ))}
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{marginTop:20,textAlign:"center",fontSize:10,color:"#94A3B8",borderTop:"1px solid #E2E8F0",paddingTop:12}}>
+        <div style={{marginTop:20,textAlign:"center",fontSize:10,color:"#94A3B8",borderTop:"1px solid #e1e8df",paddingTop:12}}>
           נתיבים — מערכת ניהול שטח &nbsp;·&nbsp; דו"ח שבועי של {c.name} &nbsp;·&nbsp; {fd(w.start)} – {fd(w.end)}
         </div>
 
       </div>
-    </>
+    </article>
   )
 }
 

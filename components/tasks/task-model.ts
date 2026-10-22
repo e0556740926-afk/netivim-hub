@@ -3,10 +3,10 @@
 // dashboard widget read the same labels and the same due buckets.
 
 export const STATUS = [
-  { key: "todo",       label: "לביצוע",       dot: "#94A3B8", bg: "#F8FAFC", fg: "#334155" },
-  { key: "inprogress", label: "בתהליך",       dot: "#00488D", bg: "#EEF4FB", fg: "#1E40AF" },
-  { key: "waiting",    label: "ממתין לתשובה", dot: "#B45309", bg: "#FFF8E8", fg: "#92400E" },
-  { key: "done",       label: "בוצע",         dot: "#166534", bg: "#EEF8F0", fg: "#166534" },
+  { key: "todo",       label: "לביצוע",       dot: "#94A3B8", bg: "#f7f9f5", fg: "#334155" },
+  { key: "inprogress", label: "בתהליך",       dot: "#356990", bg: "#eaf0f4", fg: "#356990" },
+  { key: "waiting",    label: "ממתין לתשובה", dot: "#946014", bg: "#FFF8E8", fg: "#946014" },
+  { key: "done",       label: "בוצע",         dot: "#28634e", bg: "#EEF8F0", fg: "#28634e" },
 ] as const
 export type StatusKey = typeof STATUS[number]["key"]
 export const STATUS_BY_KEY = Object.fromEntries(STATUS.map(s => [s.key, s])) as Record<string, typeof STATUS[number]>
@@ -25,9 +25,9 @@ export const STUCK_DAYS = 3
 
 export type DueBucket = "overdue" | "today" | "week" | "later" | "none"
 export const BUCKETS: { key: DueBucket; label: string; tone: string }[] = [
-  { key: "overdue", label: "באיחור",     tone: "#960010" },
-  { key: "today",   label: "היום",       tone: "#00488D" },
-  { key: "week",    label: "השבוע",      tone: "#0D2744" },
+  { key: "overdue", label: "באיחור",     tone: "#a74450" },
+  { key: "today",   label: "היום",       tone: "#28634e" },
+  { key: "week",    label: "השבוע",      tone: "#193d33" },
   { key: "later",   label: "מאוחר יותר", tone: "#475569" },
   { key: "none",    label: "ללא תאריך",  tone: "#64748B" },
 ]

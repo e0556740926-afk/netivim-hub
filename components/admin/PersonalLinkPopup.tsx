@@ -46,25 +46,25 @@ export default function PersonalLinkPopup() {
         width="380px"
         footer={available !== false ? <>
           <button onClick={copy}
-            className={`flex-1 py-2 rounded-[9px] text-xs font-bold transition-colors ${copied ? "bg-[#DCFCE7] text-[#166534]" : "bg-[#0D2744] text-white hover:bg-[#00488D]"}`}>
+            className={`flex-1 py-2 rounded-[9px] text-xs font-bold transition-colors ${copied ? "bg-[#eaf1e7] text-[#28634e]" : "bg-[#193d33] text-white hover:bg-[#28634e]"}`}>
             {copied ? "✓ הועתק!" : "העתק לינק"}
           </button>
           <button onClick={whatsapp} disabled={!url}
-            className="flex-1 py-2 rounded-[9px] text-xs font-bold bg-[#DCFCE7] text-[#166534] hover:bg-[#BBF7D0] disabled:opacity-50">
+            className="flex-1 py-2 rounded-[9px] text-xs font-bold bg-[#eaf1e7] text-[#28634e] hover:bg-[#c8dac7] disabled:opacity-50">
             שתף בוואטסאפ
           </button>
         </> : undefined}
       >
         {available === false ? (
-          <div className="text-xs text-[#B45309] bg-[#FEF3C7] rounded-[9px] px-3 py-2.5">
+          <div className="text-xs text-[#946014] bg-[#faf1e3] rounded-[9px] px-3 py-2.5">
             הפיצ'ר הזה ממתין לעדכון מסד נתונים שטרם הופעל. פנה למי שמריץ עדכונים במערכת.
           </div>
         ) : (
           <>
-            <div className="text-xs text-[#64748B] mb-3">
+            <div className="text-xs text-[#63756b] mb-3">
               כל ליד שיגיע דרך הלינק הזה ישויך אליך ותקבל התראה
             </div>
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[9px] px-3 py-2 text-[11px] font-mono text-[#475569] break-all select-all">
+            <div className="bg-[#f7f9f5] border border-[#e1e8df] rounded-[9px] px-3 py-2 text-[11px] font-mono text-[#63756b] break-all select-all">
               {url || "טוען..."}
             </div>
           </>

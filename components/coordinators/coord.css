@@ -1,6 +1,6 @@
 /* ניהול רכזים — scoped skin (team picture, coordinator card, dialogs).
    Everything lives under .coord-ws / .coord-dialog so other screens are untouched. */
-.coord-ws,.coord-dialog{--c-navy:#112e42;--c-green:#27634e;--c-ink:#213e33;--c-muted:#6c7d72;--c-line:#dfe7de;--c-bg:#f5f7f2;color:var(--c-ink);font-variant-numeric:tabular-nums}
+.coord-ws,.coord-dialog{--c-navy:var(--ui-nav);--c-green:var(--ui-brand);--c-ink:var(--ui-ink);--c-muted:var(--ui-muted);--c-line:var(--ui-line);--c-bg:var(--ui-bg);color:var(--c-ink);font-variant-numeric:tabular-nums}
 .coord-ws *,.coord-dialog *{box-sizing:border-box}
 :where(.coord-ws,.coord-dialog) :where(button,input,select,textarea){font:inherit;color:inherit}
 .coord-ws button,.coord-dialog button{cursor:pointer;touch-action:manipulation}

@@ -1,4 +1,7 @@
 "use client"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
+import ErrorState from "@/components/ui/ErrorState"
+import { useToast } from "@/components/ui/Toast"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 
@@ -9,6 +12,8 @@ function fd(d: string) {
 }
 
 export default function CoordNewsletterPage() {
+  const toast=useToast()
+  const [error,setError]=useState(false)
   const { user } = useAuth()
   const [coord, setCoord] = useState<any>(null)
   const [subscribers, setSubscribers] = useState<any[]>([])
@@ -26,7 +31,7 @@ export default function CoordNewsletterPage() {
       const d = await res.json()
       setSubscribers(d.subscribers || [])
       setLoading(false)
-    })
+    }).catch(()=>{setError(true);setLoading(false)})
   }, [user])
 
   const shareUrl = coord ? `${origin}/newsletter/${coord.slug}` : ""
@@ -40,14 +45,15 @@ export default function CoordNewsletterPage() {
     window.open(`https://wa.me/?text=${msg}`, "_blank")
   }
 
+  if(error)return <div className="ui-page ui-personal"><ErrorState retry={()=>window.location.reload()}/></div>
   if (loading) return <div className="p-4 max-w-2xl mx-auto text-sm text-[#94A3B8] text-center py-10">טוען...</div>
 
   return (
-    <div className="p-4 max-w-2xl mx-auto fade-up">
-      <div className="text-xl font-extrabold mb-3">ניוזלטר להורים</div>
+    <div className="ui-page ui-personal fade-up">
+      <WorkspaceHeader title="ניוזלטר להורים" description="קישור ההרשמה שלכם ומעקב אחרי המצטרפים דרכו."/>
 
       {/* Personal link */}
-      <div className="bg-[#0D2744] rounded-[18px] p-4 mb-4">
+      <div className="bg-[#193d33] rounded-[18px] p-4 mb-4">
         <div className="text-white text-sm font-bold mb-1">📬 הלינק האישי שלך</div>
         <div className="text-[#60A5FA] text-xs mb-3">שתף עם הורים — כל מי שנרשם דרכו יופיע כאן</div>
         <div className="text-xs font-mono bg-white/10 rounded-[10px] p-2.5 mb-3 text-white/90 break-all">{shareUrl || "טוען..."}</div>
@@ -55,7 +61,7 @@ export default function CoordNewsletterPage() {
           <button onClick={copy} className="py-2.5 bg-white/20 hover:bg-white/30 text-white text-sm font-bold rounded-[10px] transition-colors">
             {copied ? "✓ הועתק!" : "העתק לינק"}
           </button>
-          <button onClick={whatsapp} className="py-2.5 bg-[#166534] text-white text-sm font-bold rounded-[10px] hover:bg-[#15803d] transition-colors">שתף בוואטסאפ</button>
+          <button onClick={whatsapp} className="py-2.5 bg-[#28634e] text-white text-sm font-bold rounded-[10px] hover:bg-[#15803d] transition-colors">שתף בוואטסאפ</button>
         </div>
         {shareUrl && (
           <div className="flex items-center gap-3 mt-3 pt-3 border-t border-white/10">
@@ -72,23 +78,23 @@ export default function CoordNewsletterPage() {
       </div>
 
       {/* Stats */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[14px] p-4 text-center mb-4">
-        <div className="text-3xl font-extrabold text-[#0D2744]">{subscribers.length}</div>
-        <div className="text-xs text-[#64748B] mt-0.5">הורים נרשמו דרכך</div>
+      <div className="bg-white border border-[#e1e8df] rounded-[14px] p-4 text-center mb-4">
+        <div className="text-3xl font-extrabold text-[#193d33]">{subscribers.length}</div>
+        <div className="text-xs text-[#63756b] mt-0.5">הורים נרשמו דרכך</div>
       </div>
 
       {/* List */}
-      <div className="bg-white border border-[#E2E8F0] rounded-[16px] p-4">
+      <div className="bg-white border border-[#e1e8df] rounded-[16px] p-4">
         <div className="text-sm font-bold mb-3">נרשמים ({subscribers.length})</div>
         {subscribers.length === 0 ? (
           <div className="text-sm text-[#94A3B8] text-center py-4">עדיין לא נרשם אף אחד דרך הלינק שלך</div>
         ) : (
           <div className="space-y-2">
             {subscribers.map((s: any, i: number) => (
-              <div key={i} className="flex items-center justify-between pb-2.5 border-b border-[#F1F5F9] last:border-0">
+              <div key={i} className="flex items-center justify-between pb-2.5 border-b border-[#edf1e9] last:border-0">
                 <div>
                   <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="text-xs text-[#64748B]">{s.email}</div>
+                  <div className="text-xs text-[#63756b]">{s.email}</div>
                 </div>
                 <div className="text-xs text-[#94A3B8]">{fd(s.created_at)}</div>
               </div>

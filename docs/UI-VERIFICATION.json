@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-22",
+  "baseCommit": "073e9937d55f6efa71c74f95f74880276dd4fa64",
+  "environment": "Production Next.js renderer; isolated localhost fixture API; no production database writes",
+  "unitTests": {
+    "passed": 68,
+    "failed": 0
+  },
+  "build": {
+    "status": "passed",
+    "typescriptChecked": true,
+    "staticGenerationCompleted": true,
+    "adapter": "External QA-only worker-thread launcher; no source/config build-error skipping"
+  },
+  "responsive": {
+    "checks": 90,
+    "views": 45,
+    "widths": [
+      320,
+      1440
+    ],
+    "horizontalPageOverflow": 0,
+    "applicationErrorPages": 0
+  },
+  "dashboard": {
+    "desktopWidth": 1440,
+    "columnBottomDifferencePixels": 0,
+    "scrollableCardBodies": 5
+  },
+  "functionalChecks": [
+    "Event creation",
+    "Failed event save retains dialog and text",
+    "Vendor deletion confirmation and cancellation; no deletion performed",
+    "Task saved with two coordinator assignees",
+    "Task due-date preset and today filter",
+    "Coordinator quick-add opens existing task form",
+    "Overlay scrolling restored after closing nested dialogs",
+    "Organization target validation and update",
+    "Calendar connector dialog on a narrow screen",
+    "Newsletter subscription through fixture API",
+    "Public source lead carries lead_source_id and coordinator_id"
+  ],
+  "limitations": [
+    "Real Google sign-in and live provider sends were not executed",
+    "Real database permissions and mutations were not integration-tested",
+    "Previous vendor-record recovery incident remains unresolved"
+  ],
+  "warnings": [
+    "Existing Next middleware naming deprecation",
+    "Existing images.domains deprecation"
+  ]
+}

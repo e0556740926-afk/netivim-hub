@@ -1,12 +1,18 @@
 "use client"
+import { uiRequest, uiMutation } from "@/lib/ui-request"
+import { useToast } from "@/components/ui/Toast"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { useEffect, useState } from "react"
 
-const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
+const T = { navy: "#193d33", blue: "#28634e", slate: "#63756b", border: "#d0dbd0", bg: "#f4f6f2", ok: "#28634e", warn: "#946014", breach: "#a74450" }
 const FIELD_TYPES = [["text", "טקסט"], ["number", "מספר"], ["date", "תאריך"], ["select", "בחירה"], ["multiselect", "בחירה מרובה"], ["boolean", "כן / לא"]]
 const ROLES = ["יועצים", "מנהלים", "רכזי שטח"]
 const SWATCHES = [T.blue, T.warn, T.ok, T.breach, "#6B4E9E"]
 
 export default function FieldBuilder() {
+  const toast=useToast()
+  const [busy,setBusy]=useState(false)
+  const [error,setError]=useState("")
   const [fields, setFields] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<any>({ label: "", field_type: "select", options: [], required: false, in_list: false, visible_roles: [], group_name: "שדות מותאמים כלליים" })
@@ -15,9 +21,8 @@ export default function FieldBuilder() {
 
   async function load() {
     setLoading(true)
-    const r = await fetch("/api/admin/custom-fields")
-    setFields((await r.json()).fields || [])
-    setLoading(false)
+    setError("")
+    try{const d=await uiRequest("/api/admin/custom-fields");setFields(d.fields||[])}catch(e){setError(e instanceof Error?e.message:"הטעינה נכשלה")}finally{setLoading(false)}
   }
   useEffect(() => { load() }, [])
 
@@ -34,32 +39,33 @@ export default function FieldBuilder() {
   }
 
   async function save() {
-    if (!form.label) return
-    const method = editing ? "PATCH" : "POST"
-    const body = editing ? { ...form, id: editing } : form
-    await fetch("/api/admin/custom-fields", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-    setForm({ label: "", field_type: "select", options: [], required: false, in_list: false, visible_roles: [], group_name: "שדות מותאמים כלליים" })
-    setEditing(null)
-    await load()
+    if(!form.label.trim()||busy)return
+    setBusy(true);setError("")
+    try{await uiMutation("/api/admin/custom-fields",editing?"PATCH":"POST",editing?{...form,id:editing}:form);setForm({label:"",field_type:"select",options:[],required:false,in_list:false,visible_roles:[],group_name:"שדות מותאמים כלליים"});setEditing(null);toast.success("השדה נשמר");await load()}
+    catch(e){setError(e instanceof Error?e.message:"השמירה נכשלה")}
+    finally{setBusy(false)}
   }
   function editField(f: any) {
     setForm({ label: f.label, field_type: f.field_type, options: f.options || [], required: f.required, in_list: f.in_list, visible_roles: f.visible_roles || [], group_name: f.group_name })
     setEditing(f.id)
   }
   async function remove(id: number) {
-    await fetch("/api/admin/custom-fields", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) })
-    await load()
+    const field=fields.find(f=>f.id===id)
+    if(!confirm(`למחוק לצמיתות את השדה "${field?.label||id}"?`))return
+    if(busy)return
+    setBusy(true)
+    try{await uiMutation("/api/admin/custom-fields","DELETE",{id});toast.success("השדה נמחק");await load()}catch(e){setError(e instanceof Error?e.message:"המחיקה נכשלה")}finally{setBusy(false)}
   }
 
   const showOptions = form.field_type === "select" || form.field_type === "multiselect"
   const listsByField = fields.filter(f => (f.options || []).length > 0)
 
   return (
-    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", color: T.navy, padding: "24px 32px 60px" }}>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>בונה שדות מותאמים</span></div>
-      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>בונה שדות מותאמים</div>
+    <div dir="rtl" className="ui-page ui-settings">
+      <WorkspaceHeader title="שדות מותאמים" description="התאימו את המידע שהצוות אוסף: סוגי שדות, רשימות ערכים ותצוגה לפי תפקיד." parent={{label:"הגדרות",href:"/admin/settings"}}/>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20, marginBottom: 32 }}>
+      {error&&<p role="alert" className="ui-error">{error}</p>}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 20, marginBottom: 32 }}>
         {/* FIELD LIST */}
         <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "14px 18px", borderBottom: `1px solid ${T.border}`, fontSize: 15, fontWeight: 700 }}>שדות מותאמים בתיק</div>
@@ -69,15 +75,15 @@ export default function FieldBuilder() {
             <span>תווית</span><span>סוג</span><span>חובה</span><span>ברשימה</span><span>מי רואה</span><span></span>
           </div>
           {loading ? <div style={{ padding: 20, color: T.slate, fontSize: 13 }}>טוען...</div> : fields.map(f => (
-            <div key={f.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 60px 60px 100px 60px", gap: 10, alignItems: "center", padding: "12px 18px", borderTop: `1px solid ${T.bg}`, background: editing === f.id ? "#EDF2F8" : undefined }}>
+            <div key={f.id} style={{ display: "grid", gridTemplateColumns: "1fr 90px 60px 60px 100px 60px", gap: 10, alignItems: "center", padding: "12px 18px", borderTop: `1px solid ${T.bg}`, background: editing === f.id ? "#edf4eb" : undefined }}>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{f.label}</span>
               <span style={{ fontSize: 12, color: T.slate }}>{FIELD_TYPES.find(t => t[0] === f.field_type)?.[1] || f.field_type}</span>
               <span style={{ fontSize: 16, color: f.required ? T.ok : T.border }}>{f.required ? "✓" : "–"}</span>
               <span style={{ fontSize: 16, color: f.in_list ? T.ok : T.border }}>{f.in_list ? "✓" : "–"}</span>
               <span style={{ fontSize: 11, color: T.slate }}>{f.visible_roles?.length ? f.visible_roles.join(", ") : "כולם"}</span>
               <span style={{ display: "flex", gap: 6 }}>
-                <span onClick={() => editField(f)} style={{ cursor: "pointer", color: T.blue, fontSize: 12 }}>ערוך</span>
-                <span onClick={() => remove(f.id)} style={{ cursor: "pointer", color: T.breach, fontSize: 12 }}>✕</span>
+                <button type="button" aria-label={`עריכת השדה ${f.label}`} onClick={() => editField(f)} style={{ cursor: "pointer", color: T.blue, fontSize: 12 }}>ערוך</button>
+                <button type="button" aria-label={`מחיקת השדה ${f.label}`} onClick={() => remove(f.id)} style={{ cursor: "pointer", color: T.breach, fontSize: 12 }}>✕</button>
               </span>
             </div>
           ))}
@@ -132,7 +138,7 @@ export default function FieldBuilder() {
           <label style={{ fontSize: 12, fontWeight: 700, color: T.slate, display: "block", marginBottom: 6 }}>גלוי לתפקידים</label>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
             {ROLES.map(r => (
-              <span key={r} onClick={() => toggleRole(r)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 14, background: form.visible_roles.includes(r) ? "#EDF2F8" : T.bg, color: form.visible_roles.includes(r) ? T.blue : T.slate, cursor: "pointer" }}>
+              <span key={r} onClick={() => toggleRole(r)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 14, background: form.visible_roles.includes(r) ? "#edf4eb" : T.bg, color: form.visible_roles.includes(r) ? T.blue : T.slate, cursor: "pointer" }}>
                 {r}{form.visible_roles.includes(r) ? " ✓" : ""}
               </span>
             ))}
@@ -145,7 +151,7 @@ export default function FieldBuilder() {
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setForm({ label: "", field_type: "select", options: [], required: false, in_list: false, visible_roles: [], group_name: "שדות מותאמים כלליים" }); setEditing(null) }}
               style={{ flex: 1, background: T.bg, color: T.slate, border: "none", borderRadius: 8, padding: 10, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>ביטול</button>
-            <button onClick={save} style={{ flex: 1, background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>שמור שדה</button>
+            <button disabled={busy||!form.label.trim()} onClick={save} style={{ flex: 1, background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: 10, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>שמור שדה</button>
           </div>
         </div>
 
@@ -160,11 +166,11 @@ export default function FieldBuilder() {
             {showOptions ? (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {form.options.length ? form.options.map((o: any, i: number) => (
-                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 14, background: i === 0 ? "#EDF2F8" : "#fff", color: i === 0 ? T.blue : T.slate, border: `1.5px solid ${i === 0 ? T.blue : T.border}` }}>{o.label}</span>
+                  <span key={i} style={{ fontSize: 12, fontWeight: 600, padding: "6px 12px", borderRadius: 14, background: i === 0 ? "#edf4eb" : "#fff", color: i === 0 ? T.blue : T.slate, border: `1.5px solid ${i === 0 ? T.blue : T.border}` }}>{o.label}</span>
                 )) : <span style={{ fontSize: 12, color: T.slate }}>הוסף ערכים כדי לראות תצוגה מקדימה</span>}
               </div>
             ) : form.field_type === "boolean" ? (
-              <div style={{ display: "flex", gap: 6 }}><span style={{ fontSize: 12, padding: "6px 12px", borderRadius: 14, background: "#EDF2F8", color: T.blue, border: `1.5px solid ${T.blue}` }}>כן</span><span style={{ fontSize: 12, padding: "6px 12px", borderRadius: 14, background: "#fff", color: T.slate, border: `1.5px solid ${T.border}` }}>לא</span></div>
+              <div style={{ display: "flex", gap: 6 }}><span style={{ fontSize: 12, padding: "6px 12px", borderRadius: 14, background: "#edf4eb", color: T.blue, border: `1.5px solid ${T.blue}` }}>כן</span><span style={{ fontSize: 12, padding: "6px 12px", borderRadius: 14, background: "#fff", color: T.slate, border: `1.5px solid ${T.border}` }}>לא</span></div>
             ) : (
               <input disabled placeholder={form.field_type === "date" ? "תאריך..." : form.field_type === "number" ? "0" : "טקסט חופשי..."} style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${T.border}`, borderRadius: 6, padding: 8, fontSize: 13, background: "#fff" }} />
             )}

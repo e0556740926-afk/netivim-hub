@@ -16,10 +16,10 @@ const DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"]
 const FREQ: Record<string, string> = { daily: "יומי", weekly: "שבועי", monthly: "חודשי" }
 const LINKED: Record<string, string> = { weekly_report: "דיווח שבועי", meeting: "פגישה" }
 const STATUS: Record<string, { label: string; bg: string; fg: string; dot: string }> = {
-  planned:   { label: "מתוכנן", bg: "#F1F5F9", fg: "#475569", dot: "#94A3B8" },
-  done:      { label: "בוצע",   bg: "#DCFCE7", fg: "#166534", dot: "#16A34A" },
-  missed:    { label: "חסר",    bg: "#FEE2E2", fg: "#991B1B", dot: "#DC2626" },
-  postponed: { label: "נדחה",   bg: "#FEF3C7", fg: "#B45309", dot: "#F59E0B" },
+  planned:   { label: "מתוכנן", bg: "#edf1e9", fg: "#63756b", dot: "#94A3B8" },
+  done:      { label: "בוצע",   bg: "#eaf1e7", fg: "#28634e", dot: "#16A34A" },
+  missed:    { label: "חסר",    bg: "#faeeed", fg: "#a74450", dot: "#DC2626" },
+  postponed: { label: "נדחה",   bg: "#faf1e3", fg: "#946014", dot: "#F59E0B" },
 }
 const TASK_TYPE: Record<string, string> = { call: "שיחה", meeting: "פגישה", materials: "חומרים", backoffice: "בק-אופיס" }
 
@@ -110,17 +110,17 @@ export default function RoutinesPage() {
   if (error) return <div className="p-6"><ErrorState retry={load} /></div>
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-up">
+    <div className="ui-page fade-up">
       {/* header */}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0D2744]">שגרות</h1>
-          <div className="text-sm text-[#64748B] mt-1">הריטואלים הקבועים שלך עם הרכזים — מה מתוכנן, מה בוצע, ומה תועד</div>
+          <h1 className="text-2xl font-extrabold text-[#193d33]">שגרות</h1>
+          <div className="text-sm text-[#63756b] mt-1">הריטואלים הקבועים שלך עם הרכזים — מה מתוכנן, מה בוצע, ומה תועד</div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-[#F1F5F9] rounded-[10px] p-1">
+          <div className="flex bg-[#edf1e9] rounded-[10px] p-1">
             {([["week", "השבוע"], ["routines", "ניהול שגרות"], ["history", "היסטוריה"]] as const).map(([k, l]) => (
-              <button key={k} onClick={() => setView(k)} className={`px-3.5 py-1.5 text-sm font-semibold rounded-[8px] transition-colors ${view === k ? "bg-white text-[#0D2744] shadow-sm" : "text-[#64748B] hover:text-[#0D2744]"}`}>{l}</button>
+              <button key={k} onClick={() => setView(k)} className={`px-3.5 py-1.5 text-sm font-semibold rounded-[8px] transition-colors ${view === k ? "bg-white text-[#193d33] shadow-sm" : "text-[#63756b] hover:text-[#193d33]"}`}>{l}</button>
             ))}
           </div>
           <Button onClick={openNew}>+ שגרה חדשה</Button>
@@ -134,15 +134,15 @@ export default function RoutinesPage() {
               {/* week nav + stats */}
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setWeekStart(w => addDays(w, -7))} className="w-9 h-9 rounded-[9px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0D2744] font-bold">›</button>
-                  <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="px-3 h-9 rounded-[9px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-sm font-semibold text-[#0D2744]">השבוע</button>
-                  <button onClick={() => setWeekStart(w => addDays(w, 7))} className="w-9 h-9 rounded-[9px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#0D2744] font-bold">‹</button>
-                  <div className="text-sm font-bold text-[#0D2744] mr-2">{fd(ymd(weekStart))} – {fd(ymd(weekEnd))}</div>
+                  <button onClick={() => setWeekStart(w => addDays(w, -7))} className="w-9 h-9 rounded-[9px] border border-[#e1e8df] bg-white hover:bg-[#f7f9f5] text-[#193d33] font-bold">›</button>
+                  <button onClick={() => setWeekStart(startOfWeek(new Date()))} className="px-3 h-9 rounded-[9px] border border-[#e1e8df] bg-white hover:bg-[#f7f9f5] text-sm font-semibold text-[#193d33]">השבוע</button>
+                  <button onClick={() => setWeekStart(w => addDays(w, 7))} className="w-9 h-9 rounded-[9px] border border-[#e1e8df] bg-white hover:bg-[#f7f9f5] text-[#193d33] font-bold">‹</button>
+                  <div className="text-sm font-bold text-[#193d33] mr-2">{fd(ymd(weekStart))} – {fd(ymd(weekEnd))}</div>
                 </div>
                 <div className="flex gap-2 text-xs font-semibold">
-                  <span className="px-2.5 py-1 rounded-full bg-[#DCFCE7] text-[#166534]">בוצע {weekStats.done}</span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#FEE2E2] text-[#991B1B]">חסר {weekStats.missed}</span>
-                  <span className="px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#475569]">מתוכנן {weekStats.planned}</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#eaf1e7] text-[#28634e]">בוצע {weekStats.done}</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#faeeed] text-[#a74450]">חסר {weekStats.missed}</span>
+                  <span className="px-2.5 py-1 rounded-full bg-[#edf1e9] text-[#63756b]">מתוכנן {weekStats.planned}</span>
                 </div>
               </div>
 
@@ -152,14 +152,14 @@ export default function RoutinesPage() {
                   const key = ymd(d); const isToday = key === today; const isPast = key < today
                   const items = occ.filter(o => o.due_date === key)
                   return (
-                    <div key={key} className={`rounded-[14px] border min-h-[140px] flex flex-col ${isToday ? "border-[#00488D] bg-[#EFF6FF]" : "border-[#E2E8F0] bg-white"} ${isPast && !isToday ? "opacity-90" : ""}`}>
-                      <div className={`px-3 py-2 border-b flex items-center justify-between ${isToday ? "border-[#BFDBFE]" : "border-[#F1F5F9]"}`}>
-                        <div className="text-xs font-bold text-[#0D2744]">{DAYS[i]}</div>
-                        <div className={`text-xs font-semibold ${isToday ? "text-[#00488D]" : "text-[#94A3B8]"}`}>{d.getDate()}.{d.getMonth() + 1}</div>
+                    <div key={key} className={`rounded-[14px] border min-h-[140px] flex flex-col ${isToday ? "border-[#28634e] bg-[#edf4eb]" : "border-[#e1e8df] bg-white"} ${isPast && !isToday ? "opacity-90" : ""}`}>
+                      <div className={`px-3 py-2 border-b flex items-center justify-between ${isToday ? "border-[#c8dac7]" : "border-[#edf1e9]"}`}>
+                        <div className="text-xs font-bold text-[#193d33]">{DAYS[i]}</div>
+                        <div className={`text-xs font-semibold ${isToday ? "text-[#28634e]" : "text-[#94A3B8]"}`}>{d.getDate()}.{d.getMonth() + 1}</div>
                       </div>
                       <div className="p-2 flex flex-col gap-2 flex-1">
                         {items.map(o => <OccCard key={o.id} o={o} onOpen={() => setDocOcc(o)} participants={participantsOf(o)} />)}
-                        {!items.length && <div className="text-[11px] text-[#CBD5E1] text-center mt-4">—</div>}
+                        {!items.length && <div className="text-[11px] text-[#c6d2c7] text-center mt-4">—</div>}
                       </div>
                     </div>
                   )
@@ -175,11 +175,11 @@ export default function RoutinesPage() {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-base font-bold text-[#0D2744]">{r.name}</div>
-                        <div className="text-xs text-[#64748B] mt-0.5">
+                        <div className="text-base font-bold text-[#193d33]">{r.name}</div>
+                        <div className="text-xs text-[#63756b] mt-0.5">
                           {FREQ[r.frequency]}{r.frequency === "weekly" && ` · יום ${DAYS[r.weekday ?? 0]}`}{r.frequency === "monthly" && ` · ${r.day_of_month} בחודש`}{r.time && ` · ${r.time}`}
                           {r.linked_type && <span className="mr-2 px-1.5 py-0.5 rounded bg-[#EDE9FE] text-[#5B21B6] font-semibold">{LINKED[r.linked_type]}</span>}
-                          {r.requires_doc && <span className="mr-1.5 px-1.5 py-0.5 rounded bg-[#FEF3C7] text-[#B45309] font-semibold">דורש תיעוד</span>}
+                          {r.requires_doc && <span className="mr-1.5 px-1.5 py-0.5 rounded bg-[#faf1e3] text-[#946014] font-semibold">דורש תיעוד</span>}
                         </div>
                       </div>
                       <div className="flex gap-1.5">
@@ -187,11 +187,11 @@ export default function RoutinesPage() {
                         <Button size="sm" variant={r.active ? "danger" : "success"} onClick={() => toggleActive(r)}>{r.active ? "השבת" : "הפעל"}</Button>
                       </div>
                     </div>
-                    {r.description && <div className="text-sm text-[#475569] mt-2">{r.description}</div>}
-                    <div className="flex flex-wrap gap-3 text-xs text-[#64748B] mt-3">
-                      <span>משתתפים: <b className="text-[#0D2744]">{r.participants?.length ? r.participants.map((id: number) => coordName(id)).join(", ") : "כל הרכזים"}</b></span>
-                      {r.next_due && <span>הבא: <b className="text-[#0D2744]">{fd(String(r.next_due).slice(0, 10))}</b></span>}
-                      <span>בוצע <b className="text-[#166534]">{r.done_count}</b> · חסר <b className="text-[#991B1B]">{r.missed_count}</b></span>
+                    {r.description && <div className="text-sm text-[#63756b] mt-2">{r.description}</div>}
+                    <div className="flex flex-wrap gap-3 text-xs text-[#63756b] mt-3">
+                      <span>משתתפים: <b className="text-[#193d33]">{r.participants?.length ? r.participants.map((id: number) => coordName(id)).join(", ") : "כל הרכזים"}</b></span>
+                      {r.next_due && <span>הבא: <b className="text-[#193d33]">{fd(String(r.next_due).slice(0, 10))}</b></span>}
+                      <span>בוצע <b className="text-[#28634e]">{r.done_count}</b> · חסר <b className="text-[#a74450]">{r.missed_count}</b></span>
                     </div>
                   </div>
                 </Card>
@@ -202,23 +202,23 @@ export default function RoutinesPage() {
 
           {view === "history" && (
             <Card>
-              <div className="p-3 border-b border-[#E2E8F0] flex items-center gap-3">
-                <div className="text-sm font-bold text-[#0D2744]">8 השבועות האחרונים</div>
-                <select value={histFilter} onChange={e => setHistFilter(e.target.value ? +e.target.value : "")} className="px-3 py-1.5 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+              <div className="p-3 border-b border-[#e1e8df] flex items-center gap-3">
+                <div className="text-sm font-bold text-[#193d33]">8 השבועות האחרונים</div>
+                <select value={histFilter} onChange={e => setHistFilter(e.target.value ? +e.target.value : "")} className="px-3 py-1.5 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
                   <option value="">כל השגרות</option>
                   {routines.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
-              <div className="divide-y divide-[#F1F5F9]">
+              <div className="divide-y divide-[#edf1e9]">
                 {history.filter(o => !histFilter || o.routine_id === histFilter).map(o => {
                   const st = STATUS[o.status] || STATUS.planned
                   return (
-                    <div key={o.id} onClick={() => setDocOcc(o)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[#F8FAFC]">
+                    <div key={o.id} onClick={() => setDocOcc(o)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-[#f7f9f5]">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: st.dot }} />
-                      <div className="w-24 text-xs text-[#64748B]">{fd(o.due_date)} · {DAYS_SHORT[new Date(o.due_date + "T00:00:00").getDay()]}</div>
-                      <div className="flex-1 min-w-0"><div className="text-sm font-semibold text-[#0D2744]">{o.name}</div>{o.notes && <div className="text-xs text-[#64748B] truncate">{o.notes}</div>}</div>
-                      {o.linked_type === "weekly_report" && o.report && <div className="text-xs text-[#64748B]">{o.report.submitted.length}/{o.report.submitted.length + o.report.missing.length} הגישו</div>}
-                      {o.tasks_created?.length > 0 && <div className="text-xs text-[#64748B]">{o.tasks_created.length} משימות</div>}
+                      <div className="w-24 text-xs text-[#63756b]">{fd(o.due_date)} · {DAYS_SHORT[new Date(o.due_date + "T00:00:00").getDay()]}</div>
+                      <div className="flex-1 min-w-0"><div className="text-sm font-semibold text-[#193d33]">{o.name}</div>{o.notes && <div className="text-xs text-[#63756b] truncate">{o.notes}</div>}</div>
+                      {o.linked_type === "weekly_report" && o.report && <div className="text-xs text-[#63756b]">{o.report.submitted.length}/{o.report.submitted.length + o.report.missing.length} הגישו</div>}
+                      {o.tasks_created?.length > 0 && <div className="text-xs text-[#63756b]">{o.tasks_created.length} משימות</div>}
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-bold" style={{ background: st.bg, color: st.fg }}>{st.label}</span>
                     </div>
                   )
@@ -254,7 +254,7 @@ export default function RoutinesPage() {
             </select></div>}
           {form.frequency === "monthly" && <div><label className="text-xs font-semibold block mb-1">יום בחודש</label>
             <input type="number" min={1} max={31} value={form.day_of_month} onChange={e => setForm(f => ({ ...f, day_of_month: +e.target.value }))} className={INPUT} /></div>}
-          {form.frequency === "daily" && <div className="text-xs text-[#64748B] self-end pb-2">ימים א׳–ה׳</div>}
+          {form.frequency === "daily" && <div className="text-xs text-[#63756b] self-end pb-2">ימים א׳–ה׳</div>}
           <div><label className="text-xs font-semibold block mb-1">שעה</label>
             <input type="time" value={form.time} onChange={e => setForm(f => ({ ...f, time: e.target.value }))} className={INPUT} /></div>
           <div><label className="text-xs font-semibold block mb-1">מקושר ל־</label>
@@ -268,7 +268,7 @@ export default function RoutinesPage() {
               {coords.map(c => {
                 const on = form.participants.includes(c.id)
                 return <button key={c.id} type="button" onClick={() => setForm(f => ({ ...f, participants: on ? f.participants.filter(x => x !== c.id) : [...f.participants, c.id] }))}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${on ? "bg-[#00488D] text-white border-[#00488D]" : "bg-white text-[#475569] border-[#CBD5E1] hover:border-[#00488D]"}`}>{c.name}</button>
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${on ? "bg-[#28634e] text-white border-[#28634e]" : "bg-white text-[#63756b] border-[#c6d2c7] hover:border-[#28634e]"}`}>{c.name}</button>
               })}
             </div></div>
           <div className="sm:col-span-2"><label className="text-xs font-semibold block mb-1">תבנית סדר יום</label>
@@ -283,27 +283,27 @@ export default function RoutinesPage() {
   )
 }
 
-const INPUT = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D]"
+const INPUT = "w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#28634e]"
 
 // ─── occurrence card (week view) ───────────────────────────────────────
 function OccCard({ o, onOpen, participants }: { o: Occ; onOpen: () => void; participants: any[] }) {
   const st = STATUS[o.status] || STATUS.planned
   const rep = o.report
   return (
-    <div onClick={onOpen} className="rounded-[10px] border border-[#E2E8F0] bg-white p-2.5 cursor-pointer hover:border-[#00488D] hover:shadow-sm transition-all" style={{ borderRightWidth: 3, borderRightColor: st.dot }}>
+    <div onClick={onOpen} className="rounded-[10px] border border-[#e1e8df] bg-white p-2.5 cursor-pointer hover:border-[#28634e] hover:shadow-sm transition-all" style={{ borderRightWidth: 3, borderRightColor: st.dot }}>
       <div className="flex items-center justify-between gap-1 mb-1">
-        <div className="text-xs font-bold text-[#0D2744] leading-tight truncate">{o.name}</div>
+        <div className="text-xs font-bold text-[#193d33] leading-tight truncate">{o.name}</div>
         {o.time && <div className="text-[10px] text-[#94A3B8] flex-shrink-0">{o.time}</div>}
       </div>
       <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: st.bg, color: st.fg }}>{st.label}</span>
-      {rep && <div className="text-[10px] text-[#64748B] mt-1">{rep.submitted.length}/{rep.submitted.length + rep.missing.length} הגישו</div>}
+      {rep && <div className="text-[10px] text-[#63756b] mt-1">{rep.submitted.length}/{rep.submitted.length + rep.missing.length} הגישו</div>}
       {!rep && (
         <div className="flex items-center mt-1.5 -space-x-1 space-x-reverse">
-          {participants.slice(0, 4).map(c => <span key={c.id} title={c.name} className="w-5 h-5 rounded-full bg-[#DBEAFE] text-[#00488D] text-[9px] font-bold flex items-center justify-center border border-white">{c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}</span>)}
+          {participants.slice(0, 4).map(c => <span key={c.id} title={c.name} className="w-5 h-5 rounded-full bg-[#eaf1e7] text-[#28634e] text-[9px] font-bold flex items-center justify-center border border-white">{c.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}</span>)}
           {participants.length > 4 && <span className="text-[10px] text-[#94A3B8] mr-1.5">+{participants.length - 4}</span>}
         </div>
       )}
-      {o.status === "planned" && !rep && <div className="text-[10px] text-[#00488D] font-semibold mt-1.5">תעד ←</div>}
+      {o.status === "planned" && !rep && <div className="text-[10px] text-[#28634e] font-semibold mt-1.5">תעד ←</div>}
     </div>
   )
 }
@@ -358,41 +358,41 @@ function DocPanel({ o, coords, participants, onClose, onSaved, router }: { o: Oc
 
   return (
     <>
-      <div onClick={onClose} className="fixed inset-0 bg-[#0D2744]/40 z-[90]" />
+      <div onClick={onClose} className="fixed inset-0 bg-[#193d33]/40 z-[90]" />
       <div dir="rtl" className="fixed top-0 bottom-0 right-0 w-[520px] max-w-[94vw] bg-white z-[91] shadow-2xl flex flex-col" style={{ animation: "routine-slide .18s ease-out" }}>
-        <div className="px-5 py-4 border-b border-[#E2E8F0] flex items-start justify-between gap-3">
+        <div className="px-5 py-4 border-b border-[#e1e8df] flex items-start justify-between gap-3">
           <div>
-            <div className="text-xs text-[#64748B]">{dayName} · {fd(o.due_date)}{o.time && ` · ${o.time}`}</div>
-            <div className="text-lg font-extrabold text-[#0D2744] mt-0.5">{o.name}</div>
+            <div className="text-xs text-[#63756b]">{dayName} · {fd(o.due_date)}{o.time && ` · ${o.time}`}</div>
+            <div className="text-lg font-extrabold text-[#193d33] mt-0.5">{o.name}</div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-[8px] bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#475569] text-sm">✕</button>
+          <button onClick={onClose} className="w-8 h-8 rounded-[8px] bg-[#edf1e9] hover:bg-[#e1e8df] text-[#63756b] text-sm">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {isReport ? (
             <div>
-              <div className="text-xs font-bold text-[#64748B] mb-2">דיווח שבועי · שבוע שמתחיל {fd(o.report?.week_start)}</div>
+              <div className="text-xs font-bold text-[#63756b] mb-2">דיווח שבועי · שבוע שמתחיל {fd(o.report?.week_start)}</div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-[10px] bg-[#DCFCE7] p-3">
-                  <div className="text-xs font-bold text-[#166534] mb-1.5">הגישו ({o.report?.submitted.length || 0})</div>
-                  {(o.report?.submitted || []).map((c: any) => <div key={c.id} className="text-sm text-[#166534]">✓ {c.name}</div>)}
-                  {!o.report?.submitted.length && <div className="text-xs text-[#166534]/70">עדיין אף אחד</div>}
+                <div className="rounded-[10px] bg-[#eaf1e7] p-3">
+                  <div className="text-xs font-bold text-[#28634e] mb-1.5">הגישו ({o.report?.submitted.length || 0})</div>
+                  {(o.report?.submitted || []).map((c: any) => <div key={c.id} className="text-sm text-[#28634e]">✓ {c.name}</div>)}
+                  {!o.report?.submitted.length && <div className="text-xs text-[#28634e]/70">עדיין אף אחד</div>}
                 </div>
-                <div className="rounded-[10px] bg-[#FEE2E2] p-3">
-                  <div className="text-xs font-bold text-[#991B1B] mb-1.5">חסרים ({o.report?.missing.length || 0})</div>
-                  {(o.report?.missing || []).map((c: any) => <div key={c.id} className="text-sm text-[#991B1B]">• {c.name}</div>)}
-                  {!o.report?.missing.length && <div className="text-xs text-[#991B1B]/70">כולם הגישו 🎉</div>}
+                <div className="rounded-[10px] bg-[#faeeed] p-3">
+                  <div className="text-xs font-bold text-[#a74450] mb-1.5">חסרים ({o.report?.missing.length || 0})</div>
+                  {(o.report?.missing || []).map((c: any) => <div key={c.id} className="text-sm text-[#a74450]">• {c.name}</div>)}
+                  {!o.report?.missing.length && <div className="text-xs text-[#a74450]/70">כולם הגישו 🎉</div>}
                 </div>
               </div>
-              <div className="text-xs text-[#64748B] mt-2">הסטטוס נגזר אוטומטית מהדיווחים שהוגשו במערכת. <span onClick={() => router.push("/admin/reports?tab=reports")} className="text-[#00488D] font-semibold cursor-pointer">לדיווחים ←</span></div>
+              <div className="text-xs text-[#63756b] mt-2">הסטטוס נגזר אוטומטית מהדיווחים שהוגשו במערכת. <span onClick={() => router.push("/admin/reports?tab=reports")} className="text-[#28634e] font-semibold cursor-pointer">לדיווחים ←</span></div>
             </div>
           ) : (
             <div>
-              <div className="text-xs font-bold text-[#64748B] mb-2">סטטוס</div>
+              <div className="text-xs font-bold text-[#63756b] mb-2">סטטוס</div>
               <div className="flex gap-1.5">
                 {(["done", "postponed", "missed", "planned"] as const).map(s => {
                   const x = STATUS[s]; const on = status === s
-                  return <button key={s} onClick={() => setStatus(s)} className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors" style={{ background: on ? x.bg : "#fff", color: on ? x.fg : "#64748B", borderColor: on ? x.dot : "#E2E8F0" }}>{x.label}</button>
+                  return <button key={s} onClick={() => setStatus(s)} className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors" style={{ background: on ? x.bg : "#fff", color: on ? x.fg : "#63756b", borderColor: on ? x.dot : "#e1e8df" }}>{x.label}</button>
                 })}
               </div>
             </div>
@@ -400,11 +400,11 @@ function DocPanel({ o, coords, participants, onClose, onSaved, router }: { o: Oc
 
           {!isReport && (
             <div>
-              <div className="text-xs font-bold text-[#64748B] mb-2">מי השתתף</div>
+              <div className="text-xs font-bold text-[#63756b] mb-2">מי השתתף</div>
               <div className="flex flex-wrap gap-1.5">
                 {participants.map(c => {
                   const on = attendees.includes(c.id)
-                  return <button key={c.id} onClick={() => setAttendees(a => on ? a.filter(x => x !== c.id) : [...a, c.id])} className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${on ? "bg-[#0D2744] text-white border-[#0D2744]" : "bg-white text-[#64748B] border-[#CBD5E1] line-through"}`}>{c.name}</button>
+                  return <button key={c.id} onClick={() => setAttendees(a => on ? a.filter(x => x !== c.id) : [...a, c.id])} className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${on ? "bg-[#193d33] text-white border-[#193d33]" : "bg-white text-[#63756b] border-[#c6d2c7] line-through"}`}>{c.name}</button>
                 })}
               </div>
             </div>
@@ -412,7 +412,7 @@ function DocPanel({ o, coords, participants, onClose, onSaved, router }: { o: Oc
 
           {isMeeting && (
             <div>
-              <div className="text-xs font-bold text-[#64748B] mb-2">סדר יום</div>
+              <div className="text-xs font-bold text-[#63756b] mb-2">סדר יום</div>
               <textarea value={agenda} onChange={e => setAgenda(e.target.value)} rows={4} className={INPUT} />
             </div>
           )}
@@ -420,53 +420,53 @@ function DocPanel({ o, coords, participants, onClose, onSaved, router }: { o: Oc
           {!isReport && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-[#64748B]">{isMeeting ? "סיכום הפגישה" : "תיעוד"}</div>
+                <div className="text-xs font-bold text-[#63756b]">{isMeeting ? "סיכום הפגישה" : "תיעוד"}</div>
                 {isMeeting && <Button size="sm" variant="secondary" onClick={extract} disabled={extracting || !notes.trim()}>{extracting ? "מחלץ..." : "✨ חלץ משימות מהסיכום"}</Button>}
               </div>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={6} className={INPUT} placeholder={isMeeting ? "מה סוכם, מי לוקח מה, חסמים..." : "מה נעשה"} />
               {isMeeting && !o.meeting_id && (
-                <label className="flex items-center gap-2 text-xs text-[#475569] mt-2 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-[#63756b] mt-2 cursor-pointer">
                   <input type="checkbox" checked={createMeeting} onChange={e => setCreateMeeting(e.target.checked)} />
                   לרשום גם כסיכום פגישה בכרטיס של כל רכז שהשתתף
                 </label>
               )}
-              {o.meeting_id && <div className="text-xs text-[#166534] mt-2">✓ נרשם כסיכום פגישה בכרטיסי הרכזים</div>}
+              {o.meeting_id && <div className="text-xs text-[#28634e] mt-2">✓ נרשם כסיכום פגישה בכרטיסי הרכזים</div>}
             </div>
           )}
 
           {!isReport && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-bold text-[#64748B]">משימות להמשך {tasks.length > 0 && `(${tasks.filter(t => !t._skip && t.title).length})`}</div>
-                <button onClick={addManualTask} className="text-xs text-[#00488D] font-semibold">+ משימה</button>
+                <div className="text-xs font-bold text-[#63756b]">משימות להמשך {tasks.length > 0 && `(${tasks.filter(t => !t._skip && t.title).length})`}</div>
+                <button onClick={addManualTask} className="text-xs text-[#28634e] font-semibold">+ משימה</button>
               </div>
               <div className="space-y-2">
                 {tasks.map((t, i) => (
-                  <div key={i} className={`rounded-[10px] border p-2.5 ${t._skip ? "opacity-40 border-[#E2E8F0]" : "border-[#BFDBFE] bg-[#F8FBFF]"}`}>
+                  <div key={i} className={`rounded-[10px] border p-2.5 ${t._skip ? "opacity-40 border-[#e1e8df]" : "border-[#c8dac7] bg-[#F8FBFF]"}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <input type="checkbox" checked={!t._skip} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, _skip: !e.target.checked } : x))} />
-                      <input value={t.title} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} placeholder="כותרת המשימה" className="flex-1 px-2 py-1 border border-[#CBD5E1] rounded-[7px] text-sm bg-white" />
+                      <input value={t.title} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} placeholder="כותרת המשימה" className="flex-1 px-2 py-1 border border-[#c6d2c7] rounded-[7px] text-sm bg-white" />
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
-                      <select value={t.type} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} className="px-2 py-1 border border-[#CBD5E1] rounded-[7px] text-xs bg-white">
+                      <select value={t.type} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, type: e.target.value } : x))} className="px-2 py-1 border border-[#c6d2c7] rounded-[7px] text-xs bg-white">
                         {Object.entries(TASK_TYPE).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
-                      <select value={t.coordinator_id} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, coordinator_id: e.target.value } : x))} className="px-2 py-1 border border-[#CBD5E1] rounded-[7px] text-xs bg-white">
+                      <select value={t.coordinator_id} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, coordinator_id: e.target.value } : x))} className="px-2 py-1 border border-[#c6d2c7] rounded-[7px] text-xs bg-white">
                         <option value="">אני</option>
                         {coords.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
-                      <input type="date" value={t.due_date} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, due_date: e.target.value } : x))} className="px-2 py-1 border border-[#CBD5E1] rounded-[7px] text-xs bg-white" />
+                      <input type="date" value={t.due_date} onChange={e => setTasks(ts => ts.map((x, j) => j === i ? { ...x, due_date: e.target.value } : x))} className="px-2 py-1 border border-[#c6d2c7] rounded-[7px] text-xs bg-white" />
                     </div>
                   </div>
                 ))}
                 {!tasks.length && <div className="text-xs text-[#94A3B8]">{isMeeting ? "כתוב סיכום ולחץ \"חלץ משימות\", או הוסף ידנית" : "אין משימות"}</div>}
               </div>
-              {o.tasks_created?.length > 0 && <div className="text-xs text-[#64748B] mt-2">כבר נוצרו {o.tasks_created.length} משימות ממופע זה · <span onClick={() => router.push("/admin/tasks")} className="text-[#00488D] font-semibold cursor-pointer">למשימות ←</span></div>}
+              {o.tasks_created?.length > 0 && <div className="text-xs text-[#63756b] mt-2">כבר נוצרו {o.tasks_created.length} משימות ממופע זה · <span onClick={() => router.push("/admin/tasks")} className="text-[#28634e] font-semibold cursor-pointer">למשימות ←</span></div>}
             </div>
           )}
         </div>
 
-        <div className="px-5 py-3 border-t border-[#E2E8F0] flex items-center justify-between gap-2 bg-[#F8FAFC]">
+        <div className="px-5 py-3 border-t border-[#e1e8df] flex items-center justify-between gap-2 bg-[#f7f9f5]">
           <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ background: st.bg, color: st.fg }}>{st.label}</span>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>סגור</Button>

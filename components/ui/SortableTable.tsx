@@ -69,8 +69,8 @@ export function Th({ label, k, sortKey, sortDir, onSort, className = "" }: ThPro
       aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
       className={
         "px-3 py-2.5 text-right text-xs font-bold whitespace-nowrap select-none " +
-        (sortable ? "cursor-pointer hover:text-[#00488D] " : "") +
-        (active ? "text-[#00488D] " : "text-[#64748B] ") +
+        (sortable ? "cursor-pointer hover:text-[#28634e] " : "") +
+        (active ? "text-[#28634e] " : "text-[#63756b] ") +
         className
       }
     >

@@ -18,10 +18,10 @@ const STATUS_LABEL: Record<string,string> = {
   new:"חדש", contacted:"יצרתי קשר", advanced:"עבר לשלב", irrelevant:"לא רלוונטי"
 }
 const STATUS_COLORS: Record<string,{bg:string,fg:string}> = {
-  new:{bg:"#DBEAFE",fg:"#1E40AF"},
-  contacted:{bg:"#DCFCE7",fg:"#166534"},
+  new:{bg:"#eaf1e7",fg:"#28634e"},
+  contacted:{bg:"#eaf1e7",fg:"#28634e"},
   advanced:{bg:"#EDE9FE",fg:"#5B21B6"},
-  irrelevant:{bg:"#FEE2E2",fg:"#991B1B"}
+  irrelevant:{bg:"#faeeed",fg:"#a74450"}
 }
 const EMPTY_FORM = {
   firstName:"", lastName:"", phone:"", age:"", idNumber:"", notes:"", eventId:"", leadSourceId:"", arrivalChannelId:"", contactId:""
@@ -179,7 +179,7 @@ export default function CoordLeads() {
         </div>
         <div className="ws-list">
           {shown.map(l=>{
-            const c=STATUS_COLORS[l.status]||{bg:"#F3F4F6",fg:"#374151"}
+            const c=STATUS_COLORS[l.status]||{bg:"#F3F4F6",fg:"#193d33"}
             const wa=`https://wa.me/972${String(l.phone||"").replace(/^0/,"").replace(/[^0-9]/g,"")}`
             return (
               <div key={l.id} className="ws-item" style={{alignItems:"flex-start"}}>
@@ -190,7 +190,7 @@ export default function CoordLeads() {
                     {l.phone && <a href={`tel:${l.phone}`} style={{color:"inherit"}}>{l.phone}</a>}
                     {l.age&&<> · גיל {l.age}</>}
                     {l.id_number&&<> · ת.ז {l.id_number}</>}
-                    {l.score!=null&&<> · <span style={{color:l.score>=8?"#166534":l.score>=5?"#B45309":"#94A3B8"}}>★ {l.score}</span></>}
+                    {l.score!=null&&<> · <span style={{color:l.score>=8?"#28634e":l.score>=5?"#946014":"#94A3B8"}}>★ {l.score}</span></>}
                   </small>
                   {l.notes&&<small style={{whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{l.notes}</small>}
                   <div style={{marginTop:6}}><SfStatusBadge lead={l}/></div>

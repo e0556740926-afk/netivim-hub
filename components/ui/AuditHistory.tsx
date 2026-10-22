@@ -5,7 +5,7 @@ const ACTION_LABEL: Record<string, string> = {
   create: "נוצר", update: "עודכן", delete: "נמחק", restore: "שוחזר",
 }
 const ACTION_COLOR: Record<string, string> = {
-  create: "#166534", update: "#00488D", delete: "#960010", restore: "#B45309",
+  create: "#28634e", update: "#28634e", delete: "#a74450", restore: "#946014",
 }
 
 interface Entry {
@@ -43,7 +43,7 @@ export default function AuditHistory({
   return (
     <div className="space-y-0">
       {entries.map(e => (
-        <div key={e.id} className="flex items-start gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
+        <div key={e.id} className="flex items-start gap-2.5 py-2 border-b border-[#edf1e9] last:border-0">
           <div
             className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
             style={{ background: ACTION_COLOR[e.action] || "#94A3B8" }}
@@ -53,9 +53,9 @@ export default function AuditHistory({
               <span className="font-semibold" style={{ color: ACTION_COLOR[e.action] }}>
                 {ACTION_LABEL[e.action] || e.action}
               </span>
-              {e.actor_name && <span className="text-[#64748B]"> · {e.actor_name}</span>}
+              {e.actor_name && <span className="text-[#63756b]"> · {e.actor_name}</span>}
             </div>
-            {e.summary && <div className="text-xs text-[#475569] mt-0.5">{e.summary}</div>}
+            {e.summary && <div className="text-xs text-[#63756b] mt-0.5">{e.summary}</div>}
           </div>
           <div className="text-[10px] text-[#94A3B8] flex-shrink-0 whitespace-nowrap">{fmt(e.created_at)}</div>
         </div>

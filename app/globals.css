@@ -1,17 +1,18 @@
 @import "tailwindcss";
+@import "./design-tokens.css";
 
 @theme {
-  --color-navy: #0D2744;
-  --color-blue: #00488D;
-  --color-light-blue: #DBEAFE;
+  --color-navy: #193d33;
+  --color-blue: #28634e;
+  --color-light-blue: #eaf1e7;
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: 'Heebo', system-ui, sans-serif;
-  background: #F0F4F8;
-  color: #0D2744;
+  background: #f4f6f2;
+  color: #193d33;
   direction: rtl;
 }
 
@@ -37,8 +38,8 @@ input, textarea, select, button {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #F0F4F8; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+::-webkit-scrollbar-track { background: #f4f6f2; }
+::-webkit-scrollbar-thumb { background: #c6d2c7; border-radius: 99px; }
 
 /* Responsive table wrapper */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -52,3 +53,14 @@ html { scroll-behavior: smooth; }
 /* Better input on iOS */
 input, select, textarea { font-size: 16px; }
 @media (min-width: 640px) { input, select, textarea { font-size: 14px; } }
+
+html { scrollbar-gutter:stable; }
+body { margin:0; background:var(--ui-bg); color:var(--ui-ink); line-height:1.6; }
+button,input,select,textarea { touch-action:manipulation; }
+button:disabled { cursor:not-allowed; }
+input,select,textarea { min-width:0; max-width:100%; accent-color:var(--ui-brand); }
+button,a,input,select,textarea,summary { scroll-margin-block:90px; }
+:focus-visible { outline:3px solid var(--ui-gold); outline-offset:3px; }
+::selection { background:#d3e5cf; color:#193d33; }
+@media(max-width:767px){input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:16px!important}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}

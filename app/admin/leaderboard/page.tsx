@@ -1,145 +1,75 @@
 "use client"
 import { useEffect, useState } from "react"
+import Link from "next/link"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
+import Button from "@/components/ui/Button"
+import Modal from "@/components/ui/Modal"
+import ErrorState from "@/components/ui/ErrorState"
+import { SkeletonCard } from "@/components/ui/Skeleton"
+import { useToast } from "@/components/ui/Toast"
+import { uiRequest, uiMutation } from "@/lib/ui-request"
 
-const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B7791F", breach: "#C0392B" }
-const MEDAL = ["🥇", "🥈", "🥉"]
-
-function pct(actual: number, target: number) {
-  if (!target) return null
-  return Math.min(100, Math.round((actual / target) * 100))
-}
-function colorFor(p: number | null) {
-  if (p === null) return T.slate
-  if (p >= 100) return T.ok
-  if (p >= 60) return T.warn
-  return T.breach
-}
-
-export default function LeaderboardPage() {
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [editingOrgTarget, setEditingOrgTarget] = useState(false)
-  const [orgTargetInput, setOrgTargetInput] = useState("")
-  const [editingSource, setEditingSource] = useState<number | null>(null)
-  const [sourceTargetInput, setSourceTargetInput] = useState("")
-
-  async function load() {
-    const r = await fetch("/api/admin/leaderboard-sources")
-    const d = await r.json()
-    setData(d)
-    setOrgTargetInput(String(d.org_target || 0))
-    setLoading(false)
-  }
-  useEffect(() => { load() }, [])
-
-  async function saveOrgTarget() {
-    await fetch("/api/admin/leaderboard-sources", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ org_target: Number(orgTargetInput) || 0 }) })
-    setEditingOrgTarget(false)
-    await load()
-  }
-  async function saveSourceTarget(id: number) {
-    await fetch("/api/admin/leaderboard-sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ lead_source_id: id, target_leads: Number(sourceTargetInput) || 0 }) })
-    setEditingSource(null)
-    await load()
-  }
-
-  if (loading || !data) return <div style={{ padding: 32 }}>טוען...</div>
-
-  const orgPct = pct(data.total_this_month, data.org_target)
-  const sorted = [...data.sources].sort((a: any, b: any) => b.total_this_month - a.total_this_month)
-
-  return (
-    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", padding: "24px 32px 60px", color: T.navy }}>
-      <div style={{ fontSize: 24, fontWeight: 700, marginBottom: 6 }}>לוח מובילים · לידים החודש לפי מקור</div>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 20 }}>
-        כל מקור (רכז או גורם חופשי) עם לינק משלו, וכמה לידים הוא הביא החודש — כולל כמה מהם הגיעו דרך הלינק.
-        <span style={{ marginRight: 12 }}>
-          <a href="/admin/leaderboard/sources" style={{ color: T.blue, fontWeight: 600 }}>ניהול מקורות ולינקים</a>
-          <span style={{ margin: "0 6px" }}>·</span>
-          <a href="/admin/leaderboard/channels" style={{ color: T.blue, fontWeight: 600 }}>ערוצי הגעה</a>
-        </span>
-      </div>
-
-      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, padding: 24, marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.slate }}>יעד כללי לארגון החודש</div>
-            <div style={{ fontSize: 34, fontWeight: 700, marginTop: 4, color: colorFor(orgPct) }}>
-              {data.total_this_month} / {data.org_target || "—"}
-              {orgPct !== null && <span style={{ fontSize: 16, marginRight: 10 }}>({orgPct}%)</span>}
-            </div>
-            {data.unattributed_this_month > 0 && (
-              <div style={{ fontSize: 11, color: T.slate, marginTop: 4 }}>
-                מתוכם {data.unattributed_this_month} לידים החודש בלי מקור משויך (מלפני שהשדה היה חובה)
-              </div>
-            )}
-          </div>
-          {editingOrgTarget ? (
-            <div style={{ display: "flex", gap: 8 }}>
-              <input type="number" value={orgTargetInput} onChange={e => setOrgTargetInput(e.target.value)} style={{ width: 90, border: `1px solid ${T.border}`, borderRadius: 8, padding: 8 }} />
-              <button onClick={saveOrgTarget} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>שמור</button>
-            </div>
-          ) : (
-            <button onClick={() => setEditingOrgTarget(true)} style={{ background: T.bg, color: T.slate, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13 }}>ערוך יעד כללי</button>
-          )}
-        </div>
-        {data.org_target > 0 && (
-          <div style={{ height: 10, background: T.bg, borderRadius: 5, marginTop: 14 }}>
-            <div style={{ height: "100%", width: `${orgPct}%`, background: colorFor(orgPct), borderRadius: 5 }} />
-          </div>
-        )}
-      </div>
-
-      <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 600 }}>
-          <thead><tr style={{ background: "#EDF2F8" }}>
-            {["#", "מקור", "החודש", "דרך הלינק", "יעד", "התקדמות", "סה\"כ (כל הזמנים)", "%"].map(h => <th key={h} style={{ textAlign: "right", padding: "10px 14px", fontSize: 12, fontWeight: 600, color: T.slate }}>{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {sorted.map((s: any, i: number) => {
-              const p = pct(s.total_this_month, s.target_leads)
-              const col = colorFor(p)
-              return (
-                <tr key={s.id} style={{ borderTop: `1px solid ${T.bg}` }}>
-                  <td style={{ padding: "10px 14px", fontSize: 16 }}>{MEDAL[i] || i + 1}</td>
-                  <td style={{ padding: "10px 14px", fontWeight: 600 }}>
-                    {s.label}{s.coordinator_id && <span style={{ fontSize: 11, color: T.slate, marginRight: 6 }}>רכז</span>}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontWeight: 700, color: col }}>{s.total_this_month}</td>
-                  <td style={{ padding: "10px 14px" }}>
-                    <span style={{ fontWeight: 600 }}>{s.via_link_this_month}</span>
-                    {s.slug && typeof window !== "undefined" && (
-                      <button title="העתק לינק" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/s/${s.slug}`)} style={{ marginRight: 6, background: T.bg, border: "none", borderRadius: 6, padding: "2px 8px", fontSize: 11, cursor: "pointer", color: T.slate }}>🔗 העתק</button>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px" }}>
-                    {editingSource === s.id ? (
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <input type="number" value={sourceTargetInput} onChange={e => setSourceTargetInput(e.target.value)} style={{ width: 60, border: `1px solid ${T.border}`, borderRadius: 6, padding: 4 }} />
-                        <button onClick={() => saveSourceTarget(s.id)} style={{ background: T.blue, color: "#fff", border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 11, cursor: "pointer" }}>✓</button>
-                      </div>
-                    ) : (
-                      <span onClick={() => { setEditingSource(s.id); setSourceTargetInput(String(s.target_leads || 0)) }} style={{ cursor: "pointer", textDecoration: "underline dotted" }}>
-                        {s.target_leads || "—"}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", minWidth: 120 }}>
-                    {p !== null ? (
-                      <div style={{ height: 8, background: T.bg, borderRadius: 4 }}><div style={{ height: "100%", width: `${p}%`, background: col, borderRadius: 4 }} /></div>
-                    ) : <span style={{ color: T.slate, fontSize: 11 }}>אין יעד</span>}
-                  </td>
-                  <td style={{ padding: "10px 14px", color: T.slate }}>{s.total_all_time}</td>
-                  <td style={{ padding: "10px 14px", fontWeight: 700, color: col }}>{p !== null ? `${p}%` : "—"}</td>
-                </tr>
-              )
-            })}
-            {!sorted.length && <tr><td colSpan={8} style={{ padding: 20, textAlign: "center", color: T.slate }}>אין עדיין מקורות פעילים — הגדר ב&quot;מקורות ליד&quot;</td></tr>}
-          </tbody>
-        </table>
-        </div>
-      </div>
+interface Source {id:number;label:string;coordinator_id:number|null;slug:string;target_leads:number;total_this_month:number;via_link_this_month:number;total_all_time:number}
+interface Ranking {sources:Source[];org_target:number;total_this_month:number;unattributed_this_month:number}
+const percent=(a:number,b:number)=>b>0?Math.round(a/b*100):null
+function Progress({value}:{value:number|null}){return <div className="ui-progress" role="progressbar" aria-label="התקדמות ליעד" aria-valuenow={value===null?undefined:Math.min(value,100)} aria-valuemin={0} aria-valuemax={100} aria-valuetext={value===null?"טרם הוגדר יעד":`${value}% מהיעד`}><span style={{width:`${Math.min(100,value||0)}%`}}/></div>}
+export default function LeaderboardPage(){
+ const [data,setData]=useState<Ranking|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(false)
+ const [target,setTarget]=useState<{id:number|null;label:string}|null>(null),[input,setInput]=useState("")
+ const [saving,setSaving]=useState(false),[formError,setFormError]=useState("")
+ const [query,setQuery]=useState("")
+ const toast=useToast()
+ async function load(){setError(false);try{setData(await uiRequest<Ranking>("/api/admin/leaderboard-sources"))}catch{setError(true)}finally{setLoading(false)}}
+ useEffect(()=>{load()},[])
+ function edit(id:number|null,label:string,value:number){setInput(String(value||0));setFormError("");setTarget({id,label})}
+ async function save(){
+  if(!target||saving)return
+  const value=Number(input)
+  if(input.trim()===""||!Number.isInteger(value)||value<0){setFormError("יש להזין יעד שלם שאינו שלילי.");return}
+  setSaving(true);setFormError("")
+  try{await uiMutation("/api/admin/leaderboard-sources",target.id===null?"PATCH":"POST",target.id===null?{org_target:value}:{lead_source_id:target.id,target_leads:value});setTarget(null);toast.success("היעד עודכן");await load()}
+  catch(e){setFormError(e instanceof Error?e.message:"היעד לא נשמר")}
+  finally{setSaving(false)}
+ }
+ async function copy(slug:string){try{await navigator.clipboard.writeText(`${window.location.origin}/s/${slug}`);toast.success("הלינק הועתק")}catch{toast.error("לא ניתן להעתיק כרגע. אפשר להעתיק מתוך ניהול המקורות.")}}
+ const sorted=[...(data?.sources||[])].sort((a,b)=>b.total_this_month-a.total_this_month)
+ const rows=sorted.filter(s=>s.label.includes(query.trim()))
+ const orgPct=data?percent(data.total_this_month,data.org_target):null
+ return <div className="ui-page">
+  <WorkspaceHeader title="לוח המובילים" description="תמונת ההתקדמות החודשית — מי מביא לידים, מאיזה מקור וכמה נשאר ליעד."
+   actions={<><Link className="ui-btn" href="/admin/leaderboard/channels">ערוצי הגעה</Link><Link className="ui-btn ui-btn-primary" href="/admin/leaderboard/sources">ניהול מקורות ולינקים</Link></>}/>
+  {error?<ErrorState retry={load}/>:loading?<div className="space-y-4"><SkeletonCard rows={3}/><SkeletonCard rows={6}/></div>:data&&<>
+   <section className="ui-hero" aria-label="היעד הארגוני">
+    <div><span className="ui-eyebrow">ההתקדמות של כולנו · החודש</span><h2>כל ליד הוא התחלה של דרך</h2><strong>{data.total_this_month.toLocaleString("he-IL")} <span className="text-lg font-normal text-[#63756b]">/ {data.org_target||"טרם הוגדר יעד"}</span></strong>
+     <p className="ui-note">{orgPct===null?"הגדרת יעד מאפשרת לעקוב אחרי ההתקדמות החודשית.":orgPct>=100?`הגענו ל־${orgPct}% מהיעד החודשי`:`עוד ${Math.max(0,data.org_target-data.total_this_month)} לידים ליעד החודשי`}</p>
     </div>
-  )
+    <div className="min-w-[180px] flex-1 max-w-[400px]"><div className="flex justify-between text-xs mb-3"><span>התקדמות ליעד</span><b>{orgPct===null?"—":`${orgPct}%`}</b></div><Progress value={orgPct}/><button className="ui-target mt-3 text-xs" onClick={()=>edit(null,"היעד הארגוני",data.org_target)}>עריכת היעד הארגוני</button></div>
+   </section>
+   <div className="ui-stat-grid">
+    <div className="ui-card ui-stat"><small>לידים החודש</small><strong>{data.total_this_month}</strong></div>
+    <div className="ui-card ui-stat"><small>מקורות בדירוג</small><strong>{sorted.length}</strong></div>
+    <div className="ui-card ui-stat"><small>ללא מקור משויך</small><strong>{data.unattributed_this_month||0}</strong></div>
+   </div>
+   <section className="ui-card">
+    <div className="ui-toolbar"><div><h2>הדירוג החודשי</h2><p className="ui-note">לפי מספר הלידים שהתקבלו החודש</p></div><input type="search" className="ui-input max-w-[260px]" aria-label="חיפוש מקור בדירוג" placeholder="חיפוש מקור או רכז…" value={query} onChange={e=>setQuery(e.target.value)}/></div>
+    <div className="ui-table-wrap"><table className="ui-table ui-table-mobile"><caption className="sr-only">מקורות ליד, הישגים ויעדים בחודש הנוכחי</caption>
+     <thead><tr>{["דירוג","מקור","לידים החודש","דרך הלינק","יעד חודשי","התקדמות","כל הזמנים"].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead>
+     <tbody>{rows.map(s=>{const index=sorted.findIndex(x=>x.id===s.id),p=percent(s.total_this_month,s.target_leads);return <tr key={s.id}>
+      <td><span className={`ui-rank ${index<3&&s.total_this_month>0?"ui-rank-top":""}`}>{index+1}</span></td>
+      <td><div className="ui-name"><span className="ui-avatar">{s.label.slice(0,2)}</span><div>{s.label}<small className="block ui-note">{s.coordinator_id?"רכז שטח":"מקור ליד"}</small></div></div></td>
+      <td data-label="לידים החודש"><b>{s.total_this_month}</b></td>
+      <td data-label="דרך הלינק"><div className="ui-actions"><span>{s.via_link_this_month}</span>{s.slug&&<button className="ui-btn ui-btn-sm" onClick={()=>copy(s.slug)} aria-label={`העתקת הלינק של ${s.label}`}>העתק לינק</button>}</div></td>
+      <td data-label="יעד חודשי"><button className="ui-target" onClick={()=>edit(s.id,s.label,s.target_leads)} aria-label={`עריכת יעד עבור ${s.label}`}>{s.target_leads||"הגדרת יעד"}</button></td>
+      <td data-progress><div className="flex justify-between text-[11px] mb-2 gap-3"><span>{p===null?"ללא יעד":`${p}%`}</span>{p!==null&&p>=100&&<span className="text-[#28634e]">היעד הושג</span>}</div><Progress value={p}/></td>
+      <td data-label="כל הזמנים">{s.total_all_time}</td>
+     </tr>})}</tbody>
+    </table></div>
+    {!rows.length&&<div className="ui-empty"><h2>{query?"לא נמצאו מקורות בחיפוש":"הדירוג מחכה למקורות הראשונים"}</h2><p>{query?"אפשר לנסות שם אחר או לנקות את החיפוש.":"הוסיפו מקורות ליד ולינקים אישיים כדי להתחיל למדוד."}</p><Link href="/admin/leaderboard/sources" className="ui-btn mt-4">ניהול מקורות</Link></div>}
+   </section>
+  </>}
+  <Modal open={target!==null} onClose={()=>{if(!saving)setTarget(null)}} title={`עדכון יעד · ${target?.label||""}`} subtitle="יעד הלידים לחודש הנוכחי. ערך 0 מסיר את היעד." width="440px"
+   footer={<><Button onClick={save} disabled={saving}>{saving?"שומר…":"שמירת יעד"}</Button><Button variant="secondary" disabled={saving} onClick={()=>setTarget(null)}>ביטול</Button></>}>
+   <form onSubmit={e=>{e.preventDefault();save()}}><label className="ui-field">מספר לידים<input autoFocus className="ui-input" inputMode="numeric" type="number" min="0" step="1" value={input} onChange={e=>setInput(e.target.value)}/></label>{formError&&<p role="alert" className="ui-error mt-3">{formError}</p>}</form>
+  </Modal>
+ </div>
 }

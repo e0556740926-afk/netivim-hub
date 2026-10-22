@@ -1,8 +1,8 @@
 /* Phone shell — navy brand header, green actions, quiet light surface.
    Shared by the coordinator and manager layouts. */
 :root{
-  --sh-navy:#102d43;--sh-green:#21634f;--sh-green-dark:#184c3c;--sh-ink:#183d32;--sh-muted:#62756e;
-  --sh-line:#e1e8e3;--sh-bg:#f4f7f4;--sh-tint:#edf4ee;--sh-red:#a03c36;--sh-amber:#946014;
+  --sh-navy:var(--ui-nav);--sh-green:var(--ui-brand);--sh-green-dark:var(--ui-brand-hover);--sh-ink:var(--ui-ink);--sh-muted:var(--ui-muted);
+  --sh-line:var(--ui-line);--sh-bg:var(--ui-bg);--sh-tint:var(--ui-tint);--sh-red:var(--ui-danger);--sh-amber:var(--ui-warning);
   --sh-nav-h:64px;--sh-safe:env(safe-area-inset-bottom,0px);
 }
 .shell-icon{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}

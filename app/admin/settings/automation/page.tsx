@@ -1,7 +1,9 @@
 "use client"
+import { uiRequest, uiMutation } from "@/lib/ui-request"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { useEffect, useState } from "react"
 
-const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F" }
+const T = { navy: "#193d33", blue: "#28634e", slate: "#63756b", border: "#d0dbd0", bg: "#f4f6f2", ok: "#28634e" }
 
 function Row({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
   return (
@@ -18,20 +20,19 @@ export default function AutomationSettings() {
   const [s, setS] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState("")
 
   async function load() {
     setLoading(true)
-    const r = await fetch("/api/admin/automation-settings")
-    setS((await r.json()).settings || {})
-    setLoading(false)
+    try{const d=await uiRequest("/api/admin/automation-settings");setS(d.settings||{})}catch(e){setError(e instanceof Error?e.message:"הטעינה נכשלה")}finally{setLoading(false)}
   }
   useEffect(() => { load() }, [])
 
   async function save(patch: Record<string, string>) {
     const next = { ...s, ...patch }
     setS(next)
-    await fetch("/api/admin/automation-settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) })
-    setSaved(true); setTimeout(() => setSaved(false), 1500)
+    setSaved(false);setError("")
+    try{await uiMutation("/api/admin/automation-settings","PATCH",patch);setSaved(true);setTimeout(()=>setSaved(false),1500)}catch(e){setError(e instanceof Error?e.message:"ההגדרה לא נשמרה")}
   }
 
   const [checkinA, checkinB] = (s.support_checkin_months || "4,8").split(",")
@@ -39,12 +40,10 @@ export default function AutomationSettings() {
   if (loading) return <div style={{ padding: 32 }}>טוען...</div>
 
   return (
-    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", color: T.navy, padding: "24px 32px 60px" }}>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 10 }}>הגדרות › <span style={{ color: T.navy, fontWeight: 600 }}>אוטומציה</span></div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>הגדרות אוטומציה</div>
-        {saved && <span style={{ fontSize: 12, color: T.ok, fontWeight: 600 }}>✓ נשמר</span>}
-      </div>
+    <div dir="rtl" className="ui-page ui-settings">
+      <WorkspaceHeader title="אוטומציות וכללי טיפול" description="תזמונים, תזכורות וכללים קבועים — לפי תהליכי העבודה הקיימים במערכת." parent={{label:"הגדרות",href:"/admin/settings"}}/>
+      {error&&<p role="alert" className="ui-error">{error} <button className="underline" onClick={load}>טעינה מחדש</button></p>}
+      {saved&&<p className="ui-badge mb-4" role="status">✓ השינוי נשמר</p>}
 
       <div style={{ background: "#fff", border: `1px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
         <Row title='חלון הפולו-אפ ל"לא רלוונטי"' sub="תיק שסווג לא רלוונטי יוחזר אוטומטית לבדיקה אחרי">

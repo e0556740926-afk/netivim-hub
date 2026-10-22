@@ -21,19 +21,19 @@ export default function ArchiveIssuePage({ params }: { params: Promise<{ id: str
   }, [id])
 
   if (err) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8]" dir="rtl">
-      <div className="text-[#64748B] text-sm">הגיליון לא נמצא</div>
+    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f2]" dir="rtl">
+      <div className="text-[#63756b] text-sm">הגיליון לא נמצא</div>
     </div>
   )
   if (!issue) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8]" dir="rtl">
-      <div className="text-[#64748B] text-sm">טוען...</div>
+    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f2]" dir="rtl">
+      <div className="text-[#63756b] text-sm">טוען...</div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#F0F4F8]" dir="rtl">
-      <div className="sticky top-0 bg-[#0D2744] px-4 py-3 flex items-center justify-between shadow-md z-10">
+    <div className="min-h-screen bg-[#f4f6f2]" dir="rtl">
+      <div className="sticky top-0 bg-[#193d33] px-4 py-3 flex items-center justify-between shadow-md z-10">
         <a href="/newsletter/archive" className="text-white/70 text-sm hover:text-white">← לכל הגיליונות</a>
         <div className="text-white/50 text-xs">{fd(issue.sent_at)}</div>
       </div>

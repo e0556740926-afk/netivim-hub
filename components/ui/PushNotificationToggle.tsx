@@ -87,8 +87,8 @@ export default function PushNotificationToggle() {
       disabled={busy}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] text-xs font-semibold border transition-colors disabled:opacity-50 ${
         subscribed
-          ? "bg-[#DCFCE7] border-[#BBF7D0] text-[#166534]"
-          : "bg-white border-[#E2E8F0] text-[#374151] hover:bg-[#F0F7FF] hover:border-[#BFDBFE]"
+          ? "bg-[#eaf1e7] border-[#c8dac7] text-[#28634e]"
+          : "bg-white border-[#e1e8df] text-[#193d33] hover:bg-[#edf4eb] hover:border-[#c8dac7]"
       }`}
     >
       {busy ? "..." : subscribed ? "🔔 התראות פעילות" : "🔕 הפעל התראות"}

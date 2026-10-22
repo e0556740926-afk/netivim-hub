@@ -2,9 +2,9 @@
 
 /** Traffic-light palette for the coordinator engagement score (see lib/coordinator-metrics.ts for the rule). */
 export const LIGHT: Record<string, { bg: string; fg: string; dot: string; label: string }> = {
-  green:  { bg: "#DCFCE7", fg: "#166534", dot: "#16A34A", label: "פעיל" },
-  yellow: { bg: "#FEF3C7", fg: "#B45309", dot: "#F59E0B", label: "חלקי" },
-  red:    { bg: "#FEE2E2", fg: "#991B1B", dot: "#DC2626", label: "דורש תשומת לב" },
+  green:  { bg: "#eaf1e7", fg: "#28634e", dot: "#16A34A", label: "פעיל" },
+  yellow: { bg: "#faf1e3", fg: "#946014", dot: "#F59E0B", label: "חלקי" },
+  red:    { bg: "#faeeed", fg: "#a74450", dot: "#DC2626", label: "דורש תשומת לב" },
 }
 
 export default function EngagementLight({ light, withLabel, size = "sm" }: { light: string; withLabel?: boolean; size?: "sm" | "md" }) {

@@ -27,7 +27,7 @@ export function ViewAsBanner() {
   const label = ROLES.find(r => r[0] === active.role)?.[1] || active.role
 
   return (
-    <div style={{ background: "#B7791F", color: "#fff", padding: "8px 20px", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }} dir="rtl">
+    <div style={{ background: "#946014", color: "#fff", padding: "8px 20px", fontSize: 13, fontWeight: 600, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 }} dir="rtl">
       <span>👁️ אתה צופה כ&quot;{label}&quot; — זו לא הזהות האמיתית שלך, זו תצוגה זמנית לבדיקה</span>
       <span onClick={exit} style={{ cursor: "pointer", textDecoration: "underline", fontWeight: 700 }}>יציאה מהתצוגה</span>
     </div>
@@ -59,7 +59,7 @@ export default function ViewAsControl() {
       {open && (
         <div style={{ position: "absolute", bottom: "100%", right: 0, background: "#fff", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.2)", overflow: "hidden", minWidth: 180, marginBottom: 6 }}>
           {ROLES.map(([r, label]) => (
-            <div key={r} onClick={() => start(r)} style={{ padding: "10px 14px", fontSize: 13, color: "#14213D", cursor: "pointer" }}>
+            <div key={r} onClick={() => start(r)} style={{ padding: "10px 14px", fontSize: 13, color: "#193d33", cursor: "pointer" }}>
               {label}
             </div>
           ))}

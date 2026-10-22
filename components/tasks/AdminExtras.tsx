@@ -58,15 +58,15 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
     success(action === "pause" ? "הסדרה הושהתה" : "הסדרה חודשה"); load(); onChanged()
   }
 
-  const FIELD = "px-2.5 py-1.5 border border-[#CBD5E1] rounded-[8px] text-xs bg-white focus:outline-none focus:border-[#00488D]"
+  const FIELD = "px-2.5 py-1.5 border border-[#c6d2c7] rounded-[8px] text-xs bg-white focus:outline-none focus:border-[#28634e]"
 
   return (
     <>
       <div className="panel-backdrop" onClick={onClose} />
       <aside ref={dialogRef} tabIndex={-1} className="panel tw-admin-panel" role="dialog" aria-label={tab === "templates" ? "תבניות משימות" : "סדרות חוזרות"} aria-modal="true" dir="rtl">
         <header className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#EEF2F6]">
-          <div className="text-base font-extrabold text-[#0D2744]">{tab === "templates" ? "תבניות משימות" : "סדרות חוזרות"}</div>
-          <button onClick={onClose} aria-label="סגור" className="press w-8 h-8 rounded-[8px] text-[#64748B] hover:bg-[#F1F5F9] flex items-center justify-center">
+          <div className="text-base font-extrabold text-[#193d33]">{tab === "templates" ? "תבניות משימות" : "סדרות חוזרות"}</div>
+          <button onClick={onClose} aria-label="סגור" className="press w-8 h-8 rounded-[8px] text-[#63756b] hover:bg-[#edf1e9] flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 2l10 10M12 2L2 12" /></svg>
           </button>
         </header>
@@ -75,16 +75,16 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
 
           {tab === "series" && !loading && (
             <>
-              <p className="text-xs text-[#64748B] leading-relaxed">משימה עם חזרה היא &quot;סדרה&quot;: המערכת יוצרת ממנה הופעה חדשה בכל מועד. השהיה עוצרת את ההופעות הבאות בלי למחוק את הקיימות.</p>
+              <p className="text-xs text-[#63756b] leading-relaxed">משימה עם חזרה היא &quot;סדרה&quot;: המערכת יוצרת ממנה הופעה חדשה בכל מועד. השהיה עוצרת את ההופעות הבאות בלי למחוק את הקיימות.</p>
               {series.map(s => (
-                <div key={s.id} className="border border-[#E2E8F0] rounded-[12px] p-3 flex items-center gap-3">
+                <div key={s.id} className="border border-[#e1e8df] rounded-[12px] p-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-bold text-[#0D2744] truncate">{s.title}</div>
-                    <div className="text-[11px] text-[#64748B] mt-0.5">{RECURRENCE_LABEL[s.recurrence] || s.recurrence} · {s.spawned_count} נוצרו · {s.open_count} פתוחות{!s.next_run && " · מושהית"}</div>
+                    <div className="text-sm font-bold text-[#193d33] truncate">{s.title}</div>
+                    <div className="text-[11px] text-[#63756b] mt-0.5">{RECURRENCE_LABEL[s.recurrence] || s.recurrence} · {s.spawned_count} נוצרו · {s.open_count} פתוחות{!s.next_run && " · מושהית"}</div>
                   </div>
                   {s.next_run
-                    ? <button onClick={() => seriesAction(s.id, "pause")} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] border border-[#E2E8F0] hover:bg-[#F8FAFC]">השהה</button>
-                    : <button onClick={() => seriesAction(s.id, "resume")} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#DCFCE7] text-[#166534]">חדש</button>}
+                    ? <button onClick={() => seriesAction(s.id, "pause")} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] border border-[#e1e8df] hover:bg-[#f7f9f5]">השהה</button>
+                    : <button onClick={() => seriesAction(s.id, "resume")} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#eaf1e7] text-[#28634e]">חדש</button>}
                 </div>
               ))}
               {!series.length && <div className="text-sm text-[#94A3B8] text-center py-8">אין סדרות חוזרות. צור משימה ובחר &quot;חזרה&quot; כדי להתחיל אחת.</div>}
@@ -94,27 +94,27 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
           {tab === "templates" && !loading && (
             <>
               {templates.map(t => (
-                <div key={t.id} className="border border-[#E2E8F0] rounded-[12px] p-3">
+                <div key={t.id} className="border border-[#e1e8df] rounded-[12px] p-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-bold text-[#0D2744]">{t.name} <span className="text-[#94A3B8] font-normal text-xs">· {t.items.length} שלבים</span></div>
+                    <div className="text-sm font-bold text-[#193d33]">{t.name} <span className="text-[#94A3B8] font-normal text-xs">· {t.items.length} שלבים</span></div>
                     <div className="flex gap-1">
-                      <button onClick={() => setApplyId(applyId === t.id ? null : t.id)} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#0D2744] text-white">{applyId === t.id ? "ביטול" : "החל"}</button>
-                      <button onClick={() => deleteTemplate(t.id)} className="press text-xs px-2 py-1.5 rounded-[8px] text-[#64748B] hover:text-[#960010] hover:bg-[#FFF1F1]">מחק</button>
+                      <button onClick={() => setApplyId(applyId === t.id ? null : t.id)} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#193d33] text-white">{applyId === t.id ? "ביטול" : "החל"}</button>
+                      <button onClick={() => deleteTemplate(t.id)} className="press text-xs px-2 py-1.5 rounded-[8px] text-[#63756b] hover:text-[#a74450] hover:bg-[#FFF1F1]">מחק</button>
                     </div>
                   </div>
-                  <ol className="text-[11px] text-[#64748B] mt-1.5 space-y-0.5 pr-4 list-decimal">{t.items.map((i: any) => <li key={i.id}>{i.title} <span className="text-[#B6C2D1]">+{i.offset_days}י׳</span></li>)}</ol>
+                  <ol className="text-[11px] text-[#63756b] mt-1.5 space-y-0.5 pr-4 list-decimal">{t.items.map((i: any) => <li key={i.id}>{i.title} <span className="text-[#B6C2D1]">+{i.offset_days}י׳</span></li>)}</ol>
                   {applyId === t.id && (
                     <div className="mt-3 pt-3 border-t border-[#EEF2F6] space-y-2">
                       <div className="flex flex-wrap gap-1.5">
                         {people.map(p => {
                           const on = applyTo.includes(p.name)
                           return <button key={`${p.id}-${p._isManager ? "m" : "c"}`} type="button" onClick={() => setApplyTo(a => on ? a.filter(x => x !== p.name) : [...a, p.name])}
-                            className={`press text-xs rounded-full px-2.5 py-1 border ${on ? "bg-[#0D2744] border-[#0D2744] text-white" : "bg-white border-[#E2E8F0] text-[#334155]"}`}>{p.name}</button>
+                            className={`press text-xs rounded-full px-2.5 py-1 border ${on ? "bg-[#193d33] border-[#193d33] text-white" : "bg-white border-[#e1e8df] text-[#334155]"}`}>{p.name}</button>
                         })}
                       </div>
                       <div className="flex items-center gap-2">
                         <input type="date" value={applyDate} onChange={e => setApplyDate(e.target.value)} className={FIELD} />
-                        <button onClick={applyTemplate} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#00488D] text-white">צור משימות</button>
+                        <button onClick={applyTemplate} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#28634e] text-white">צור משימות</button>
                       </div>
                     </div>
                   )}
@@ -122,8 +122,8 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
               ))}
               {!templates.length && <div className="text-sm text-[#94A3B8] text-center py-6">אין תבניות עדיין</div>}
 
-              <details className="border border-dashed border-[#CBD5E1] rounded-[12px] p-3">
-                <summary className="text-sm font-bold text-[#00488D] cursor-pointer select-none">+ תבנית חדשה</summary>
+              <details className="border border-dashed border-[#c6d2c7] rounded-[12px] p-3">
+                <summary className="text-sm font-bold text-[#28634e] cursor-pointer select-none">+ תבנית חדשה</summary>
                 <div className="mt-3 space-y-2">
                   <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="שם התבנית, למשל: רצף פתיחת שותפות" className={FIELD + " w-full"} />
                   {newItems.map((it, idx) => (
@@ -132,14 +132,14 @@ export default function AdminExtras({ tab, people, today, onClose, onChanged }: 
                       <select value={it.type} onChange={e => setNewItems(items => items.map((x, i) => i === idx ? { ...x, type: e.target.value } : x))} className={FIELD}>
                         {Object.entries(TYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
-                      <label className="flex items-center gap-1 text-[11px] text-[#64748B]">
+                      <label className="flex items-center gap-1 text-[11px] text-[#63756b]">
                         <input type="number" value={it.offset_days} onChange={e => setNewItems(items => items.map((x, i) => i === idx ? { ...x, offset_days: Number(e.target.value) } : x))} className={FIELD + " w-14"} />ימים
                       </label>
                     </div>
                   ))}
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setNewItems(i => [...i, { title: "", type: "call", priority: "normal", offset_days: 0 }])} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] border border-[#E2E8F0]">+ שלב</button>
-                    <button type="button" onClick={saveTemplate} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#00488D] text-white">שמור תבנית</button>
+                    <button type="button" onClick={() => setNewItems(i => [...i, { title: "", type: "call", priority: "normal", offset_days: 0 }])} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] border border-[#e1e8df]">+ שלב</button>
+                    <button type="button" onClick={saveTemplate} className="press text-xs font-bold px-3 py-1.5 rounded-[8px] bg-[#28634e] text-white">שמור תבנית</button>
                   </div>
                 </div>
               </details>

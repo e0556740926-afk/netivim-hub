@@ -1,0 +1,632 @@
+[
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/calendar",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/contacts",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/contacts?view=organizations",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/dashboard",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/events",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/leaderboard",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/leaderboard/channels",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/leaderboard/sources",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/leads",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/messaging/audiences/1",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/messaging/campaigns/1",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/messaging/campaigns/new",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/messaging/import",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/messaging",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/newsletter",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/reports/monthly",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/reports",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/reports/weekly?coordinator_id=101",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/reports/101",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 319,
+    "url": "/admin/routines",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/settings/automation",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/settings/fields",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/settings",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/settings/whatsapp-bot",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/admin/tasks",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/calendar",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/contacts",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/contacts?view=organizations",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/dashboard",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/events",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/leaderboard",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/leaderboard/channels",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/leaderboard/sources",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/leads",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/messaging/audiences/1",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/messaging/campaigns/1",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/messaging/campaigns/new",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/messaging/import",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/messaging",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/newsletter",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/reports/monthly",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/reports",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/reports/weekly?coordinator_id=101",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/reports/101",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/routines",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/settings/automation",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/settings/fields",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/settings",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/settings/whatsapp-bot",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/admin/tasks",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/home",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/tasks",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/calendar",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/events",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/leads",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/contacts",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/contacts?view=organizations",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/profile",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/link",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/coord/newsletter",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/home",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/tasks",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/calendar",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/events",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/leads",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/contacts",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/contacts?view=organizations",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/profile",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/link",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/coord/newsletter",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/login",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter/preferences",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter/archive",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter/unsubscribed",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/s/qa-source-0",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/j/event/qa-event-0",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/j/qa-coord-0",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter/qa-coord-0",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 316,
+    "url": "/newsletter/archive/1",
+    "width": 320
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/login",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter/preferences",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter/archive",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter/unsubscribed",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/s/qa-source-0",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/j/event/qa-event-0",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/j/qa-coord-0",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter/qa-coord-0",
+    "width": 1440
+  },
+  {
+    "error": false,
+    "overflow": false,
+    "scrollWidth": 1436,
+    "url": "/newsletter/archive/1",
+    "width": 1440
+  }
+]

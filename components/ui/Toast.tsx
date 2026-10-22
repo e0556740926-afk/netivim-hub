@@ -25,9 +25,9 @@ const Ctx = createContext<ToastCtx>({
 })
 
 const STYLES: Record<ToastKind, { bg: string; fg: string; icon: string }> = {
-  success: { bg: "#0D2744", fg: "#fff", icon: "✓" },
-  error:   { bg: "#960010", fg: "#fff", icon: "✕" },
-  info:    { bg: "#374151", fg: "#fff", icon: "ℹ" },
+  success: { bg: "#193d33", fg: "#fff", icon: "✓" },
+  error:   { bg: "#a74450", fg: "#fff", icon: "✕" },
+  info:    { bg: "#193d33", fg: "#fff", icon: "ℹ" },
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         dir="rtl"
         style={{
-          position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)",
           zIndex: 9999, display: "flex", flexDirection: "column", gap: 8,
           pointerEvents: "none", width: "min(92vw, 420px)",
         }}

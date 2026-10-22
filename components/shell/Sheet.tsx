@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useRef } from "react"
 import { Icon } from "./icons"
+import { lockOverlayScroll } from "@/lib/overlay-scroll"
 
 /**
  * Phone-first sheet: slides up from the bottom on a phone, centred panel
@@ -29,8 +30,7 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
   useEffect(() => {
     if (!open) return
     const opener = document.activeElement as HTMLElement | null
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = "hidden"
+    const releaseScroll=lockOverlayScroll()
     // Focus the panel itself (not the first input) so a phone keyboard
     // doesn't pop up just from opening the sheet.
     const first = panel.current?.querySelector<HTMLElement>("[data-autofocus]") || panel.current
@@ -54,7 +54,7 @@ export default function Sheet({ open, onClose, title, subtitle, children, footer
     document.addEventListener("keydown", onKey)
     return () => {
       document.removeEventListener("keydown", onKey)
-      document.body.style.overflow = prevOverflow
+      releaseScroll()
       if (opener && document.contains(opener)) opener.focus({ preventScroll: true })
     }
   }, [open])

@@ -18,8 +18,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Show loader only on initial load (no user yet)
   if (loading && !user) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F0F4F8]">
-      <div className="text-[#64748B] text-sm">טוען...</div>
+    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f2]">
+      <div className="text-[#63756b] text-sm">טוען...</div>
     </div>
   )
 
@@ -27,7 +27,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!user) return null
 
   return (
-    <div className="admin-shell flex min-h-screen bg-[#F0F4F8]" dir="rtl">
+    <div className="admin-shell flex min-h-screen bg-[#f4f6f2]" dir="rtl">
+      <a className="ui-skip" href="#main-content">דילוג לתוכן</a>
       {/* Sidebar — desktop only. On a phone the bottom nav + "עוד" replace it. */}
       <div className="admin-sidebar-wrap hidden md:block sticky top-0 h-screen flex-shrink-0">
         <Sidebar/>
@@ -38,7 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Phone header (hidden from md up) */}
         <ShellHeader kind="admin" onAvatar={() => setMoreOpen(true)}/>
         <ViewAsBanner/>
-        <div className="admin-scroll-content flex-1 overflow-y-auto">{children}</div>
+        <div id="main-content" className="admin-scroll-content flex-1 min-w-0">{children}</div>
       </main>
       <ShellChrome kind="admin" moreOpen={moreOpen} setMoreOpen={setMoreOpen}/>
     </div>

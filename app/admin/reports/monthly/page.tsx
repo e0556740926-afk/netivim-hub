@@ -33,44 +33,43 @@ function MonthlyReportContent() {
   const maxScore = Math.max(...coordinators.map((c: any) => c.score), 1)
 
   return (
-    <>
+    <article className="ui-print-report">
       <style>{`
         @page { size: A4; margin: 18mm 15mm; }
         @media print { .no-print { display: none !important; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        * { box-sizing: border-box; }
-        body { margin:0; padding:0; background:#fff; font-family:"Segoe UI",Arial,sans-serif; direction:rtl; color:#1E293B; }
-        table { border-collapse: collapse; width:100%; }
-        th { background:#0D2744; color:#fff; padding:8px 10px; font-size:11px; text-align:right; }
-        td { padding:7px 10px; font-size:11px; border-bottom:1px solid #F1F5F9; }
-        tr:nth-child(even) td { background:#F8FAFC; }
-        .section { margin-bottom:20px; border:1px solid #E2E8F0; border-radius:10px; overflow:hidden; }
-        .section-title { background:#F0F4F8; padding:10px 14px; font-size:13px; font-weight:700; color:#0D2744; border-bottom:1px solid #E2E8F0; }
-        .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
-        .kpi { background:#F0F7FF; border:1px solid #BFDBFE; border-radius:10px; padding:12px; text-align:center; }
-        .kpi-num { font-size:26px; font-weight:900; color:#0D2744; line-height:1; }
-        .kpi-label { font-size:10px; color:#64748B; margin-top:3px; }
+        .ui-print-report {background:#fff;font-family:inherit;direction:rtl;color:#193d33;}
+        .ui-print-report table { border-collapse: collapse; width:100%; }
+        .ui-print-report th { background:#193d33; color:#fff; padding:8px 10px; font-size:11px; text-align:right; }
+        .ui-print-report td { padding:7px 10px; font-size:11px; border-bottom:1px solid #edf1e9; }
+        .ui-print-report tr:nth-child(even) td { background:#f7f9f5; }
+        .ui-print-report .section { margin-bottom:20px; border:1px solid #e1e8df; border-radius:10px; overflow:hidden; }
+        .ui-print-report .section-title { background:#f4f6f2; padding:10px 14px; font-size:13px; font-weight:700; color:#193d33; border-bottom:1px solid #e1e8df; }
+        .ui-print-report .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+        .ui-print-report .kpi { background:#edf4eb; border:1px solid #c8dac7; border-radius:10px; padding:12px; text-align:center; }
+        .ui-print-report .kpi-num { font-size:26px; font-weight:900; color:#193d33; line-height:1; }
+        .ui-print-report .kpi-label { font-size:10px; color:#63756b; margin-top:3px; }
       `}</style>
 
       <div className="no-print" style={{ position:"fixed", top:16, left:16, zIndex:99, display:"flex", gap:8 }}>
         <button onClick={() => window.print()}
-          style={{ padding:"10px 20px", background:"#0D2744", color:"#fff", border:"none", borderRadius:9, fontWeight:700, cursor:"pointer", fontSize:13 }}>
+          style={{ padding:"10px 20px", background:"#193d33", color:"#fff", border:"none", borderRadius:9, fontWeight:700, cursor:"pointer", fontSize:13 }}>
           🖨 הדפס / שמור PDF
         </button>
       </div>
 
       <div style={{ maxWidth:900, margin:"0 auto", padding:"28px 24px" }}>
 
-        <div style={{ marginBottom:24, paddingBottom:18, borderBottom:"3px solid #0D2744" }}>
-          <div style={{ fontSize:11, color:"#64748B", marginBottom:4 }}>ארגון נתיבים</div>
-          <div style={{ fontSize:24, fontWeight:900, color:"#0D2744" }}>דו"ח חודשי ארגוני</div>
-          <div style={{ fontSize:14, color:"#64748B", marginTop:4 }}>{MONTHS[m.month-1]} {m.year}</div>
+        <div style={{ marginBottom:24, paddingBottom:18, borderBottom:"3px solid #193d33" }}>
+          <div style={{ fontSize:11, color:"#63756b", marginBottom:4 }}>ארגון נתיבים</div>
+          <div style={{ fontSize:24, fontWeight:900, color:"#193d33" }}>דו"ח חודשי ארגוני</div>
+          <div style={{ fontSize:14, color:"#63756b", marginTop:4 }}>{MONTHS[m.month-1]} {m.year}</div>
         </div>
 
         <div className="kpi-grid">
-          <div className="kpi"><div className="kpi-num" style={{color:"#00488D"}}>{totals.leads}</div><div className="kpi-label">לידים החודש</div></div>
-          <div className="kpi"><div className="kpi-num" style={{color:"#166534"}}>{totals.tasksDone}</div><div className="kpi-label">משימות שבוצעו</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#28634e"}}>{totals.leads}</div><div className="kpi-label">לידים החודש</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#28634e"}}>{totals.tasksDone}</div><div className="kpi-label">משימות שבוצעו</div></div>
           <div className="kpi"><div className="kpi-num" style={{color:"#5B21B6"}}>{totals.interactions}</div><div className="kpi-label">אינטראקציות</div></div>
-          <div className="kpi"><div className="kpi-num" style={{color:"#B45309"}}>₪{Math.round(totalExpenses).toLocaleString()}</div><div className="kpi-label">הוצאות</div></div>
+          <div className="kpi"><div className="kpi-num" style={{color:"#946014"}}>₪{Math.round(totalExpenses).toLocaleString()}</div><div className="kpi-label">הוצאות</div></div>
         </div>
 
         {/* Coordinator comparison */}
@@ -86,13 +85,13 @@ function MonthlyReportContent() {
                   <td>{c.area || "—"}</td>
                   <td>{c.leads}</td>
                   <td>{c.target || "—"}</td>
-                  <td>{c.tasksDone}{c.tasksLate > 0 && <span style={{color:"#960010"}}> ({c.tasksLate} באיחור)</span>}</td>
+                  <td>{c.tasksDone}{c.tasksLate > 0 && <span style={{color:"#a74450"}}> ({c.tasksLate} באיחור)</span>}</td>
                   <td>{c.interactions}</td>
                   <td>{c.reportsSubmitted}/4</td>
                   <td>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
-                      <div style={{width:50,height:6,background:"#F0F4F8",borderRadius:3,overflow:"hidden"}}>
-                        <div style={{width:`${Math.round(c.score/maxScore*100)}%`,height:"100%",background:"#00488D"}}/>
+                      <div style={{width:50,height:6,background:"#f4f6f2",borderRadius:3,overflow:"hidden"}}>
+                        <div style={{width:`${Math.round(c.score/maxScore*100)}%`,height:"100%",background:"#28634e"}}/>
                       </div>
                       <span style={{fontWeight:700}}>{c.score}</span>
                     </div>
@@ -116,18 +115,18 @@ function MonthlyReportContent() {
                   <td>{e.status}</td>
                   <td>₪{(+e.budget_planned||0).toLocaleString()}</td>
                   <td>{e.actual_attendees || "—"}</td>
-                  <td style={{color:"#00488D",fontWeight:700}}>{e.leads_collected || 0}</td>
+                  <td style={{color:"#28634e",fontWeight:700}}>{e.leads_collected || 0}</td>
                 </tr>
               ))}
             </tbody>
           </table></div>
         </div>}
 
-        <div style={{marginTop:20,textAlign:"center",fontSize:10,color:"#94A3B8",borderTop:"1px solid #E2E8F0",paddingTop:12}}>
+        <div style={{marginTop:20,textAlign:"center",fontSize:10,color:"#94A3B8",borderTop:"1px solid #e1e8df",paddingTop:12}}>
           נתיבים — מערכת ניהול שטח · דו"ח חודשי · {MONTHS[m.month-1]} {m.year}
         </div>
       </div>
-    </>
+    </article>
   )
 }
 

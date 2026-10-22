@@ -1,9 +1,10 @@
 "use client"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { useEffect, useState } from "react"
 
 /** Bot settings screen: connection, toggles, who can use the bot, weekly numbers and the conversation log. */
 
-const T = { navy: "#14213D", blue: "#2E5C8A", slate: "#5A6472", border: "#CBD3DD", bg: "#F7F9FC", ok: "#2E6B4F", warn: "#B45309", bad: "#B42318" }
+const T = { navy: "#193d33", blue: "#28634e", slate: "#63756b", border: "#d0dbd0", bg: "#f4f6f2", ok: "#28634e", warn: "#946014", bad: "#a74450" }
 
 type Settings = { enabled: boolean; buttons_enabled: boolean; reminders_enabled: boolean; reminder_hour: number; support_phone: string; auto_disabled_at: string | null; last_state_at: string | null }
 type LogRow = { id: number; phone: string; direction: "in" | "out"; body: string; sender_name: string; status: string; kind: string; created_at: string }
@@ -93,10 +94,10 @@ export default function WhatsAppBotSettings() {
   const log: LogRow[] = data.log || []
 
   return (
-    <div dir="rtl" style={{ fontFamily: "Assistant, Heebo, sans-serif", background: T.bg, minHeight: "100vh", color: T.navy, padding: "20px 16px 60px", maxWidth: 960, margin: "0 auto" }}>
-      <div style={{ fontSize: 12, color: T.slate, marginBottom: 8 }}><a href="/admin/settings" style={{ color: T.slate }}>הגדרות</a> › <span style={{ color: T.navy, fontWeight: 600 }}>בוט וואטסאפ</span></div>
+    <div dir="rtl" className="ui-page ui-settings">
+      <WorkspaceHeader title="בוט וואטסאפ" description="החיבור של הצוות מהשטח: זמינות הבוט, תזכורות, מספרים מורשים ויומן השיחות." parent={{label:"הגדרות",href:"/admin/settings"}}/>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>בוט וואטסאפ</div>
+        <span className="ui-note">מצב החיבור</span>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {saved && <span style={{ fontSize: 12, color: T.ok, fontWeight: 600 }}>✓ נשמר</span>}
           <span style={{ fontSize: 13, fontWeight: 700, color: conn.color, background: "#fff", border: `1px solid ${T.border}`, borderRadius: 20, padding: "4px 12px" }}>● {conn.label}</span>

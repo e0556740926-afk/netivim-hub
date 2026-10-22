@@ -1,4 +1,5 @@
 "use client"
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import { useQuickAction } from "@/lib/quick-action"
 import ErrorState from "@/components/ui/ErrorState"
@@ -125,88 +126,83 @@ export default function SettingsPage() {
   if (error) return <div className="p-6"><ErrorState retry={load}/></div>
   if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1,2,3].map(i=><SkeletonCard key={i} rows={4}/>)}</div>
 
-  return <div className="p-4 md:p-6 lg:p-8 fade-up">
-    <div className="flex items-center justify-between mb-5">
-      <div><h1 className="text-2xl font-extrabold text-[#0D2744]">הגדרות ומשתמשים</h1>
-        <div className="text-sm text-[#64748B] mt-0.5">{users.length} משתמשים</div>
-      </div>
-      <div className="flex items-center gap-3 flex-wrap justify-end">
-        <a href="/admin/settings/fields" className="text-sm font-semibold text-[#00488D]">בונה שדות מותאמים</a>
-        <a href="/admin/settings/automation" className="text-sm font-semibold text-[#00488D]">הגדרות אוטומציה</a>
-        <a href="/admin/settings/whatsapp-bot" className="text-sm font-semibold text-[#00488D]">בוט וואטסאפ</a>
-        <Button onClick={startAdd}>+ משתמש חדש</Button>
-      </div>
-    </div>
+  return <div className="ui-page fade-up">
+    <WorkspaceHeader title="הגדרות ומשתמשים" description={users.length + " משתמשים · הרשאות, שדות וכלי העבודה של המערכת"} actions={<Button onClick={startAdd}>+ משתמש חדש</Button>}/>
+    <nav className="ui-settings-links" aria-label="תחומי הגדרות">
+      <a href="/admin/settings/fields" className="ui-card"><b>שדות מותאמים</b><span>שדות, רשימות והרשאות תצוגה</span></a>
+      <a href="/admin/settings/automation" className="ui-card"><b>אוטומציות</b><span>תזמונים וכללי טיפול</span></a>
+      <a href="/admin/settings/whatsapp-bot" className="ui-card"><b>בוט וואטסאפ</b><span>חיבור, תזכורות ויומן שיחות</span></a>
+    </nav>
 
     {/* User form */}
-    {showForm && <Card className="mb-5 border-2 border-[#00488D]"><div className="p-5">
-      <div className="text-sm font-bold text-[#00488D] mb-4">{editUser?`עריכת ${editUser.name}`:"משתמש חדש"}</div>
+    {showForm && <Card className="mb-5 border-2 border-[#28634e]"><div className="p-5">
+      <div className="text-sm font-bold text-[#28634e] mb-4">{editUser?`עריכת ${editUser.name}`:"משתמש חדש"}</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-        <div><label className="text-xs font-semibold block mb-1">שם מלא *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
-        <div><label className="text-xs font-semibold block mb-1">דואל (לכניסה)</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
-        <div><label className="text-xs font-semibold block mb-1">סיסמה{editUser?" (ריק = ללא שינוי)":""}</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
-        <div><label className="text-xs font-semibold block mb-1">טלפון</label><input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">שם מלא *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">דואל (לכניסה)</label><input type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">סיסמה{editUser?" (ריק = ללא שינוי)":""}</label><input type="password" value={form.password} onChange={e=>setForm(f=>({...f,password:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">טלפון</label><input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/></div>
         <div><label className="text-xs font-semibold block mb-1">תפקיד</label>
-          <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+          <select value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
             {Object.entries(ROLE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
           </select></div>
         {form.role === "coordinator" && (
           <div><label className="text-xs font-semibold block mb-1">מנהל ישיר (לצורך הרשאות "הצוות שלו")</label>
-            <select value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+            <select value={form.reports_to} onChange={e=>setForm(f=>({...f,reports_to:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
               <option value="">— ללא —</option>
               {users.filter((u:any)=>form.role==="advisor"?u.role==="recruitment_manager":u.role==="field_manager").map((u:any)=>
                 <option key={u.id} value={u.id}>{u.name}</option>)}
             </select></div>
         )}
-        <div><label className="text-xs font-semibold block mb-1">אזור פעילות</label><input value={form.area} onChange={e=>setForm(f=>({...f,area:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"/></div>
+        <div><label className="text-xs font-semibold block mb-1">אזור פעילות</label><input value={form.area} onChange={e=>setForm(f=>({...f,area:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/></div>
         <div><label className="text-xs font-semibold block mb-1">סטטוס</label>
-          <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className="w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white">
+          <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
             <option value="active">פעיל</option><option value="inactive">לא פעיל</option>
           </select></div>
       </div>
-      {err && <div className="text-xs text-[#960010] mb-3 font-semibold">{err}</div>}
+      {err && <div className="text-xs text-[#a74450] mb-3 font-semibold">{err}</div>}
       <div className="flex gap-2"><Button onClick={save} disabled={saving}>{saving?"שומר...":"שמור"}</Button><Button variant="secondary" onClick={()=>setShowForm(false)}>ביטול</Button></div>
     </div></Card>}
 
     {/* Coordinators section */}
-    <div className="text-xs font-bold text-[#64748B] uppercase tracking-widest mb-3">רכזי שטח</div>
+    <div className="text-xs font-bold text-[#63756b] uppercase tracking-widest mb-3">רכזי שטח</div>
     <div className="space-y-2 mb-6">
       {coordUsers.map(u => {
         const coord = coords.find((c:any)=>c.name===u.name)
         const isOpen = activeCoord?.id === coord?.id
         return <div key={u.id}>
-          <div className={`bg-white border rounded-[12px] p-3.5 flex items-center gap-3 transition-colors ${isOpen?"border-[#00488D] bg-[#F0F7FF]":"border-[#E2E8F0]"}`}>
-            <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <div className={`bg-white border rounded-[12px] p-3.5 flex items-center gap-3 transition-colors ${isOpen?"border-[#28634e] bg-[#edf4eb]":"border-[#e1e8df]"}`}>
+            <div className="w-10 h-10 rounded-full bg-[#eaf1e7] text-[#28634e] flex items-center justify-center text-sm font-bold flex-shrink-0">
               {u.name.split(" ").map((w:string)=>w[0]).join("")}
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold">{u.name}</div>
-              <div className="text-xs text-[#64748B]">{u.email}{u.area?` · ${u.area}`:""}</div>
+              <div className="text-xs text-[#63756b]">{u.email}{u.area?` · ${u.area}`:""}</div>
             </div>
             <Badge text={u.status==="active"?"פעיל":"לא פעיל"}/>
             <div className="flex gap-1.5">
               {coord && <button onClick={()=>openActivity(coord)}
-                className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold border transition-colors ${isOpen?"bg-[#00488D] text-white border-[#00488D]":"border-[#E2E8F0] hover:bg-[#F0F7FF] hover:border-[#BFDBFE]"}`}>
+                className={`px-3 py-1.5 rounded-[8px] text-xs font-semibold border transition-colors ${isOpen?"bg-[#28634e] text-white border-[#28634e]":"border-[#e1e8df] hover:bg-[#edf4eb] hover:border-[#c8dac7]"}`}>
                 {isOpen?"▲ סגור":"📊 פעילות"}
               </button>}
-              <button onClick={()=>startEdit(u)} className="px-2 py-1.5 rounded-[8px] text-xs border border-[#E2E8F0] hover:bg-[#F0F7FF]">✎</button>
-              <button onClick={()=>del(u.id)} className="px-2 py-1.5 rounded-[8px] text-xs border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
+              <button onClick={()=>startEdit(u)} className="px-2 py-1.5 rounded-[8px] text-xs border border-[#e1e8df] hover:bg-[#edf4eb]">✎</button>
+              <button onClick={()=>del(u.id)} className="px-2 py-1.5 rounded-[8px] text-xs border border-[#e1e8df] hover:bg-[#FFF0F0] hover:text-[#a74450]">✕</button>
             </div>
           </div>
 
           {/* Activity Panel */}
-          {isOpen && activity && <div className="border border-t-0 border-[#00488D] rounded-b-[12px] bg-white overflow-hidden">
+          {isOpen && activity && <div className="border border-t-0 border-[#28634e] rounded-b-[12px] bg-white overflow-hidden">
             {/* Summary bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[#F1F5F9] border-b border-[#E2E8F0]" style={{direction:"ltr"}}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[#edf1e9] border-b border-[#e1e8df]" style={{direction:"ltr"}}>
               {[
                 {label:"משימות",count:activity.tasks?.length||0,tab:"tasks"},
                 {label:"לידים",count:activity.leads?.length||0,tab:"leads"},
                 {label:"אינטראקציות",count:activity.interactions?.length||0,tab:"interactions"},
                 {label:"דיווחים",count:activity.reports?.length||0,tab:"reports"},
               ].map(x=><button key={x.tab} onClick={()=>setActTab(x.tab as any)}
-                className={`py-3 text-center transition-colors ${actTab===x.tab?"bg-[#F0F7FF]":""}`} style={{direction:"rtl"}}>
-                <div className={`text-xl font-extrabold ${actTab===x.tab?"text-[#00488D]":"text-[#0D2744]"}`}>{x.count}</div>
-                <div className="text-xs text-[#64748B]">{x.label}</div>
+                className={`py-3 text-center transition-colors ${actTab===x.tab?"bg-[#edf4eb]":""}`} style={{direction:"rtl"}}>
+                <div className={`text-xl font-extrabold ${actTab===x.tab?"text-[#28634e]":"text-[#193d33]"}`}>{x.count}</div>
+                <div className="text-xs text-[#63756b]">{x.label}</div>
               </button>)}
             </div>
 
@@ -215,11 +211,11 @@ export default function SettingsPage() {
               {/* Tasks */}
               {actTab==="tasks" && <div className="space-y-2">
                 {(activity.tasks||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין משימות</div>}
-                {(activity.tasks||[]).map((t:any)=><div key={t.id} className="flex items-start gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${t.status==="done"?"bg-[#166534]":t.status==="waiting"?"bg-[#B45309]":"bg-[#00488D]"}`}/>
+                {(activity.tasks||[]).map((t:any)=><div key={t.id} className="flex items-start gap-2.5 py-2 border-b border-[#edf1e9] last:border-0">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${t.status==="done"?"bg-[#28634e]":t.status==="waiting"?"bg-[#946014]":"bg-[#28634e]"}`}/>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold">{t.title}</div>
-                    <div className="text-xs text-[#64748B] mt-0.5">{TASK_STATUS[t.status]||t.status} {t.due_date&&`· ${fd(t.due_date.slice(0,10))}`} {t.event_name&&`· ${t.event_name}`}</div>
+                    <div className="text-xs text-[#63756b] mt-0.5">{TASK_STATUS[t.status]||t.status} {t.due_date&&`· ${fd(t.due_date.slice(0,10))}`} {t.event_name&&`· ${t.event_name}`}</div>
                   </div>
                   <div className="text-xs text-[#94A3B8] flex-shrink-0">{fd(t.created_at?.slice(0,10))}</div>
                 </div>)}
@@ -228,11 +224,11 @@ export default function SettingsPage() {
               {/* Leads */}
               {actTab==="leads" && <div className="space-y-2">
                 {(activity.leads||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין לידים</div>}
-                {(activity.leads||[]).map((l:any)=><div key={l.id} className="flex items-center gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                  <div className="w-8 h-8 rounded-full bg-[#F0F7FF] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">{l.name?.[0]}</div>
-                  <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{l.name}</div><div className="text-xs text-[#64748B]">{l.phone} · {l.source==="link"?"לינק":l.source==="event"?"אירוע":"ידני"}</div></div>
+                {(activity.leads||[]).map((l:any)=><div key={l.id} className="flex items-center gap-2.5 py-2 border-b border-[#edf1e9] last:border-0">
+                  <div className="w-8 h-8 rounded-full bg-[#edf4eb] text-[#28634e] flex items-center justify-center text-xs font-bold flex-shrink-0">{l.name?.[0]}</div>
+                  <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{l.name}</div><div className="text-xs text-[#63756b]">{l.phone} · {l.source==="link"?"לינק":l.source==="event"?"אירוע":"ידני"}</div></div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-xs px-2 py-0.5 rounded-full bg-[#F0F7FF] text-[#00488D]">{LEAD_STATUS[l.status]||l.status}</div>
+                    <div className="text-xs px-2 py-0.5 rounded-full bg-[#edf4eb] text-[#28634e]">{LEAD_STATUS[l.status]||l.status}</div>
                     <div className="text-xs text-[#94A3B8] mt-0.5">{fd(l.created_at?.slice(0,10))}</div>
                   </div>
                 </div>)}
@@ -241,11 +237,11 @@ export default function SettingsPage() {
               {/* Interactions */}
               {actTab==="interactions" && <div className="space-y-2">
                 {(activity.interactions||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין אינטראקציות</div>}
-                {(activity.interactions||[]).map((i:any)=><div key={i.id} className="flex gap-2.5 py-2 border-b border-[#F1F5F9] last:border-0">
-                  <div className="w-8 h-8 rounded-full bg-[#F0F7FF] flex items-center justify-center text-sm flex-shrink-0">{INT_ICON[i.type]||"📝"}</div>
+                {(activity.interactions||[]).map((i:any)=><div key={i.id} className="flex gap-2.5 py-2 border-b border-[#edf1e9] last:border-0">
+                  <div className="w-8 h-8 rounded-full bg-[#edf4eb] flex items-center justify-center text-sm flex-shrink-0">{INT_ICON[i.type]||"📝"}</div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-semibold">{i.contact_name||"—"} · {i.type==="call"?"שיחה":i.type==="meeting"?"פגישה":i.type==="whatsapp"?"וואטסאפ":i.type==="email"?"דואל":"אחר"}</div>
-                    <div className="text-xs text-[#475569] mt-0.5 bg-[#F9FAFB] rounded p-1.5">{i.summary}</div>
+                    <div className="text-xs text-[#63756b] mt-0.5 bg-[#F9FAFB] rounded p-1.5">{i.summary}</div>
                   </div>
                   <div className="text-xs text-[#94A3B8] flex-shrink-0">{fd(i.date)}</div>
                 </div>)}
@@ -254,13 +250,13 @@ export default function SettingsPage() {
               {/* Reports */}
               {actTab==="reports" && <div className="space-y-2">
                 {(activity.reports||[]).length===0 && <div className="text-sm text-[#94A3B8] text-center py-4">אין דיווחים</div>}
-                {(activity.reports||[]).map((r:any)=><div key={r.id} className="py-3 border-b border-[#F1F5F9] last:border-0">
+                {(activity.reports||[]).map((r:any)=><div key={r.id} className="py-3 border-b border-[#edf1e9] last:border-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm font-semibold">שבוע {fd(r.week_start)}</div>
-                    <div className="text-xs text-[#00488D] font-bold">{r.leads_count} לידים</div>
+                    <div className="text-xs text-[#28634e] font-bold">{r.leads_count} לידים</div>
                   </div>
-                  {r.achievements&&<div className="text-xs text-[#475569] bg-[#F9FAFB] rounded p-2 mb-1"><span className="font-semibold text-[#374151]">הישגים: </span>{r.achievements}</div>}
-                  {r.challenges&&<div className="text-xs text-[#475569] bg-[#FFF9F0] rounded p-2"><span className="font-semibold text-[#374151]">אתגרים: </span>{r.challenges}</div>}
+                  {r.achievements&&<div className="text-xs text-[#63756b] bg-[#F9FAFB] rounded p-2 mb-1"><span className="font-semibold text-[#193d33]">הישגים: </span>{r.achievements}</div>}
+                  {r.challenges&&<div className="text-xs text-[#63756b] bg-[#FFF9F0] rounded p-2"><span className="font-semibold text-[#193d33]">אתגרים: </span>{r.challenges}</div>}
                 </div>)}
               </div>}
             </div>
@@ -271,15 +267,15 @@ export default function SettingsPage() {
 
     {/* Other users */}
     {otherUsers.length > 0 && <>
-      <div className="text-xs font-bold text-[#64748B] uppercase tracking-widest mb-3">מנהלים וצופים</div>
+      <div className="text-xs font-bold text-[#63756b] uppercase tracking-widest mb-3">מנהלים וצופים</div>
       <Card><div className="p-4 space-y-0">
-        {otherUsers.map(u=><div key={u.id} className="flex items-center gap-3 py-3 border-b border-[#F1F5F9] last:border-0">
+        {otherUsers.map(u=><div key={u.id} className="flex items-center gap-3 py-3 border-b border-[#edf1e9] last:border-0">
           <div className="w-9 h-9 rounded-full bg-[#EDE9FE] text-[#5B21B6] flex items-center justify-center text-xs font-bold flex-shrink-0">{u.name.split(" ").map((w:string)=>w[0]).join("")}</div>
-          <div className="flex-1 min-w-0"><div className="text-sm font-semibold flex items-center gap-2">{u.name}{u.id===me?.id&&<span className="text-xs text-[#94A3B8]">(אתה)</span>}</div><div className="text-xs text-[#64748B]">{u.email}</div></div>
+          <div className="flex-1 min-w-0"><div className="text-sm font-semibold flex items-center gap-2">{u.name}{u.id===me?.id&&<span className="text-xs text-[#94A3B8]">(אתה)</span>}</div><div className="text-xs text-[#63756b]">{u.email}</div></div>
           <Badge text={ROLE_LABEL[u.role]||u.role}/>
           <div className="flex gap-1">
-            <button onClick={()=>startEdit(u)} className="px-2 py-1 rounded-[6px] text-xs border border-[#E2E8F0] hover:bg-[#F0F7FF]">✎</button>
-            <button onClick={()=>del(u.id)} className="px-2 py-1 rounded-[6px] text-xs border border-[#E2E8F0] hover:bg-[#FFF0F0] hover:text-[#960010]">✕</button>
+            <button onClick={()=>startEdit(u)} className="px-2 py-1 rounded-[6px] text-xs border border-[#e1e8df] hover:bg-[#edf4eb]">✎</button>
+            <button onClick={()=>del(u.id)} className="px-2 py-1 rounded-[6px] text-xs border border-[#e1e8df] hover:bg-[#FFF0F0] hover:text-[#a74450]">✕</button>
           </div>
         </div>)}
       </div></Card>
@@ -290,46 +286,46 @@ export default function SettingsPage() {
       open={!!onboarding}
       onClose={()=>setOnboarding(null)}
       title={`✓ ${onboarding?.name} נוסף בהצלחה`}
-      accent="#166534"
-      footer={<button onClick={()=>setOnboarding(null)} className="w-full py-2.5 bg-[#0D2744] text-white rounded-[10px] text-sm font-bold">סיימתי</button>}
+      accent="#28634e"
+      footer={<button onClick={()=>setOnboarding(null)} className="w-full py-2.5 bg-[#193d33] text-white rounded-[10px] text-sm font-bold">סיימתי</button>}
     >
       {onboarding && (
         <div className="space-y-3">
-          <div className="flex items-start gap-2.5 bg-[#F0FFF4] border border-[#BBF7D0] rounded-[10px] px-3 py-2.5">
-            <span className="text-[#166534] text-sm">✓</span>
+          <div className="flex items-start gap-2.5 bg-[#edf4eb] border border-[#c8dac7] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#28634e] text-sm">✓</span>
             <div className="text-sm">
-              <div className="font-semibold text-[#166534]">חשבון נוצר</div>
-              <div className="text-xs text-[#64748B]">שם משתמש וסיסמה פעילים</div>
+              <div className="font-semibold text-[#28634e]">חשבון נוצר</div>
+              <div className="text-xs text-[#63756b]">שם משתמש וסיסמה פעילים</div>
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 bg-[#F0FFF4] border border-[#BBF7D0] rounded-[10px] px-3 py-2.5">
-            <span className="text-[#166534] text-sm">✓</span>
+          <div className="flex items-start gap-2.5 bg-[#edf4eb] border border-[#c8dac7] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#28634e] text-sm">✓</span>
             <div className="text-sm flex-1 min-w-0">
-              <div className="font-semibold text-[#166534]">לינק אישי נוצר</div>
-              <div className="text-xs font-mono text-[#64748B] break-all mt-0.5">/j/{onboarding.slug}</div>
+              <div className="font-semibold text-[#28634e]">לינק אישי נוצר</div>
+              <div className="text-xs font-mono text-[#63756b] break-all mt-0.5">/j/{onboarding.slug}</div>
             </div>
           </div>
 
-          <div className="flex items-start gap-2.5 bg-[#F0F7FF] border border-[#BFDBFE] rounded-[10px] px-3 py-2.5">
-            <span className="text-[#00488D] text-sm">ℹ</span>
+          <div className="flex items-start gap-2.5 bg-[#edf4eb] border border-[#c8dac7] rounded-[10px] px-3 py-2.5">
+            <span className="text-[#28634e] text-sm">ℹ</span>
             <div className="text-sm">
-              <div className="font-semibold text-[#00488D]">לינק ליומן Google</div>
-              <div className="text-xs text-[#64748B]">ייווצר אוטומטית בכניסה הראשונה שלו לפרופיל</div>
+              <div className="font-semibold text-[#28634e]">לינק ליומן Google</div>
+              <div className="text-xs text-[#63756b]">ייווצר אוטומטית בכניסה הראשונה שלו לפרופיל</div>
             </div>
           </div>
 
-          <div className={`border rounded-[10px] px-3 py-2.5 ${targetSaved ? "bg-[#F0FFF4] border-[#BBF7D0]" : "bg-white border-[#E2E8F0]"}`}>
+          <div className={`border rounded-[10px] px-3 py-2.5 ${targetSaved ? "bg-[#edf4eb] border-[#c8dac7]" : "bg-white border-[#e1e8df]"}`}>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className={targetSaved ? "text-[#166534] text-sm" : "text-[#94A3B8] text-sm"}>{targetSaved ? "✓" : "○"}</span>
+              <span className={targetSaved ? "text-[#28634e] text-sm" : "text-[#94A3B8] text-sm"}>{targetSaved ? "✓" : "○"}</span>
               <div className="text-sm font-semibold">{targetSaved ? "יעד חודשי הוגדר" : "הגדר יעד חודשי (מומלץ)"}</div>
             </div>
             {!targetSaved && (
               <div className="flex gap-2 mt-2">
                 <input type="number" value={targetInput} onChange={e=>setTargetInput(e.target.value)}
-                  placeholder="לדוגמה: 15" className="flex-1 px-3 py-1.5 border border-[#CBD5E1] rounded-[8px] text-sm focus:outline-none focus:border-[#00488D]"/>
+                  placeholder="לדוגמה: 15" className="flex-1 px-3 py-1.5 border border-[#c6d2c7] rounded-[8px] text-sm focus:outline-none focus:border-[#28634e]"/>
                 <button onClick={saveOnboardingTarget} disabled={!targetInput||targetSaving}
-                  className="px-4 py-1.5 bg-[#0D2744] text-white rounded-[8px] text-xs font-bold disabled:opacity-40">
+                  className="px-4 py-1.5 bg-[#193d33] text-white rounded-[8px] text-xs font-bold disabled:opacity-40">
                   {targetSaving?"שומר...":"שמור"}
                 </button>
               </div>

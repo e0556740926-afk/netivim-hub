@@ -22,7 +22,7 @@ export const EMPTY_ATTENDEE = { name:"", phone:"", email:"" }
 export const EMPTY_VENDOR = { name:"", category:"other", contact:"", amount:"", deposit_paid:false, notes:"" }
 export const VENDOR_CATEGORIES: Record<string,string> = { venue:"אולם/מיקום", catering:"קייטרינג", marketing:"שיווק/פרסום", materials:"חומרים", other:"אחר" }
 
-export const InputClass = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]"
+export const InputClass = "w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"
 
 export function formFromEvent(e: any): EventForm {
   return {

@@ -1,115 +1,28 @@
 "use client"
 import { useState } from "react"
-import Image from "next/image"
-
-export default function PreferencesPage() {
-  const [email, setEmail] = useState("")
-  const [sub, setSub] = useState<any>(null)
-  const [area, setArea] = useState("")
-  const [frequency, setFrequency] = useState("monthly")
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState("")
-  const [saved, setSaved] = useState(false)
-  const [unsubscribed, setUnsubscribed] = useState(false)
-
-  async function lookup() {
-    if (!email.trim()) { setErr("נא להזין כתובת מייל"); return }
-    setLoading(true); setErr(""); setSaved(false)
-    const res = await fetch(`/api/newsletter/preferences?email=${encodeURIComponent(email.trim())}`)
-    setLoading(false)
-    if (!res.ok) { const d = await res.json().catch(()=>({})); setErr(d.error || "שגיאה"); setSub(null); return }
-    const d = await res.json()
-    setSub(d.subscriber)
-    setArea(d.subscriber.area || "")
-    setFrequency(d.subscriber.frequency || "monthly")
-  }
-
-  async function save() {
-    setSaving(true); setErr(""); setSaved(false)
-    const res = await fetch("/api/newsletter/preferences", {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), area: area.trim(), frequency }),
-    })
-    setSaving(false)
-    if (!res.ok) { const d = await res.json().catch(()=>({})); setErr(d.error || "שגיאה"); return }
-    setSaved(true)
-  }
-
-  async function unsubscribe() {
-    if (!confirm("להסיר אותך לגמרי מרשימת התפוצה?")) return
-    setSaving(true); setErr("")
-    const res = await fetch("/api/newsletter/preferences", {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.trim(), unsubscribe: true }),
-    })
-    setSaving(false)
-    if (!res.ok) { const d = await res.json().catch(()=>({})); setErr(d.error || "שגיאה"); return }
-    setUnsubscribed(true)
-  }
-
-  const bg = { background: "linear-gradient(160deg, #0D4A47 0%, #0D2744 60%, #1a1a2e 100%)" }
-
-  if (unsubscribed) return (
-    <div className="min-h-screen flex items-center justify-center" style={bg}>
-      <div className="text-center px-6 max-w-sm" dir="rtl">
-        <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-4xl mx-auto mb-6">👋</div>
-        <div className="text-2xl font-extrabold text-white mb-3">הוסרת מהרשימה</div>
-        <div className="text-white/70 text-sm leading-relaxed">לא תקבל/י יותר עדכונים מהניוזלטר. אפשר להירשם שוב בכל עת.</div>
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10" style={bg}>
-      <div className="mb-6"><Image src="/netivim-logo.png" alt="נתיבים" width={130} height={42} className="brightness-0 invert opacity-90" priority/></div>
-      <div className="text-center mb-6 max-w-lg" dir="rtl">
-        <div className="text-[#C9A84C] text-2xl md:text-3xl font-extrabold mb-2">ניהול העדפות ניוזלטר</div>
-        <div className="text-white/60 text-sm">עדכן/י את פרטי ההרשמה שלך, או הסר/י את עצמך מהרשימה</div>
-      </div>
-
-      <div className="w-full max-w-md space-y-3" dir="rtl">
-        {!sub ? (
-          <>
-            <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="כתובת המייל שנרשמת איתה"
-              className="w-full px-4 py-3.5 bg-white/10 border border-white/30 rounded-[12px] text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#C9A84C] backdrop-blur-sm" style={{fontSize:16}}/>
-            {err && <div className="text-[#f87171] text-xs text-center">{err}</div>}
-            <button onClick={lookup} disabled={loading}
-              className="w-full py-4 rounded-[14px] text-[#0D2744] font-extrabold text-base disabled:opacity-60"
-              style={{ background:"linear-gradient(135deg, #C9A84C, #E8C96A)" }}>
-              {loading ? "מחפש..." : "המשך"}
-            </button>
-          </>
-        ) : (
-          <div className="bg-white/10 rounded-[16px] p-5 backdrop-blur-sm space-y-3">
-            <div className="text-white text-sm font-bold">{sub.name} · {sub.email}</div>
-            <div>
-              <label className="text-white/60 text-xs block mb-1">עיר / אזור</label>
-              <input value={area} onChange={e=>setArea(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white/10 border border-white/30 rounded-[10px] text-white text-sm focus:outline-none focus:border-[#C9A84C]"/>
-            </div>
-            <div>
-              <label className="text-white/60 text-xs block mb-1">תדירות</label>
-              <select value={frequency} onChange={e=>setFrequency(e.target.value)}
-                className="w-full px-3 py-2.5 bg-[#0D2744] border border-white/30 rounded-[10px] text-white text-sm focus:outline-none focus:border-[#C9A84C]">
-                <option value="monthly">חודשי (ברירת מחדל)</option>
-                <option value="quarterly">רבעוני בלבד</option>
-              </select>
-            </div>
-            {err && <div className="text-[#f87171] text-xs text-center">{err}</div>}
-            {saved && <div className="text-[#86efac] text-xs text-center">✓ נשמר בהצלחה</div>}
-            <button onClick={save} disabled={saving}
-              className="w-full py-3 rounded-[12px] text-[#0D2744] font-extrabold text-sm disabled:opacity-60"
-              style={{ background:"linear-gradient(135deg, #C9A84C, #E8C96A)" }}>
-              {saving ? "שומר..." : "שמור שינויים"}
-            </button>
-            <button onClick={unsubscribe} disabled={saving}
-              className="w-full py-3 rounded-[12px] border border-[#f87171]/50 text-[#f87171] font-semibold text-sm">
-              הסר אותי מהרשימה
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  )
+import Link from "next/link"
+import PublicShell from "@/components/ui/PublicShell"
+import Button from "@/components/ui/Button"
+import Modal from "@/components/ui/Modal"
+import { uiRequest, uiMutation } from "@/lib/ui-request"
+export default function PreferencesPage(){
+ const [email,setEmail]=useState(""),[subscriber,setSubscriber]=useState<any>(null),[area,setArea]=useState(""),[frequency,setFrequency]=useState("monthly")
+ const [busy,setBusy]=useState(false),[error,setError]=useState(""),[saved,setSaved]=useState(false),[unsubscribed,setUnsubscribed]=useState(false),[confirm,setConfirm]=useState(false)
+ async function lookup(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError("");setSaved(false);try{const d=await uiRequest(`/api/newsletter/preferences?email=${encodeURIComponent(email.trim())}`);if(!d.subscriber)throw new Error("לא נמצאה הרשמה לכתובת זו");setSubscriber(d.subscriber);setArea(d.subscriber.area||"");setFrequency(d.subscriber.frequency||"monthly")}catch(e){setSubscriber(null);setError(e instanceof Error?e.message:"לא הצלחנו לטעון את ההרשמה")}finally{setBusy(false)}}
+ async function save(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError("");setSaved(false);try{await uiMutation("/api/newsletter/preferences","PATCH",{email:email.trim(),area:area.trim(),frequency});setSaved(true)}catch(e){setError(e instanceof Error?e.message:"השמירה לא הושלמה")}finally{setBusy(false)}}
+ async function unsubscribe(){if(busy)return;setBusy(true);setError("");try{await uiMutation("/api/newsletter/preferences","PATCH",{email:email.trim(),unsubscribe:true});setConfirm(false);setUnsubscribed(true)}catch(e){setConfirm(false);setError(e instanceof Error?e.message:"ההסרה לא הושלמה")}finally{setBusy(false)}}
+ return <PublicShell eyebrow="ניוזלטר נתיבים" title={"בדיוק כמו\nשמתאים לכם."} description="בחרו איך להישאר בקשר. כאן מעדכנים פרטים, משנים את תדירות העדכון או מסירים את ההרשמה.">
+  {unsubscribed?<div className="ui-public-success" role="status"><span>✓</span><h2>ההרשמה הוסרה</h2><p className="ui-note">לא תקבלו יותר עדכונים מהניוזלטר. אפשר לחזור ולהירשם בכל עת.</p><Link href="/newsletter" className="ui-btn mt-6">הרשמה מחדש</Link></div>:<>
+   <span className="ui-eyebrow">העדפות אישיות</span><h2>נשארים בקשר, בדרך שלכם</h2><p className="ui-note mb-6">{subscriber?"עדכנו את הפרטים ובחרו את תדירות העדכונים.":"הזינו את כתובת הדוא״ל שנרשמתם איתה."}</p>
+   {error&&<p role="alert" className="ui-error">{error}</p>}{saved&&<p className="ui-badge mb-4" role="status">✓ ההעדפות עודכנו</p>}
+   {!subscriber?<form className="ui-public-form" onSubmit={lookup}><label className="ui-field">כתובת דוא״ל<input type="email" dir="ltr" className="ui-input" required autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><Button type="submit" disabled={busy}>{busy?"טוען…":"הצגת ההעדפות שלי"}</Button></form>:<form className="ui-public-form" onSubmit={save}>
+    <div className="ui-note break-all" dir="ltr">{email}</div><label className="ui-field">עיר או אזור מגורים<input className="ui-input" value={area} onChange={e=>{setArea(e.target.value);setSaved(false)}}/></label>
+    <label className="ui-field">תדירות העדכונים<select className="ui-input" value={frequency} onChange={e=>{setFrequency(e.target.value);setSaved(false)}}><option value="monthly">פעם בחודש</option><option value="quarterly">פעם ברבעון</option></select></label>
+    <Button type="submit" disabled={busy}>{busy?"שומר…":"שמירת העדפות"}</Button><Button variant="secondary" disabled={busy} onClick={()=>{setSubscriber(null);setSaved(false)}}>חיפוש כתובת אחרת</Button>
+    <button type="button" className="ui-note underline min-h-11 text-[#a74450]" disabled={busy} onClick={()=>setConfirm(true)}>הסרה מלאה מרשימת התפוצה</button>
+   </form>}
+   <nav className="ui-public-links"><Link href="/newsletter/archive">ארכיון הגיליונות</Link><Link href="/newsletter">הרשמה לניוזלטר</Link></nav>
+  </>}
+  <Modal open={confirm} onClose={()=>{if(!busy)setConfirm(false)}} title="הסרה מרשימת התפוצה" subtitle="אפשר להירשם שוב בהמשך." width="440px" footer={<><Button variant="danger" disabled={busy} onClick={unsubscribe}>{busy?"מסיר…":"אישור הסרה"}</Button><Button variant="secondary" disabled={busy} onClick={()=>setConfirm(false)}>להישאר ברשימה</Button></>}><p className="text-sm">לא יישלחו עוד עדכונים לכתובת <b dir="ltr">{email}</b>.</p></Modal>
+ </PublicShell>
 }

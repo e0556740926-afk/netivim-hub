@@ -1,4 +1,5 @@
 "use client"
+import { uiMutation } from "@/lib/ui-request"
 import "./tasks.css"
 import "./premium.css"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -203,56 +204,53 @@ export default function TasksWorkspace({ mode }: Props) {
       if (!r.ok) { const d = await r.json().catch(() => ({})); toastError(d.error || "השמירה נכשלה"); return }
       success(editing ? "המשימה עודכנה" : "המשימה נוצרה")
       setPanel(null); load(true)
-    } finally { setSaving(false) }
+    } catch(e) { toastError(e instanceof Error?e.message:"השמירה נכשלה") } finally { setSaving(false) }
   }, [form, panel, user, load, success, toastError])
 
   async function quickAdd() {
-    const title = quick.trim()
-    if (!title || !user) return
+    const title=quick.trim()
+    if(!title||!user||quickSaving)return
     setQuickSaving(true)
+    try {await uiMutation("/api/tasks","POST",{title,type:"call",assignees:[user.name],due_date:today,status:"todo",priority:"normal",assigned_by:user.name,notify:false});setQuick("");await load(true)}
+    catch(e){toastError(e instanceof Error?e.message:"המשימה לא נוצרה")}
+    finally{setQuickSaving(false)}
+  }
+
+  async function setStatus(t:any,status:string) {
+    if(t.status===status)return
+    setMenuFor(null)
+    const previous=t.status
+    setTasks(ts=>ts.map(x=>x.id===t.id?{...x,status,status_changed_at:new Date().toISOString()}:x))
     try {
-      await fetch("/api/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        title, type: "call", assignees: [user.name], due_date: today, status: "todo", priority: "normal", assigned_by: user.name, notify: false,
-      }) })
-      setQuick(""); load(true)
-    } finally { setQuickSaving(false) }
+      await uiMutation("/api/tasks","PATCH",{id:t.id,status,status_only:true})
+      if(status==="done"&&fDue!==""&&fDue!=="done"){
+        setLeaving(s=>new Set(s).add(t.id));setTimeout(()=>setLeaving(s=>{const next=new Set(s);next.delete(t.id);return next}),420)
+        undoable(`"${t.title}" הושלמה`,()=>setStatus({...t,status:"done"},previous))
+      }
+    }catch(e){setTasks(ts=>ts.map(x=>x.id===t.id?{...x,status:previous}:x));toastError(e instanceof Error?e.message:"העדכון נכשל")}
   }
 
-  async function setStatus(t: any, status: string) {
-    if (t.status === status) return
-    setMenuFor(null)
-    const prev = t.status
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, status, status_changed_at: new Date().toISOString() } : x))
-    const r = await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id, status, status_only: true }) })
-    if (!r.ok) { setTasks(ts => ts.map(x => x.id === t.id ? { ...x, status: prev } : x)); toastError("העדכון נכשל"); return }
-    if (status === "done" && fDue !== "" && fDue !== "done") {
-      // Let the row leave visibly, then offer an undo — a finished task vanishing from "open" should feel earned, not lost.
-      setLeaving(s => new Set(s).add(t.id))
-      setTimeout(() => setLeaving(s => { const n = new Set(s); n.delete(t.id); return n }), 420)
-      undoable(`"${t.title}" הושלמה`, () => setStatus({ ...t, status: "done" }, prev))
-    }
+  async function snooze(t:any,days:number){
+    const due=addDays(today,days),previous=t.due_date
+    setTasks(ts=>ts.map(x=>x.id===t.id?{...x,due_date:due}:x));setMenuFor(null)
+    try{await uiMutation("/api/tasks","PATCH",{id:t.id,due_date:due,due_date_only:true})}
+    catch(e){setTasks(ts=>ts.map(x=>x.id===t.id?{...x,due_date:previous}:x));toastError(e instanceof Error?e.message:"הדחייה לא נשמרה")}
   }
 
-  async function snooze(t: any, days: number) {
-    const due = addDays(today, days)
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, due_date: due } : x))
-    await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id, due_date: due, due_date_only: true }) })
-    setMenuFor(null)
-  }
-
-  async function remove(t: any) {
-    if (!confirm(`למחוק את "${t.title}"?`)) return
-    await fetch("/api/tasks", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id }) })
-    setTasks(ts => ts.filter(x => x.id !== t.id)); setPanel(null); success("המשימה נמחקה")
+  async function remove(t:any){
+    if(!confirm(`למחוק לצמיתות את "${t.title}"?`))return
+    try{await uiMutation("/api/tasks","DELETE",{id:t.id});setTasks(ts=>ts.filter(x=>x.id!==t.id));setPanel(null);success("המשימה נמחקה")}
+    catch(e){toastError(e instanceof Error?e.message:"המחיקה לא הושלמה")}
   }
 
   // Bulk
-  function toggleSelect(id: number) { setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n }) }
-  async function bulkAct(payload: any, msg: string) {
-    if (!selected.size) return
+  function toggleSelect(id:number){setSelected(s=>{const next=new Set(s);next.has(id)?next.delete(id):next.add(id);return next})}
+  async function bulkAct(payload:any,msg:string){
+    if(!selected.size||bulking)return
     setBulking(true)
-    await fetch("/api/tasks/bulk", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [...selected], ...payload }) })
-    setBulking(false); success(msg.replace("{n}", String(selected.size))); setSelected(new Set()); load(true)
+    try{await uiMutation("/api/tasks/bulk","POST",{ids:[...selected],...payload});success(msg.replace("{n}",String(selected.size)));setSelected(new Set());await load(true)}
+    catch(e){toastError(e instanceof Error?e.message:"הפעולה המרוכזת לא הושלמה")}
+    finally{setBulking(false)}
   }
 
   // Board drag
@@ -304,11 +302,11 @@ export default function TasksWorkspace({ mode }: Props) {
             const on = fAssignee === a.name; const col = avatarColor(a.name)
             return (
               <button key={a.name} onClick={() => setFAssignee(on ? "" : a.name)}
-                className={`press flex-shrink-0 inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full border text-xs ${on ? "bg-[#0D2744] border-[#0D2744] text-white" : "bg-white border-[#E2E8F0] text-[#334155] hover:border-[#94A3B8]"}`}>
+                className={`press flex-shrink-0 inline-flex items-center gap-2 pl-3 pr-1 py-1 rounded-full border text-xs ${on ? "bg-[#193d33] border-[#193d33] text-white" : "bg-white border-[#e1e8df] text-[#334155] hover:border-[#94A3B8]"}`}>
                 <span className="w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: on ? "rgba(255,255,255,.18)" : col.bg, color: on ? "#fff" : col.fg }}>{initials(a.name)}</span>
                 <span className="font-semibold">{a.name.split(" ")[0]}</span>
-                <span className={on ? "opacity-80" : "text-[#64748B]"}>{a.open}</span>
-                {a.overdue > 0 && <span className={`font-bold ${on ? "text-[#FCA5A5]" : "text-[#960010]"}`}>· {a.overdue} באיחור</span>}
+                <span className={on ? "opacity-80" : "text-[#63756b]"}>{a.open}</span>
+                {a.overdue > 0 && <span className={`font-bold ${on ? "text-[#FCA5A5]" : "text-[#a74450]"}`}>· {a.overdue} באיחור</span>}
               </button>
             )
           })}
@@ -319,7 +317,7 @@ export default function TasksWorkspace({ mode }: Props) {
       <div className="tw-filterbar">
         <div className={`relative flex-1 ${isAdmin ? "min-w-[160px]" : "min-w-[150px] flex-shrink-0"}`}>
           <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="6" cy="6" r="4.2" /><path d="M9.3 9.3L12.5 12.5" strokeLinecap="round" /></svg>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש במשימות…" className="w-full pr-9 pl-3 py-2 border border-[#E2E8F0] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D] transition-colors" />
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש במשימות…" className="w-full pr-9 pl-3 py-2 border border-[#e1e8df] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#28634e] transition-colors" />
         </div>
         <button className="tw-filter-toggle" onClick={()=>setFiltersOpen(v=>!v)} aria-expanded={filtersOpen} aria-controls="task-advanced-filters">מסננים {hasFilter?"●":""} <span aria-hidden="true">☷</span></button>
         <div id="task-advanced-filters" className={"tw-advanced-filters "+(filtersOpen?"is-open":"")}>
@@ -336,24 +334,24 @@ export default function TasksWorkspace({ mode }: Props) {
           <option value="open">פתוחות</option><option value="today">היום בלבד</option><option value="future">בעתיד</option><option value="doneweek">הושלמו ב־7 ימים</option><option value="week">7 ימים ואיחורים</option>
           <option value="overdue">באיחור</option><option value="none">ללא תאריך</option><option value="done">הושלמו</option>
         </Select>
-        {hasFilter && <button onClick={clearFilters} className="press text-xs font-semibold text-[#00488D] px-2 py-1 rounded-[7px] hover:bg-[#EEF4FB]">נקה</button>}
+        {hasFilter && <button onClick={clearFilters} className="press text-xs font-semibold text-[#28634e] px-2 py-1 rounded-[7px] hover:bg-[#EEF4FB]">נקה</button>}
         </div>
       </div>
       {hasFilter && <div className="tw-filter-summary" role="status">{filtered.length} משימות בהתאם לסינון{fAssignee && <span> · {fAssignee}</span>}{fPriority && <span> · {PRIORITY_LABEL[fPriority]}</span>}{fType && <span> · {TYPE_LABEL[fType]}</span>}{fStatus && <span> · {STATUS_BY_KEY[fStatus]?.label}</span>}<button onClick={clearFilters}>איפוס סינון</button></div>}
 
       {/* Quick add */}
-      <div className="tw-quick-add flex items-center gap-2 bg-white border border-dashed border-[#CBD5E1] rounded-[12px] px-3 py-2 mb-3 focus-within:border-[#00488D] transition-colors">
-        <span className="w-[22px] h-[22px] rounded-full border-[1.5px] border-dashed border-[#CBD5E1] flex-shrink-0" aria-hidden />
+      <div className="tw-quick-add flex items-center gap-2 bg-white border border-dashed border-[#c6d2c7] rounded-[12px] px-3 py-2 mb-3 focus-within:border-[#28634e] transition-colors">
+        <span className="w-[22px] h-[22px] rounded-full border-[1.5px] border-dashed border-[#c6d2c7] flex-shrink-0" aria-hidden />
         <input value={quick} onChange={e => setQuick(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); quickAdd() } }}
           aria-label="משימה מהירה להיום" placeholder="מה עוד צריך לעשות היום?" disabled={quickSaving}
           className="flex-1 text-sm bg-transparent focus:outline-none placeholder:text-[#94A3B8]" />
         <button disabled={!quick.trim() || quickSaving} className="tw-quick-submit" onClick={quickAdd}>{quickSaving?"יוצר…":"הוספה"}</button>
-        {quick.trim() && <button onClick={() => { openNew({ title: quick.trim(), due_date: today }); setQuick("") }} className="press text-[11px] font-semibold text-[#00488D] px-2 py-1 rounded-[7px] hover:bg-[#EEF4FB]">פרטים נוספים</button>}
+        {quick.trim() && <button onClick={() => { openNew({ title: quick.trim(), due_date: today }); setQuick("") }} className="press text-[11px] font-semibold text-[#28634e] px-2 py-1 rounded-[7px] hover:bg-[#EEF4FB]">פרטים נוספים</button>}
       </div>
 
       {/* Body */}
       {filtered.length === 0 ? (
-        <div className="bg-white border border-[#E2E8F0] rounded-[14px]">
+        <div className="bg-white border border-[#e1e8df] rounded-[14px]">
           <Empty hasFilter={hasFilter} due={fDue} onClear={clearFilters} onNew={() => openNew()} />
         </div>
       ) : view === "board" ? (
@@ -373,7 +371,7 @@ export default function TasksWorkspace({ mode }: Props) {
               )
             })}
           </div>
-          <DragOverlay>{dragging && <div className="bg-white border border-[#00488D] rounded-[12px] px-3 py-2.5 shadow-xl w-64 text-sm font-semibold text-[#0D2744]">{dragging.title}</div>}</DragOverlay>
+          <DragOverlay>{dragging && <div className="bg-white border border-[#28634e] rounded-[12px] px-3 py-2.5 shadow-xl w-64 text-sm font-semibold text-[#193d33]">{dragging.title}</div>}</DragOverlay>
         </DndContext>
       ) : (
         <div className="space-y-4">
@@ -387,7 +385,7 @@ export default function TasksWorkspace({ mode }: Props) {
                   <span className="text-[12px] font-bold" style={{ color: b.tone }}>{b.label}</span>
                   <span className="text-[11px] text-[#94A3B8]">{rows.length}</span>
                 </div>
-                <div className="bg-white border border-[#E2E8F0] rounded-[14px] overflow-visible divide-y divide-[#F1F5F9]">
+                <div className="bg-white border border-[#e1e8df] rounded-[14px] overflow-visible divide-y divide-[#edf1e9]">
                   {(b.key==="overdue" && !expandedLate && fDue!=="overdue" ? rows.slice(0,3) : rows).map((t, i) => (
                     <TaskRow key={t.id} t={t} i={i} today={today} bulk={bulk} selected={selected.has(t.id)} leaving={leaving.has(t.id)}
                       menuOpen={menuFor === t.id} onMenu={() => setMenuFor(m => m === t.id ? null : t.id)}
@@ -405,18 +403,18 @@ export default function TasksWorkspace({ mode }: Props) {
 
       {/* Bulk bar */}
       {isAdmin && bulk && selected.size > 0 && (
-        <div className="tw-bulkbar fixed bottom-4 inset-x-4 sm:inset-x-auto sm:left-6 z-40 bg-[#0D2744] text-white rounded-[14px] shadow-2xl p-2.5 flex items-center gap-2 flex-wrap fade-up">
+        <div className="tw-bulkbar fixed bottom-4 inset-x-4 sm:inset-x-auto sm:left-6 z-40 bg-[#193d33] text-white rounded-[14px] shadow-2xl p-2.5 flex items-center gap-2 flex-wrap fade-up">
           <span className="text-sm font-bold px-1.5">{selected.size} נבחרו</span>
-          <select onChange={e => { if (e.target.value) bulkAct({ action: "status", status: e.target.value }, "סטטוס עודכן ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#0D2744]">
+          <select onChange={e => { if (e.target.value) bulkAct({ action: "status", status: e.target.value }, "סטטוס עודכן ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#193d33]">
             <option value="">סטטוס…</option>{STATUS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <select onChange={e => { if (e.target.value) bulkAct({ action: "priority", priority: e.target.value }, "דחיפות עודכנה ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#0D2744]">
+          <select onChange={e => { if (e.target.value) bulkAct({ action: "priority", priority: e.target.value }, "דחיפות עודכנה ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#193d33]">
             <option value="">דחיפות…</option>{Object.entries(PRIORITY_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-          <select onChange={e => { if (e.target.value) bulkAct({ action: "add_assignee", name: e.target.value }, "משויך נוסף ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#0D2744]">
+          <select onChange={e => { if (e.target.value) bulkAct({ action: "add_assignee", name: e.target.value }, "משויך נוסף ל-{n} משימות"); e.target.value = "" }} disabled={bulking} className="px-2 py-1.5 rounded-[7px] text-xs text-[#193d33]">
             <option value="">הוסף משויך…</option>{people.map(p => <option key={`${p.id}-${p._isManager ? "m" : "c"}`} value={p.name}>{p.name}</option>)}
           </select>
-          <button onClick={() => { if (confirm(`למחוק ${selected.size} משימות?`)) bulkAct({ action: "delete" }, "{n} משימות נמחקו") }} disabled={bulking} className="press px-3 py-1.5 rounded-[7px] text-xs font-bold bg-[#960010]">מחק</button>
+          <button onClick={() => { if (confirm(`למחוק ${selected.size} משימות?`)) bulkAct({ action: "delete" }, "{n} משימות נמחקו") }} disabled={bulking} className="press px-3 py-1.5 rounded-[7px] text-xs font-bold bg-[#a74450]">מחק</button>
           <button onClick={() => setSelected(new Set())} className="press px-3 py-1.5 rounded-[7px] text-xs bg-white/10">נקה</button>
         </div>
       )}
@@ -439,10 +437,10 @@ function prioRank(t: any) { return t.priority === "urgent" ? 0 : t.priority === 
 
 function Segmented({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
-    <div className="inline-flex bg-[#F1F5F9] p-0.5 rounded-[9px]" role="tablist">
+    <div className="inline-flex bg-[#edf1e9] p-0.5 rounded-[9px]" role="tablist">
       {options.map(([v, l]) => {
         const on = value === v
-        return <button key={v} role="tab" aria-selected={on} onClick={() => onChange(v)} className="press px-3 py-1.5 rounded-[7px] text-sm font-semibold" style={{ background: on ? "#fff" : "transparent", color: on ? "#0D2744" : "#64748B", boxShadow: on ? "0 1px 2px rgba(13,39,68,.12)" : "none" }}>{l}</button>
+        return <button key={v} role="tab" aria-selected={on} onClick={() => onChange(v)} className="press px-3 py-1.5 rounded-[7px] text-sm font-semibold" style={{ background: on ? "#fff" : "transparent", color: on ? "#193d33" : "#63756b", boxShadow: on ? "0 1px 2px rgba(13,39,68,.12)" : "none" }}>{l}</button>
       })}
     </div>
   )
@@ -451,7 +449,7 @@ function Segmented({ value, onChange, options }: { value: string; onChange: (v: 
 function Select({ value, onChange, placeholder, children }: { value: string; onChange: (v: string) => void; placeholder: string; children: React.ReactNode }) {
   return (
     <select aria-label={placeholder} value={value} onChange={e => onChange(e.target.value)}
-      className={`flex-shrink-0 px-3 py-2 border rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D] transition-colors ${value ? "border-[#00488D] text-[#0D2744] font-semibold" : "border-[#E2E8F0] text-[#475569]"}`}>
+      className={`flex-shrink-0 px-3 py-2 border rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#28634e] transition-colors ${value ? "border-[#28634e] text-[#193d33] font-semibold" : "border-[#e1e8df] text-[#63756b]"}`}>
       <option value="">{placeholder}</option>{children}
     </select>
   )
@@ -465,14 +463,14 @@ function Empty({ hasFilter, due, onClear, onNew }: { hasFilter: boolean; due: Du
     : ["אין משימות פתוחות", "הכל מטופל. כשתצטרך — N פותח משימה חדשה."]
   return (
     <div className="flex flex-col items-center text-center py-14 px-6">
-      <div className="w-12 h-12 rounded-full bg-[#EEF8F0] text-[#166534] flex items-center justify-center mb-3">
+      <div className="w-12 h-12 rounded-full bg-[#EEF8F0] text-[#28634e] flex items-center justify-center mb-3">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 10.5l4 4L16 6" /></svg>
       </div>
-      <div className="text-[#0D2744] font-bold text-base">{msg[0]}</div>
-      <div className="text-sm text-[#64748B] mt-1 mb-4 max-w-xs">{msg[1]}</div>
+      <div className="text-[#193d33] font-bold text-base">{msg[0]}</div>
+      <div className="text-sm text-[#63756b] mt-1 mb-4 max-w-xs">{msg[1]}</div>
       {hasFilter
-        ? <button onClick={onClear} className="press px-4 py-2 rounded-[9px] border border-[#E2E8F0] text-sm font-semibold text-[#334155] hover:bg-[#F8FAFC]">נקה סינון</button>
-        : <button onClick={onNew} className="press px-4 py-2 rounded-[9px] bg-[#0D2744] text-white text-sm font-bold">משימה חדשה</button>}
+        ? <button onClick={onClear} className="press px-4 py-2 rounded-[9px] border border-[#e1e8df] text-sm font-semibold text-[#334155] hover:bg-[#f7f9f5]">נקה סינון</button>
+        : <button onClick={onNew} className="press px-4 py-2 rounded-[9px] bg-[#193d33] text-white text-sm font-bold">משימה חדשה</button>}
     </div>
   )
 }
@@ -485,10 +483,10 @@ function Chips({ t, contacts, events, base, router }: { t: any; contacts: any[];
   return (
     <div className="flex items-center gap-1 flex-wrap min-w-0">
       {prio && <span className="text-[10px] font-bold px-1.5 py-[1px] rounded-full" style={{ background: prio.bg, color: prio.fg }}>{PRIORITY_LABEL[t.priority]}</span>}
-      <span className="text-[10px] text-[#64748B] px-1.5 py-[1px] rounded-full bg-[#F1F5F9]">{TYPE_LABEL[t.type] || t.type}</span>
-      {t.recurrence && <span className="text-[10px] text-[#64748B] px-1.5 py-[1px] rounded-full bg-[#F1F5F9]" title={RECURRENCE_LABEL[t.recurrence]}>↻ {RECURRENCE_LABEL[t.recurrence]}</span>}
-      {stuck && <span className="text-[10px] font-bold text-[#92400E] px-1.5 py-[1px] rounded-full bg-[#FFF8E8]">תקוע {ds(t.status_changed_at || t.created_at)} ימים</span>}
-      {contact && <button onClick={e => { e.stopPropagation(); router.push(`${base}/contacts?open=${contact.id}`) }} className="text-[10px] font-semibold text-[#00488D] px-1.5 py-[1px] rounded-full bg-[#EEF4FB] hover:bg-[#DBEAFE] truncate max-w-[140px]">{contact.name}</button>}
+      <span className="text-[10px] text-[#63756b] px-1.5 py-[1px] rounded-full bg-[#edf1e9]">{TYPE_LABEL[t.type] || t.type}</span>
+      {t.recurrence && <span className="text-[10px] text-[#63756b] px-1.5 py-[1px] rounded-full bg-[#edf1e9]" title={RECURRENCE_LABEL[t.recurrence]}>↻ {RECURRENCE_LABEL[t.recurrence]}</span>}
+      {stuck && <span className="text-[10px] font-bold text-[#946014] px-1.5 py-[1px] rounded-full bg-[#FFF8E8]">תקוע {ds(t.status_changed_at || t.created_at)} ימים</span>}
+      {contact && <button onClick={e => { e.stopPropagation(); router.push(`${base}/contacts?open=${contact.id}`) }} className="text-[10px] font-semibold text-[#28634e] px-1.5 py-[1px] rounded-full bg-[#EEF4FB] hover:bg-[#eaf1e7] truncate max-w-[140px]">{contact.name}</button>}
       {event && <button onClick={e => { e.stopPropagation(); router.push(`${base}/events`) }} className="text-[10px] font-semibold text-[#7C3AED] px-1.5 py-[1px] rounded-full bg-[#F3EEFF] hover:bg-[#EDE9FE] truncate max-w-[140px]">{event.name}</button>}
     </div>
   )
@@ -500,7 +498,7 @@ function Avatars({ names, max = 3 }: { names: string[]; max?: number }) {
   return (
     <div className="tw-avatars flex items-center -space-x-1.5 space-x-reverse flex-shrink-0" aria-label={"משויכים: "+names.join(", ")} title={names.join(", ")}>
       {shown.map(n => { const c = avatarColor(n); return <span key={n} className="w-6 h-6 rounded-full border-2 border-white text-[10px] font-bold flex items-center justify-center" style={{ background: c.bg, color: c.fg }}>{initials(n)}</span> })}
-      {names.length > max && <span className="w-6 h-6 rounded-full border-2 border-white bg-[#F1F5F9] text-[#64748B] text-[10px] font-bold flex items-center justify-center">+{names.length - max}</span>}
+      {names.length > max && <span className="w-6 h-6 rounded-full border-2 border-white bg-[#edf1e9] text-[#63756b] text-[10px] font-bold flex items-center justify-center">+{names.length - max}</span>}
     </div>
   )
 }
@@ -522,7 +520,7 @@ function TaskRow({ t, i, today, bulk, selected, leaving, menuOpen, onMenu, onSel
       className={`tw-task-row row-in group relative flex items-center gap-3 px-3 sm:px-4 py-2.5 cursor-pointer hover:bg-[#FAFBFD] transition-colors ${selected ? "bg-[#EEF4FB]" : ""} ${leaving ? "leaving" : ""}`}
       style={{ animationDelay: `${Math.min(i, 12) * 28}ms` }}>
       {bulk
-        ? <input type="checkbox" checked={selected} onChange={onSelect} onClick={e => e.stopPropagation()} className="w-4 h-4 accent-[#0D2744] flex-shrink-0" />
+        ? <input type="checkbox" checked={selected} onChange={onSelect} onClick={e => e.stopPropagation()} className="w-4 h-4 accent-[#193d33] flex-shrink-0" />
         : <CheckButton on={done} onClick={onDone} size={compact ? 26 : 22} />}
       <div className="flex-1 min-w-0">
         <button onClick={e=>{e.stopPropagation();bulk?onSelect():onOpen()}} className={`tw-title-button title ${done?"done":""}`}>{t.title}</button>
@@ -533,17 +531,17 @@ function TaskRow({ t, i, today, bulk, selected, leaving, menuOpen, onMenu, onSel
       {!compact && <Avatars names={t.assignees || []} />}
       <div className="flex flex-col items-end gap-0.5 flex-shrink-0 w-[72px]">
         {t.due_date
-          ? <span className={`text-[12px] font-bold ${late ? "text-[#960010]" : done ? "text-[#94A3B8]" : "text-[#334155]"}`}>{relDay(t.due_date, today)}</span>
+          ? <span className={`text-[12px] font-bold ${late ? "text-[#a74450]" : done ? "text-[#94A3B8]" : "text-[#334155]"}`}>{relDay(t.due_date, today)}</span>
           : <span className="text-[11px] text-[#B6C2D1]">ללא תאריך</span>}
         <span className="text-[10px] font-semibold" style={{ color: st.fg }}>{st.label}</span>
       </div>
       {!bulk && (
         <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-          <button onClick={onMenu} aria-label="פעולות" aria-expanded={menuOpen} className={`tw-row-menu press w-8 h-8 rounded-[8px] flex items-center justify-center text-[#64748B] hover:bg-[#F1F5F9] ${menuOpen ? "bg-[#F1F5F9]" : "sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"} transition-opacity`}>
+          <button onClick={onMenu} aria-label="פעולות" aria-expanded={menuOpen} className={`tw-row-menu press w-8 h-8 rounded-[8px] flex items-center justify-center text-[#63756b] hover:bg-[#edf1e9] ${menuOpen ? "bg-[#edf1e9]" : "sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100"} transition-opacity`}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="2.5" cy="7" r="1.4" /><circle cx="7" cy="7" r="1.4" /><circle cx="11.5" cy="7" r="1.4" /></svg>
           </button>
           {menuOpen && (
-            <div className="pop absolute left-0 top-9 z-30 w-44 bg-white border border-[#E2E8F0] rounded-[12px] shadow-[0_8px_24px_-6px_rgba(13,39,68,.25)] p-1" role="menu">
+            <div className="pop absolute left-0 top-9 z-30 w-44 bg-white border border-[#e1e8df] rounded-[12px] shadow-[0_8px_24px_-6px_rgba(13,39,68,.25)] p-1" role="menu">
               <div className="text-[10px] font-bold text-[#94A3B8] px-2 pt-1 pb-0.5">סטטוס</div>
               {STATUS.map(s => (
                 <button key={s.key} role="menuitem" onClick={() => onStatus(s.key)} className={`w-full text-right flex items-center gap-2 px-2 py-1.5 rounded-[8px] text-sm hover:bg-[#F4F7FB] ${t.status === s.key ? "font-bold" : ""}`}>
@@ -571,16 +569,16 @@ function TaskCard({ t, i, today, bulk, selected, onSelect, onOpen, onDone, conta
   const done = t.status === "done"
   return (
     <div onClick={() => bulk ? onSelect() : onOpen()}
-      className={`tw-task-card row-in bg-white border rounded-[12px] px-3 py-2.5 cursor-pointer transition-[box-shadow,border-color] duration-150 hover:shadow-[0_4px_14px_-6px_rgba(13,39,68,.25)] ${selected ? "border-[#0D2744] bg-[#EEF4FB]" : t.priority === "urgent" && !done ? "border-[#F5C2C7]" : "border-[#E2E8F0] hover:border-[#CBD5E1]"}`}
+      className={`tw-task-card row-in bg-white border rounded-[12px] px-3 py-2.5 cursor-pointer transition-[box-shadow,border-color] duration-150 hover:shadow-[0_4px_14px_-6px_rgba(13,39,68,.25)] ${selected ? "border-[#193d33] bg-[#EEF4FB]" : t.priority === "urgent" && !done ? "border-[#F5C2C7]" : "border-[#e1e8df] hover:border-[#c6d2c7]"}`}
       style={{ animationDelay: `${Math.min(i, 10) * 28}ms` }}>
       <div className="flex items-start gap-2">
-        {bulk ? <input type="checkbox" checked={selected} onChange={onSelect} onClick={e => e.stopPropagation()} className="w-4 h-4 mt-0.5 accent-[#0D2744]" /> : <CheckButton on={done} onClick={onDone} size={20} />}
+        {bulk ? <input type="checkbox" checked={selected} onChange={onSelect} onClick={e => e.stopPropagation()} className="w-4 h-4 mt-0.5 accent-[#193d33]" /> : <CheckButton on={done} onClick={onDone} size={20} />}
         <div className="flex-1 min-w-0">
           <button onClick={e=>{e.stopPropagation();bulk?onSelect():onOpen()}} className={`tw-title-button title ${done?"done":""}`}>{t.title}</button>
           <div className="mt-1.5"><Chips t={t} contacts={contacts} events={events} base={base} router={router} /></div>
           <div className="flex items-center justify-between mt-2">
             <Avatars names={t.assignees || []} max={2} />
-            {t.due_date && <span className={`text-[11px] font-bold ${late ? "text-[#960010]" : "text-[#64748B]"}`}>{relDay(t.due_date, today)}</span>}
+            {t.due_date && <span className={`text-[11px] font-bold ${late ? "text-[#a74450]" : "text-[#63756b]"}`}>{relDay(t.due_date, today)}</span>}
           </div>
         </div>
       </div>
@@ -591,11 +589,11 @@ function TaskCard({ t, i, today, bulk, selected, onSelect, onOpen, onDone, conta
 function Column({ status, count, children }: { status: typeof STATUS[number]; count: number; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: status.key })
   return (
-    <div ref={setNodeRef} className="col rounded-[14px] p-2.5 min-h-[220px] border" style={{ background: isOver ? "#EEF4FB" : status.bg, borderColor: isOver ? "#00488D" : "transparent" }}>
+    <div ref={setNodeRef} className="col rounded-[14px] p-2.5 min-h-[220px] border" style={{ background: isOver ? "#EEF4FB" : status.bg, borderColor: isOver ? "#28634e" : "transparent" }}>
       <div className="flex items-center gap-2 px-1 mb-2">
         <span className="w-2 h-2 rounded-full" style={{ background: status.dot }} />
         <span className="text-[12px] font-bold" style={{ color: status.fg }}>{status.label}</span>
-        <span className="text-[11px] text-[#64748B] mr-auto">{count}</span>
+        <span className="text-[11px] text-[#63756b] mr-auto">{count}</span>
       </div>
       <div className="space-y-2">{children}</div>
     </div>

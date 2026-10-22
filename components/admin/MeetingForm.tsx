@@ -27,7 +27,7 @@ export default function MeetingForm({ coordinators, fixedCoordinatorId, onSaved,
   const [extracting, setExtracting] = useState(false)
   const [tasks, setTasks] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const inp = "w-full px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#00488D]"
+  const inp = "w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white focus:outline-none focus:border-[#28634e]"
 
   async function extract() {
     if (!form.summary.trim() || !form.coordinator_id) return
@@ -59,9 +59,9 @@ export default function MeetingForm({ coordinators, fixedCoordinatorId, onSaved,
   const kept = tasks.filter(t => !t._skip).length
 
   return (
-    <Card className="mb-5 border-2 border-[#00488D]">
+    <Card className="mb-5 border-2 border-[#28634e]">
       <div className="p-5">
-        <div className="text-sm font-bold text-[#00488D] mb-4">סיכום פגישה חדש</div>
+        <div className="text-sm font-bold text-[#28634e] mb-4">סיכום פגישה חדש</div>
         <div className={`grid grid-cols-1 ${fixedCoordinatorId ? "sm:grid-cols-2" : "sm:grid-cols-3"} gap-3 mb-3`}>
           {!fixedCoordinatorId && (
             <div>
@@ -88,14 +88,14 @@ export default function MeetingForm({ coordinators, fixedCoordinatorId, onSaved,
           <input value={form.agenda} onChange={e => setForm(f => ({ ...f, agenda: e.target.value }))} placeholder="נושאי הפגישה בקצרה..." className={inp} />
         </div>
         <div className="mb-3">
-          <label className="text-xs font-semibold block mb-1">סיכום הפגישה * <span className="text-[#00488D] font-normal">(ה-AI יגזור מכאן משימות)</span></label>
+          <label className="text-xs font-semibold block mb-1">סיכום הפגישה * <span className="text-[#28634e] font-normal">(ה-AI יגזור מכאן משימות)</span></label>
           <textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} rows={5}
             placeholder="כתוב כאן את סיכום הפגישה בחופשיות — מה סוכם, מה צריך לעשות, מה האתגרים..."
             className={inp + " resize-none"} />
         </div>
         <div className="mb-4">
           <label className="text-xs font-semibold block mb-1">תאריך פגישה הבאה</label>
-          <input type="date" value={form.next_meeting_date} onChange={e => setForm(f => ({ ...f, next_meeting_date: e.target.value }))} className="w-48 px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm focus:outline-none focus:border-[#00488D]" />
+          <input type="date" value={form.next_meeting_date} onChange={e => setForm(f => ({ ...f, next_meeting_date: e.target.value }))} className="w-48 px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]" />
         </div>
 
         <div className="flex gap-2 mb-4">
@@ -105,7 +105,7 @@ export default function MeetingForm({ coordinators, fixedCoordinatorId, onSaved,
               ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" /><span>מחלץ משימות...</span></>
               : <><span>✨</span><span>חלץ משימות עם AI</span></>}
           </button>
-          {tasks.length > 0 && <span className="text-xs text-[#166534] self-center font-semibold">✓ נמצאו {tasks.length} משימות</span>}
+          {tasks.length > 0 && <span className="text-xs text-[#28634e] self-center font-semibold">✓ נמצאו {tasks.length} משימות</span>}
         </div>
 
         {tasks.length > 0 && (

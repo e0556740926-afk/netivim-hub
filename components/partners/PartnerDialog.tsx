@@ -1,5 +1,6 @@
 "use client"
 import { ReactNode, useEffect, useRef } from "react"
+import { lockOverlayScroll } from "@/lib/overlay-scroll"
 
 /** Native modal supplies focus containment, inert background and Escape support. */
 export default function PartnerDialog({title, subtitle, children, onClose, wide=false, footer}: {title:string;subtitle?:string;children:ReactNode;onClose:()=>void;wide?:boolean;footer?:ReactNode}) {
@@ -7,10 +8,9 @@ export default function PartnerDialog({title, subtitle, children, onClose, wide=
   const close=useRef(onClose); close.current=onClose
   useEffect(()=>{
     const previous=document.activeElement as HTMLElement|null
-    const overflow=document.body.style.overflow
-    document.body.style.overflow="hidden"
+    const releaseScroll=lockOverlayScroll()
     ref.current?.showModal()
-    return ()=>{document.body.style.overflow=overflow;previous?.focus()}
+    return ()=>{releaseScroll();if(previous?.isConnected)previous.focus()}
   },[])
   return <dialog ref={ref} className={`partner-dialog ${wide?'partner-dialog-wide':''}`} dir="rtl" aria-label={title}
     onCancel={e=>{e.preventDefault();close.current()}}
