@@ -1,6 +1,7 @@
 "use client"
 import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { useEffect, useState } from "react"
+import StaffBroadcast from "@/components/admin/StaffBroadcast"
 
 /** Bot settings screen: connection, toggles, who can use the bot, weekly numbers and the conversation log. */
 
@@ -148,6 +149,8 @@ export default function WhatsAppBotSettings() {
           <button onClick={sendTest} style={{ border: `1px solid ${T.blue}`, color: T.blue, background: "#fff", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>שלח</button>
         </Row>
       </div>
+
+      <StaffBroadcast staff={staff} onSent={() => load()} />
 
       <div style={card}>
         <div style={h2}>7 הימים האחרונים</div>
