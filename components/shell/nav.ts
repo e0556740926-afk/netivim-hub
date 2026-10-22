@@ -42,6 +42,7 @@ export function menuFor(kind: ShellKind, u: U): MenuGroup[] {
     { title: "כלי עבודה", items: [
       { label: "יומן", sub: "סדר יום, חודש וחיבור ליומן", path: "/coord/calendar", icon: "calendar" },
       { label: "אירועים", sub: "המפגשים וההתקדמות שלך", path: "/coord/events", icon: "event" },
+      { label: "מרכז ידע", sub: "תסריטי שיחה, סרטונים ומצגות", path: "/coord/knowledge", icon: "report" },
       { label: "עמותות ומוסדות", sub: "פרטי ארגונים ואנשי הקשר שלהם", path: "/coord/contacts?view=organizations", icon: "org" },
       { label: "הקישור האישי שלי", sub: "פניות שמגיעות עם השיוך שלך", path: "/coord/link", icon: "link" },
       { label: "ניוזלטר", sub: "התוכן והאפשרויות הקיימות", path: "/coord/newsletter", icon: "mail" },
@@ -63,6 +64,7 @@ export function menuFor(kind: ShellKind, u: U): MenuGroup[] {
   field.push({ label: "לוח מובילים", sub: "התקדמות צוות השטח", path: "/admin/leaderboard", icon: "trophy" })
 
   const manage: MenuItem[] = []
+  manage.push({ label: "מרכז ידע", sub: "תוכן והדרכות לצוות הרכזים", path: "/admin/knowledge", icon: "report" })
   if (can(u, "tasks")) manage.push({ label: "משימות", sub: "הקצאה ומעקב לכל הצוות", path: "/admin/tasks", icon: "task" })
   manage.push({ label: "לוח שנה", sub: "סדר יום ותצוגת חודש", path: "/admin/calendar", icon: "calendar" })
   if (can(u, "newsletters")) {
@@ -88,6 +90,7 @@ export function menuFor(kind: ShellKind, u: U): MenuGroup[] {
 export function quickActionsFor(kind: ShellKind, u: U): QuickAction[] {
   const base = kind === "coord" ? "/coord" : "/admin"
   const out: QuickAction[] = []
+  if (kind === "admin" && u?.role === "admin") out.push({type:"content",title:"תוכן למרכז הידע",sub:"תסריט, סרטון, מצגת או מסמך",icon:"report",path:"/admin/knowledge"})
   if (canWrite(u, "leads")) out.push({ type: "lead", title: "ליד חדש", sub: "פרטים, מקור ושותף מפנה", icon: "lead", path: `${base}/leads` })
   if (canWrite(u, "tasks")) out.push({ type: "task", title: "משימה חדשה", sub: kind === "coord" ? "מועד, סוג ועדיפות" : "מועד ושיוך לכמה עובדים", icon: "task", path: `${base}/tasks` })
   if (canWrite(u, "contacts")) {

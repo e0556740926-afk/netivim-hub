@@ -25,6 +25,7 @@ const GROUPS:{key:string;label:string;items:Item[]}[]=[
  {key:"manage",label:"כלי ניהול",items:[
   {label:"משימות",path:"/admin/tasks",icon:"task",badgeKey:"late"},
   {label:"לוח שנה",path:"/admin/calendar",icon:"calendar"},
+  {label:"מרכז ידע",path:"/admin/knowledge",icon:"report"},
   {label:"ניוזלטר",path:"/admin/newsletter",icon:"mail"},
   {label:"מרכז דיוורים",path:"/admin/messaging",icon:"send"},
   {label:"הגדרות",path:"/admin/settings",icon:"settings"},
