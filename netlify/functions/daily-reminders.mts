@@ -88,6 +88,11 @@ export default async () => {
     undebriefedEvents: [] as string[],
   };
   const today = new Date();
+  // When the WhatsApp bot sends its own two-way task reminders
+  // (netlify/functions/wa-task-reminders.mts), the task sections below
+  // keep email only — otherwise people would get every task twice.
+  const botTaskReminders = process.env.WHATSAPP_BOT_ENABLED === "true" && await sql`SELECT (enabled AND reminders_enabled) AS flag FROM whatsapp_bot_settings WHERE id = 1`
+    .then((r: any[]) => !!r[0]?.flag).catch(() => false);
   const isThursdayOrLater = today.getDay() >= 4 || today.getDay() === 0; // Thu, Fri, Sat, Sun
 
   // ── 1. Missing weekly reports (only nag from Thursday onward) ──
@@ -160,7 +165,7 @@ export default async () => {
            <a href="${APP_URL}/coord/tasks" style="display:inline-block;margin-top:16px;background:#960010;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">צפה במשימות</a>`
         );
         if (c.email) await sendEmail(c.email, `⏰ ${list.length} משימות באיחור`, html);
-        if (c.phone) await sendWhatsApp(c.phone, `⏰ *${list.length} משימות באיחור*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\n👈 ${APP_URL}/coord/tasks`);
+        if (c.phone && !botTaskReminders) await sendWhatsApp(c.phone, `⏰ *${list.length} משימות באיחור*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\n👈 ${APP_URL}/coord/tasks`);
         digest.overdueByPerson.push({ name, count: list.length });
         results.overdueTasks++;
       }
@@ -208,7 +213,7 @@ export default async () => {
            <a href="${APP_URL}/coord/tasks" style="display:inline-block;margin-top:16px;background:#B45309;color:#fff;text-decoration:none;padding:10px 22px;border-radius:9px;font-size:13px;font-weight:700;">צפה במשימות</a>`
         );
         if (c.email) await sendEmail(c.email, `⚠️ ${list.length} משימות שמועדן היום`, html);
-        if (c.phone) await sendWhatsApp(c.phone, `⚠️ *מועד היום*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\nעוד רגע והמשימות באיחור.\n👈 ${APP_URL}/coord/tasks`);
+        if (c.phone && !botTaskReminders) await sendWhatsApp(c.phone, `⚠️ *מועד היום*\n\n${list.map(t=>"• "+t.title).join("\n")}\n\nעוד רגע והמשימות באיחור.\n👈 ${APP_URL}/coord/tasks`);
         digest.dueTodayByPerson.push({ name, count: list.length });
         results.dueTodayTasks++;
       }

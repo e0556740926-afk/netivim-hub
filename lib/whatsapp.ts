@@ -56,6 +56,33 @@ export async function sendWhatsApp(phone: string | null | undefined, message: st
   }
 }
 
+/** Base URL for one Green API method on this instance (or null when not configured). */
+export function greenApiUrl(method: string): string | null {
+  if (!ID_INSTANCE || !API_TOKEN) return null;
+  return `${(process.env.GREENAPI_API_URL || "https://api.green-api.com").replace(/\/$/, "")}/waInstance${ID_INSTANCE}/${method}/${API_TOKEN}`;
+}
+
+/** POST/GET to a Green API method with a timeout. Never throws. */
+export async function greenApi(method: string, body?: any, timeoutMs = 8000): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+  const url = greenApiUrl(method);
+  if (!url) return { ok: false, status: 0, data: null, error: "no_config" };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, body === undefined
+      ? { method: "GET", signal: ctrl.signal }
+      : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctrl.signal });
+    const text = await res.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    return res.ok ? { ok: true, status: res.status, data } : { ok: false, status: res.status, data, error: typeof data === "string" ? data : JSON.stringify(data) };
+  } catch (e: any) {
+    return { ok: false, status: 0, data: null, error: e?.name === "AbortError" ? "timeout" : String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Message templates (plain text, WhatsApp formatting) ───────
 const TASK_TYPE: Record<string,string> = {
   call: "📞 שיחה", meeting: "🤝 פגישה", materials: "📦 חומרים", backoffice: "💻 בק-אופיס"

@@ -885,3 +885,36 @@ CREATE TABLE IF NOT EXISTS whatsapp_sessions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS whatsapp_messages_wa_id_idx ON whatsapp_messages(wa_message_id);
+
+-- ═══ WhatsApp bot v2 — buttons, settings, two-way reminders (2026-10-22) ═══
+-- Also created on first use by lib/whatsapp-bot/settings.ts#ensureBotTables.
+CREATE TABLE IF NOT EXISTS whatsapp_bot_settings (
+  id int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  enabled boolean NOT NULL DEFAULT true,
+  buttons_enabled boolean NOT NULL DEFAULT true,
+  reminders_enabled boolean NOT NULL DEFAULT true,
+  reminder_hour int NOT NULL DEFAULT 10,
+  support_phone text NOT NULL DEFAULT '',
+  button_failures int NOT NULL DEFAULT 0,
+  button_fail_since timestamptz,
+  auto_disabled_at timestamptz,
+  last_state text,
+  last_state_at timestamptz,
+  last_reminder_date date,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO whatsapp_bot_settings (id) VALUES (1) ON CONFLICT DO NOTHING;
+-- Outgoing reminder message id → task, so a tapped button finds its task.
+CREATE TABLE IF NOT EXISTS whatsapp_outbound (
+  wa_message_id text PRIMARY KEY,
+  user_id bigint,
+  phone text,
+  task_id bigint,
+  kind text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS whatsapp_outbound_created_idx ON whatsapp_outbound(created_at);
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'text';
+ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS meta jsonb;
+CREATE INDEX IF NOT EXISTS whatsapp_messages_phone_created_idx ON whatsapp_messages(phone, created_at);
+INSERT INTO arrival_channels (label) VALUES ('בוט וואטסאפ') ON CONFLICT (label) DO NOTHING;
