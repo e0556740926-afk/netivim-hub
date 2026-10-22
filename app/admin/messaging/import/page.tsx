@@ -36,7 +36,10 @@ function ImportWizard() {
   const [jobId, setJobId] = useState<number | null>(null)
   const [mapping, setMapping] = useState<Record<string, ImportField | "">>({})
   const [audiences, setAudiences] = useState<any[]>([])
-  const [audienceId, setAudienceId] = useState<string>(params.get("audience") || "")
+  // ?campaign=<id>: "ייבוא לקמפיין" — a new audience is created and attached to that draft.
+  const campaignId = Number(params.get("campaign")) || 0
+  const [campaignName, setCampaignName] = useState("")
+  const [audienceId, setAudienceId] = useState<string>(params.get("audience") || (campaignId ? "new" : ""))
   const [newAudName, setNewAudName] = useState("")
   const [basis, setBasis] = useState<{ channels: string[]; source: string }>({ channels: [], source: "" })
   const [busy, setBusy] = useState("")
@@ -50,6 +53,10 @@ function ImportWizard() {
   useEffect(() => {
     api("/api/messaging/audiences").then(d => setAudiences(d.audiences.filter((a: any) => !a.system_key))).catch(setErr)
   }, [])
+  useEffect(() => {
+    if (!campaignId) return
+    api(`/api/messaging/campaigns/${campaignId}`).then(d => { setCampaignName(d.campaign.name); setNewAudName(n => n || `נמעני קמפיין: ${d.campaign.name}`.slice(0, 120)) }).catch(() => {})
+  }, [campaignId])
 
   // Resume an existing job (?job=)
   useEffect(() => {
@@ -153,6 +160,7 @@ function ImportWizard() {
       if (!aid) { toastError("יש לבחור קהל יעד"); setBusy(""); return }
       if (basis.channels.length && !basis.source.trim()) { toastError("כדי לסמן הסכמה לכל הקובץ יש לתעד את מקור ההסכמה"); setBusy(""); return }
       await api(`/api/messaging/imports/${jobId}`, "PATCH", { audience_id: Number(aid), consent_basis: basis.channels.length ? basis : null })
+      if (campaignId) await api(`/api/messaging/campaigns/${campaignId}/audiences`, "POST", { audience_id: Number(aid) }).catch((e: any) => toastError(`הקהל לא צורף לקמפיין: ${e.message}`))
       if (parsed) {
         const all = dataRows.map((r, i) => ({ row_no: parsed.headerRow + i + 2, data: rowObject(r) }))
         for (let i = 0; i < all.length; i += 1000) {
@@ -194,6 +202,7 @@ function ImportWizard() {
     <div className="mc-ws">
       <div className="mc-crumb"><Link href="/admin/messaging">מרכז דיוורים</Link> / ייבוא</div>
       <div className="mc-head"><div><h1>ייבוא נמענים</h1><p>מקובץ Excel או CSV. רואים מה ייכנס לפני האישור. ייבוא לא יוצר לידים או שותפים, לא משנה רכז מטפל ולא מבטל הסרות.</p></div></div>
+      {campaignId > 0 && <div className="mc-note ok">ייבוא לקמפיין <b>{campaignName || `#${campaignId}`}</b> — הנמענים ייכנסו לקהל חדש שיצורף לקמפיין. כדי שיקבלו SMS, סמנו בשלב ״יעד ומדיניות״ את הרשאת ה-SMS ואת מקור ההסכמה.</div>}
       {err && <SetupNotice error={err} />}
 
       <ol className="mc-steps">
@@ -325,7 +334,8 @@ function ImportWizard() {
             {job.status === "done" && !counts.undone && <button type="button" className="lw-btn lw-btn-danger" onClick={undo}>ביטול ההוספה לקהל</button>}
             <a className="lw-btn" href={`/api/messaging/imports/${jobId}/report?all=1`}>דוח מלא (CSV)</a>
           </div>
-          {job.audience_id && <Link className="lw-btn lw-btn-primary" href={`/admin/messaging/audiences/${job.audience_id}`}>לקהל ״{job.audience_name}״</Link>}
+          {campaignId ? <Link className="lw-btn lw-btn-primary" href={`/admin/messaging/campaigns/${campaignId}`}>חזרה לקמפיין{campaignName ? ` ״${campaignName}״` : ""}</Link>
+            : job.audience_id && <Link className="lw-btn lw-btn-primary" href={`/admin/messaging/audiences/${job.audience_id}`}>לקהל ״{job.audience_name}״</Link>}
         </div>
       </div>}
     </div>

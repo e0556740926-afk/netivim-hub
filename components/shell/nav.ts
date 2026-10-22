@@ -68,6 +68,7 @@ export function menuFor(kind: ShellKind, u: U): MenuGroup[] {
   if (can(u, "newsletters")) {
     manage.push({ label: "ניוזלטר", sub: "ניהול תוכן הניוזלטר", path: "/admin/newsletter", icon: "mail" })
     manage.push({ label: "מרכז דיוורים", sub: "קהלים, ייבוא וקמפיינים", path: "/admin/messaging", icon: "send" })
+    manage.push({ label: "לידים מקמפיינים", sub: "מי שביקש שנחזור אליו", path: "/admin/messaging/leads", icon: "chat" })
   }
 
   const groups: MenuGroup[] = [

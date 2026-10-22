@@ -202,3 +202,57 @@ CREATE TABLE IF NOT EXISTS msg_activity (
 INSERT INTO msg_audiences(name, description, source, system_key)
 SELECT 'נרשמי הניוזלטר', 'מסונכרן אוטומטית מרשימת הניוזלטר הקיימת', 'ניוזלטר', 'newsletter'
 WHERE NOT EXISTS (SELECT 1 FROM msg_audiences WHERE system_key='newsletter');
+
+-- ════════════════════════════════════════════════════════════════
+-- SMS replies menu + "לידים מקמפיינים" (2026-10-22)
+-- Additive only. A campaign's reply menu lives in content.replies.
+-- ════════════════════════════════════════════════════════════════
+
+-- First reply per delivery (for the funnel: sent → delivered → replied).
+ALTER TABLE msg_campaign_recipients ADD COLUMN IF NOT EXISTS replied_at timestamptz;
+ALTER TABLE msg_campaign_recipients ADD COLUMN IF NOT EXISTS reply_key text;
+CREATE INDEX IF NOT EXISTS msg_cr_address_sent_idx ON msg_campaign_recipients(address, sent_at DESC);
+
+-- Every incoming reply (SMS today, WhatsApp later), matched or not.
+CREATE TABLE IF NOT EXISTS msg_inbound (
+  id serial PRIMARY KEY,
+  channel text NOT NULL DEFAULT 'sms' CHECK (channel IN ('sms','whatsapp','email')),
+  provider text NOT NULL DEFAULT '019',
+  provider_event_id text NOT NULL,
+  from_norm text NOT NULL,
+  to_number text NOT NULL DEFAULT '',
+  body text NOT NULL DEFAULT '',
+  campaign_id integer REFERENCES msg_campaigns(id) ON DELETE SET NULL,
+  campaign_recipient_id integer,
+  recipient_id integer,
+  matched_key text,
+  action text NOT NULL DEFAULT 'none',   -- callback / reply / unsubscribe / none
+  auto_reply_status text NOT NULL DEFAULT '',
+  handled boolean NOT NULL DEFAULT false,
+  handled_by text NOT NULL DEFAULT '',
+  received_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS msg_inbound_uq ON msg_inbound(provider, provider_event_id);
+CREATE INDEX IF NOT EXISTS msg_inbound_open_idx ON msg_inbound(handled, received_at DESC);
+
+-- People to call back, from any campaign channel. One open row per person per campaign.
+CREATE TABLE IF NOT EXISTS msg_callbacks (
+  id serial PRIMARY KEY,
+  campaign_id integer REFERENCES msg_campaigns(id) ON DELETE SET NULL,
+  campaign_recipient_id integer,
+  recipient_id integer REFERENCES msg_recipients(id) ON DELETE SET NULL,
+  channel text NOT NULL CHECK (channel IN ('sms','whatsapp','email')),
+  full_name text NOT NULL DEFAULT '',
+  phone text NOT NULL DEFAULT '',
+  email text NOT NULL DEFAULT '',
+  city text NOT NULL DEFAULT '',
+  request_text text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT 'new' CHECK (status IN ('new','in_progress','done','no_answer')),
+  assignee_id integer,
+  note text NOT NULL DEFAULT '',
+  updated_by text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS msg_callbacks_uq ON msg_callbacks(campaign_id, recipient_id) WHERE campaign_id IS NOT NULL AND recipient_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS msg_callbacks_status_idx ON msg_callbacks(status, created_at DESC);

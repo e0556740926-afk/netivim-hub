@@ -3,7 +3,8 @@
 // on its own and can't resolve "@/..." aliases). The DB client is passed
 // in, so this file never opens a connection by itself.
 import { normalizeRow, type Channel, type NormalizedRow } from "./normalize"
-import { renderEmailHtml, personalizeHtml, personalizeText, plainTextFromEmail, renderSms, type EmailContent, EMPTY_EMAIL, contentProblems } from "./render"
+import { renderEmailHtml, personalizeHtml, personalizeText, plainTextFromEmail, renderSms, type EmailContent, EMPTY_EMAIL, EMPTY_SMS, contentProblems } from "./render"
+import { send019, sms019Missing, toLocalIL, errLabel } from "./sms019"
 
 export type Db = {
   (strings: TemplateStringsArray, ...values: any[]): Promise<any[]>
@@ -29,9 +30,11 @@ export function channelStatus(env: Env): Record<Channel, ChannelStatus> {
   if (!key) emailMissing.push("מפתח API של Resend עם הרשאת שליחה (MESSAGING_RESEND_API_KEY)")
   if (!from) emailMissing.push("כתובת שולח מדומיין מאומת (MESSAGING_EMAIL_FROM)")
   if (env.MESSAGING_EMAIL_ENABLED !== "true") emailMissing.push("הפעלה מפורשת אחרי אימות הדומיין (MESSAGING_EMAIL_ENABLED=true)")
+  const smsMissing = sms019Missing(env)
+  if (env.MESSAGING_SMS_ENABLED !== "true") smsMissing.push("הפעלה מפורשת של ערוץ ה-SMS (MESSAGING_SMS_ENABLED=true)")
   return {
     email: { channel: "email", provider: "Resend", connected: emailMissing.length === 0, missing: emailMissing, note: "מתאם קיים בקוד. דורש דומיין מאומת ב-Resend וזהות שולח." },
-    sms: { channel: "sms", provider: "טרם נבחר", connected: false, missing: ["בחירת ספק SMS ופתיחת חשבון", "זהות שולח מאושרת", "דוחות מסירה (webhook)", "מתאם שליחה לספק שנבחר"], note: "אפשר להכין טיוטות. שליחה חסומה עד חיבור ואימות." },
+    sms: { channel: "sms", provider: "019", connected: smsMissing.length === 0, missing: smsMissing, note: "נשלח מהמספר הווירטואלי — הנמען יכול להשיב (תפריט תשובות, \"השב הסר\"). תשובות ודוחות מסירה נכנסים דרך Push API של 019." },
     whatsapp: { channel: "whatsapp", provider: "טרם נבחר", connected: false, missing: ["חשבון WhatsApp Business Platform רשמי (ישיר או דרך ספק)", "תבניות הודעה מאושרות", "מתאם שליחה וסטטוסים"], note: "Green API הקיים משמש להודעות מערכת בלבד ואינו מחובר לקמפיינים." },
   }
 }
@@ -364,8 +367,9 @@ export async function runWorker(db: Db, env: Env, opts: { budgetMs?: number; bat
       if (!toSend.length) continue
 
       if (ch === "email") await deliverEmailBatch(db, env, c, toSend, log)
+      else if (ch === "sms") await deliverSmsBatch(db, env, c, toSend, log)
       else {
-        // SMS / WhatsApp adapters are deliberately not implemented until a provider is chosen.
+        // The WhatsApp adapter is deliberately not implemented until an official account is connected.
         await db`UPDATE msg_campaign_recipients SET status = 'queued', locked_until = NULL, attempts = attempts - 1 WHERE id = ANY(${toSend.map(r => Number(r.id))}::int[])`
         break
       }
@@ -386,7 +390,8 @@ async function deliverEmailBatch(db: Db, env: Env, c: any, rows: any[], log: Rec
   const payload = rows.map(r => {
     const p = byId.get(Number(r.recipient_id)) || {}
     const unsub = `${appUrl}/api/messaging/unsubscribe?t=${p.manage_token}&c=${c.id}`
-    const personal = { first_name: String(p.full_name || "").trim().split(/\s+/)[0] || "", full_name: p.full_name || "", unsubscribe_url: unsub, preferences_url: `${appUrl}/newsletter/preferences` }
+    const personal = { first_name: String(p.full_name || "").trim().split(/\s+/)[0] || "", full_name: p.full_name || "", unsubscribe_url: unsub, preferences_url: `${appUrl}/newsletter/preferences`,
+      callback_url: `${appUrl}/api/messaging/callback?t=${p.manage_token}&c=${c.id}` }
     return {
       from: fromHeader(env, content.from_name),
       to: [r.address],
@@ -435,6 +440,51 @@ async function deliverEmailBatch(db: Db, env: Env, c: any, rows: any[], log: Rec
   } else {
     const msg = `הספק דחה את הבקשה (${res.status}): ${String(body?.message || body?.name || "").slice(0, 160)}`
     await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = ${msg}, updated_at = now() WHERE id = ANY(${ids}::int[])`
+    log.failed += ids.length
+  }
+}
+
+/**
+ * SMS through 019. One request per claimed batch; our delivery-row id is the
+ * external id, so 019's delivery reports map straight back to the row.
+ */
+async function deliverSmsBatch(db: Db, env: Env, c: any, rows: any[], log: Record<string, number>) {
+  const content = { ...EMPTY_SMS, ...(c.approved_content || c.content || {}) }
+  const appUrl = (env.NEXTAUTH_URL || "").replace(/\/$/, "")
+  const people = await db`SELECT id, full_name, manage_token FROM msg_recipients WHERE id = ANY(${rows.map(r => Number(r.recipient_id))}::int[])`
+  const byId = new Map(people.map(p => [Number(p.id), p]))
+  const items: { id: string; phone: string; text: string }[] = []
+  const notLocal: number[] = []
+  for (const r of rows) {
+    const phone = toLocalIL(r.address)
+    if (!phone) { notLocal.push(Number(r.id)); continue }
+    const p = byId.get(Number(r.recipient_id)) || {}
+    const text = renderSms(content, { first_name: String(p.full_name || "").trim().split(/\s+/)[0] || "", full_name: p.full_name || "",
+      unsubscribe_url: `${appUrl}/api/messaging/unsubscribe?t=${p.manage_token}&c=${c.id}` })
+    items.push({ id: String(r.id), phone, text })
+  }
+  if (notLocal.length) {
+    await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = 'מספר שאינו ישראלי — לא נתמך כרגע', updated_at = now() WHERE id = ANY(${notLocal}::int[])`
+    log.failed += notLocal.length
+  }
+  if (!items.length) return
+  const ids = items.map(i => Number(i.id))
+  const res = await send019(env, items, c.name || `campaign ${c.id}`)
+  if (res.ok) {
+    await db`UPDATE msg_campaign_recipients SET status = 'accepted', provider_id = ${res.shipment_id}, sent_at = now(), locked_until = NULL, last_error = '', updated_at = now() WHERE id = ANY(${ids}::int[])`
+    log.accepted += ids.length
+  } else if (res.timeout) {
+    await db`UPDATE msg_campaign_recipients SET status = 'unknown', locked_until = NULL, last_error = ${errLabel(res)}, updated_at = now() WHERE id = ANY(${ids}::int[])`
+    log.unknown += ids.length
+  } else if (res.http != null && RETRYABLE.has(res.http)) {
+    const r = await db`UPDATE msg_campaign_recipients SET
+        status = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'queued' END,
+        next_attempt_at = now() + (interval '2 minutes' * attempts), locked_until = NULL, last_error = ${errLabel(res)}, updated_at = now()
+      WHERE id = ANY(${ids}::int[]) RETURNING status`
+    log.retried += r.filter(x => x.status === "queued").length
+    log.failed += r.filter(x => x.status === "failed").length
+  } else {
+    await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = ${errLabel(res)}, updated_at = now() WHERE id = ANY(${ids}::int[])`
     log.failed += ids.length
   }
 }

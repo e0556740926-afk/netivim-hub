@@ -1,6 +1,7 @@
 // Rendering for campaign content — used for the live preview in the
 // browser, the test send and the real delivery, so all three show the
 // same thing. Pure: no "@/..." imports (see normalize.ts).
+import { replyProblems, type ReplyOption } from "./replies"
 
 export type EmailContent = {
   subject: string
@@ -20,7 +21,7 @@ export type EmailContent = {
   html: string
   archive: boolean
 }
-export type SmsContent = { text: string; sender_label: string; optout_text: string }
+export type SmsContent = { text: string; sender_label: string; optout_text: string; replies?: ReplyOption[] }
 export type WhatsappContent = { template_name: string; language: string; variables: string[]; body_preview: string }
 export type CampaignContent = Partial<EmailContent & SmsContent & WhatsappContent>
 
@@ -31,13 +32,17 @@ export const EMPTY_EMAIL: EmailContent = {
   sections: [], event: null, cta: null,
   closing: "", signature: "צוות נתיבים", html: "", archive: true,
 }
-export const EMPTY_SMS: SmsContent = { text: "", sender_label: "Netivim", optout_text: "להסרה: {{unsubscribe_url}}" }
+// Replies go to the 019 virtual number, so "השב הסר" is a working opt-out (and far shorter than a link).
+export const EMPTY_SMS: SmsContent = { text: "", sender_label: "", optout_text: "להסרה השב הסר", replies: [] }
 export const EMPTY_WHATSAPP: WhatsappContent = { template_name: "", language: "he", variables: ["{{first_name}}"], body_preview: "" }
 
-export type Personal = { first_name?: string; full_name?: string; unsubscribe_url?: string; preferences_url?: string }
+export type Personal = { first_name?: string; full_name?: string; unsubscribe_url?: string; preferences_url?: string; callback_url?: string }
 
 const esc = (s: unknown) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
 const safeUrl = (u: string) => /^https?:\/\/[^\s"'<>]+$/i.test(u.trim()) ? u.trim() : ""
+/** "{{callback_url}}" — the personal "חזרו אליי" link, filled in per recipient at send time. */
+export const CALLBACK_TOKEN = "{{callback_url}}"
+const ctaUrl = (u: string) => u.trim() === CALLBACK_TOKEN ? CALLBACK_TOKEN : safeUrl(u)
 const para = (s: string) => esc(s).replace(/\n/g, "<br/>")
 
 /** {{first_name}} etc. with a graceful fallback — never "שלום undefined". */
@@ -50,6 +55,7 @@ export function personalizeText(text: string, p: Personal, forHtml = false): str
     .replace(/\{\{\s*full_name\s*\}\}/gi, enc(full || first))
     .replace(/\{\{\s*unsubscribe_url\s*\}\}/gi, p.unsubscribe_url || "#")
     .replace(/\{\{\s*preferences_url\s*\}\}/gi, p.preferences_url || "#")
+    .replace(/\{\{\s*callback_url\s*\}\}/gi, p.callback_url || "#")
 }
 
 /** Imported HTML is treated as untrusted: no scripts, frames, forms or inline handlers. */
@@ -76,9 +82,9 @@ export function renderEmailHtml(c: EmailContent, opts: { orgAddress: string; log
     const foot = `<table role="presentation" style="width:100%;max-width:600px;margin:0 auto;border-collapse:collapse;" dir="rtl">${footerHtml(opts.orgAddress)}</table>`
     return /<\/body>/i.test(clean) ? clean.replace(/<\/body>/i, foot + "</body>") : clean + foot
   }
-  const cta = c.cta && c.cta.label && safeUrl(c.cta.url) ? `
+  const cta = c.cta && c.cta.label && ctaUrl(c.cta.url) ? `
     <tr><td style="padding:6px 28px 26px;" align="right">
-      <a href="${esc(safeUrl(c.cta.url))}" style="display:inline-block;background:#21634f;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">${esc(c.cta.label)}</a>
+      <a href="${esc(ctaUrl(c.cta.url))}" style="display:inline-block;background:#21634f;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 22px;border-radius:10px;">${esc(c.cta.label)}</a>
     </td></tr>` : ""
   const img = safeUrl(c.main.image_url) ? `<img src="${esc(safeUrl(c.main.image_url))}" alt="${esc(c.main.image_alt)}" width="544" style="display:block;width:100%;max-width:544px;height:auto;border-radius:12px;margin:0 0 16px;border:0;"/>` : ""
   const main = c.main.title || c.main.text || img ? `
@@ -142,18 +148,23 @@ export function renderSms(c: SmsContent, p: Personal): string {
   return personalizeText([c.text, c.optout_text].filter(Boolean).join("\n"), p).trim()
 }
 
+/** "השב הסר" / "השיבו הסר" — works because replies reach our 019 number. */
+export const SMS_REPLY_OPTOUT = /השב(?:ו)?\s*["'״]?\s*הסר/
+
 /** What a campaign must contain before it can be approved — channel-specific. */
 export function contentProblems(channel: string, c: CampaignContent): string[] {
   const out: string[] = []
   if (channel === "email") {
     if (!String(c.subject || "").trim()) out.push("חסרה שורת נושא")
     if (c.mode === "html" ? !String(c.html || "").trim() : !(c.title || c.intro || c.main?.text || c.closing || (c.sections || []).some(x => x.title || x.text))) out.push("גוף המייל ריק — בשלב \"תוכן\" יש למלא כותרת, פתיחה או טקסט")
-    if (c.cta && c.cta.label && !safeUrl(c.cta.url || "")) out.push("כתובת הכפתור אינה קישור http/https תקין")
+    if (c.cta && c.cta.label && !ctaUrl(c.cta.url || "")) out.push("כתובת הכפתור אינה קישור http/https תקין")
     if (c.main?.image_url && !safeUrl(c.main.image_url)) out.push("כתובת התמונה אינה קישור ציבורי תקין")
     if (c.reply_to && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.reply_to)) out.push("כתובת Reply-To אינה תקינה")
   } else if (channel === "sms") {
     if (!String(c.text || "").trim()) out.push("חסר טקסט להודעה")
-    if (!/\{\{\s*unsubscribe_url\s*\}\}/.test(String(c.optout_text || "") + String(c.text || ""))) out.push("חסרה דרך הסרה שעובדת בפועל")
+    const all = String(c.optout_text || "") + " " + String(c.text || "")
+    if (!/\{\{\s*unsubscribe_url\s*\}\}/.test(all) && !SMS_REPLY_OPTOUT.test(all)) out.push("חסרה דרך הסרה שעובדת בפועל (\"להסרה השב הסר\" או קישור הסרה)")
+    out.push(...replyProblems(c.replies))
   } else if (channel === "whatsapp") {
     if (!String(c.template_name || "").trim()) out.push("יש לבחור תבנית WhatsApp מאושרת")
   }

@@ -24,5 +24,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     WHERE campaign_id = ${id} AND status IN ('failed','unknown','skipped') GROUP BY last_error, status ORDER BY n DESC LIMIT 10`
   const [unsub] = await db`SELECT count(*)::int AS n FROM msg_suppressions WHERE source = ${"campaign:" + id}`
   const [events] = await db`SELECT count(*)::int AS n FROM msg_provider_events pe JOIN msg_campaign_recipients cr ON cr.id = pe.campaign_recipient_id WHERE cr.campaign_id = ${id}`
-  return NextResponse.json({ campaign: c, funnel: s, reasons, unsubscribes: unsub.n, tracking: events.n > 0 })
+  const replies = await db`SELECT COALESCE(reply_key, '') AS key, count(*)::int AS n FROM msg_campaign_recipients
+    WHERE campaign_id = ${id} AND replied_at IS NOT NULL GROUP BY 1 ORDER BY 2 DESC`
+  const [cb] = await db`SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'new')::int AS open FROM msg_callbacks WHERE campaign_id = ${id}`
+  const [inb] = await db`SELECT count(*)::int AS total, count(*) FILTER (WHERE NOT handled)::int AS open FROM msg_inbound WHERE campaign_id = ${id}`
+  return NextResponse.json({ campaign: c, funnel: s, reasons, unsubscribes: unsub.n, tracking: events.n > 0,
+    replies: { by_key: replies, replied: replies.reduce((a: number, r: any) => a + r.n, 0), callbacks: cb.total, callbacks_open: cb.open, inbound: inb.total, inbound_open: inb.open } })
 }

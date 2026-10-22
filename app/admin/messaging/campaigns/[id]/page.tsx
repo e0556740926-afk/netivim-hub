@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast"
 import { api, n, fmtDate, StatusPill, SetupNotice, CH_LABEL } from "@/components/messaging/ui"
 import { renderEmailHtml, personalizeHtml, personalizeText, renderSms, contentProblems, EMPTY_EMAIL, EMPTY_SMS, EMPTY_WHATSAPP, type EmailContent, type SmsContent, type WhatsappContent } from "@/lib/messaging/render"
 import { smsSegments } from "@/lib/messaging/normalize"
+import { DEFAULT_REPLIES, type ReplyOption } from "@/lib/messaging/replies"
 
 const STEPS = ["ערוץ ומטרה", "קהל", "תוכן", "בדיקה", "אישור ותזמון"]
 const REASON: Record<string, string> = { no_address: "אין פרט לערוץ", invalid: "פרט לא תקין", suppressed: "הוסרו / חסומים", consent_revoked: "ביקשו הסרה", consent_unknown: "הרשאה לא ידועה" }
@@ -39,6 +40,7 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
   const [saving, setSaving] = useState(false)
   const [elig, setElig] = useState<any>(null)
   const [testTo, setTestTo] = useState(data.me || "")
+  const [testPhones, setTestPhones] = useState("")
   const [testing, setTesting] = useState(false)
   const [mode, setMode] = useState<"now" | "schedule">("now")
   const [when, setWhen] = useState("")
@@ -95,6 +97,12 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
     try { const r = await api(`/api/messaging/campaigns/${c0.id}/test`, "POST", { emails: testTo.split(/[,\s]+/).filter(Boolean) }); success(`מייל בדיקה נשלח ל-${r.results.filter((x: any) => x.ok).length} כתובות`) }
     catch (e: any) { toastError(e.message) } finally { setTesting(false) }
   }
+  async function sendSmsTest() {
+    if (dirty && !(await save(true))) return
+    setTesting(true)
+    try { const r = await api(`/api/messaging/campaigns/${c0.id}/test`, "POST", { phones: testPhones }); success(`SMS בדיקה נשלח ל-${r.results.length} מספרים`) }
+    catch (e: any) { toastError(e.message) } finally { setTesting(false) }
+  }
   async function approve() {
     if (dirty && !(await save(true))) return
     const label = mode === "now" ? `לשלוח עכשיו ל-${n(elig?.eligible)} נמענים?` : `לתזמן ל-${new Date(when).toLocaleString("he-IL")} — ${n(elig?.eligible)} נמענים?`
@@ -143,6 +151,7 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
           <h2>למי שולחים</h2>
           <p className="mc-sub" style={{ marginBottom: 10 }}>אפשר לבחור כמה קהלים — כל אדם יקבל הודעה אחת בלבד.</p>
           {audiences.map(a => <label key={a.id} className="mc-check"><input type="checkbox" checked={aud.includes(a.id)} onChange={e => { setAud(x => e.target.checked ? [...x, a.id] : x.filter(y => y !== a.id)); setExc(x => x.filter(y => y !== a.id)); touch() }} />{a.name}{a.system_key && <span className="mc-pill blue" style={{ marginInlineStart: 6 }}>מסונכרן</span>}</label>)}
+          {canEdit && <div className="mc-note" style={{ marginTop: 12 }}>יש לכם רשימה בקובץ? <Link className="lw-link" href={`/admin/messaging/import?campaign=${c0.id}`}>ייבוא נמענים מקובץ לקמפיין הזה</Link> — ייווצר קהל חדש שיצורף לקמפיין אוטומטית.</div>}
           <h3 style={{ marginTop: 16 }}>החרגות</h3>
           {audiences.filter(a => !aud.includes(a.id)).map(a => <label key={a.id} className="mc-check"><input type="checkbox" checked={exc.includes(a.id)} onChange={e => { setExc(x => e.target.checked ? [...x, a.id] : x.filter(y => y !== a.id)); touch() }} />לא לשלוח למי שב״{a.name}״</label>)}
           <div className="mc-stepfoot"><button type="button" className="lw-btn" onClick={() => go(1)}>חזרה</button><button type="button" className="lw-btn lw-btn-primary" onClick={async () => { await save(true); go(2) }}>חישוב נמענים</button></div>
@@ -169,12 +178,17 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
               <div className="ld-row"><span>ארכיון ציבורי</span><b>{content.archive ? "כן — עותק כללי בלי פרטים אישיים" : "לא"}</b></div></>}
             <div className="ld-row"><span>קהלים</span><b>{audiences.filter(a => aud.includes(a.id)).map(a => a.name).join(", ") || "—"}{exc.length ? ` (ללא ${audiences.filter(a => exc.includes(a.id)).map(a => a.name).join(", ")})` : ""}</b></div>
             <div className="ld-row"><span>נמענים כשירים</span><b>{elig ? n(elig.eligible) : "…"}</b></div>
-            <div className="ld-row"><span>עלות משוערת</span><b>{channel === "email" ? "לפי חבילת הספק" : "תחושב אחרי בחירת ספק"}</b></div>
+            <div className="ld-row"><span>עלות משוערת</span><b>{channel === "email" ? "לפי חבילת הספק" : channel === "sms" ? (elig ? `${n(elig.eligible * Math.max(1, smsSegments(renderSms({ ...EMPTY_SMS, ...content }, sample)).segments))} הודעות מהיתרה ב-019 (+ תשובות אוטומטיות)` : "…") : "תחושב אחרי בחירת ספק"}</b></div>
+            {channel === "sms" && <div className="ld-row"><span>תפריט תשובות</span><b>{(content.replies || []).length ? (content.replies as ReplyOption[]).map(r => `${r.key} — ${r.label || (r.callback ? "לחזור אליו" : "תשובה אוטומטית")}`).join(" · ") : "אין (רק ״השב הסר״)"}</b></div>}
           </section>
           {links.length > 0 && <><h3 style={{ marginTop: 14 }}>קישורים בתוכן</h3><ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, lineHeight: 1.9 }}>{links.map(l => <li key={l}><a href={l} target="_blank" rel="noopener noreferrer" className="mc-ltr" style={{ color: "var(--sh-green)" }}>{l}</a></li>)}</ul></>}
           {channel === "email" && <div className="mc-form" style={{ marginTop: 16 }}>
             <label className="mc-field full">שליחת בדיקה לכתובות מפורשות<input value={testTo} onChange={e => setTestTo(e.target.value)} placeholder="name@example.org" /><small>עד 5 כתובות. לא נספר בקמפיין ולא משנה מדדים.</small></label>
             <div className="full"><button type="button" className="lw-btn" disabled={testing || problems.length > 0} onClick={sendTest}>{testing ? "שולח…" : "שליחת מייל בדיקה"}</button></div>
+          </div>}
+          {channel === "sms" && <div className="mc-form" style={{ marginTop: 16 }}>
+            <label className="mc-field full">SMS בדיקה למספרים מפורשים<input className="mc-ltr" value={testPhones} onChange={e => setTestPhones(e.target.value)} placeholder="0501234567" /><small>עד 3 מספרים, מופרדים בפסיק. יורד מהיתרה ב-019. אפשר להשיב להודעה ולראות שהתשובה נקלטת.</small></label>
+            <div className="full"><button type="button" className="lw-btn" disabled={testing || problems.length > 0 || !conn.connected} onClick={sendSmsTest}>{testing ? "שולח…" : "שליחת SMS בדיקה"}</button></div>
           </div>}
           <div className="mc-stepfoot"><button type="button" className="lw-btn" onClick={() => go(3)}>חזרה</button><button type="button" className="lw-btn lw-btn-primary" onClick={() => go(5)}>לאישור ולתזמון</button></div>
         </div>
@@ -270,7 +284,8 @@ function EmailEditor({ content: c, setC, sample, events }: { content: EmailConte
             </div>}
           </div>
           <div className="full mc-blocks">
-            <div className="mc-block-head">כפתור פעולה מרכזי</div>
+            <div className="mc-block-head">כפתור פעולה מרכזי<span><button type="button" className="lw-link" onClick={() => setC({ cta: { label: c.cta?.label && c.cta.url === "{{callback_url}}" ? c.cta.label : "חזרו אליי", url: "{{callback_url}}" } })}>כפתור ״חזרו אליי״</button></span></div>
+            {c.cta?.url === "{{callback_url}}" && <p className="mc-sub" style={{ margin: "0 0 8px" }}>מי שילחץ ייכנס ל״לידים מקמפיינים״ ויקבל דף תודה.</p>}
             <div className="mc-form"><label className="mc-field">טקסט הכפתור<input value={c.cta?.label || ""} onChange={e => setC({ cta: { label: e.target.value, url: c.cta?.url || "" } })} placeholder="למשל: להרשמה למפגש" /></label>
               <label className="mc-field">קישור<input className="mc-ltr" value={c.cta?.url || ""} onChange={e => setC({ cta: { label: c.cta?.label || "", url: e.target.value } })} placeholder="https://" /></label></div>
           </div>
@@ -297,16 +312,34 @@ function EmailEditor({ content: c, setC, sample, events }: { content: EmailConte
 function SmsEditor({ content: c, setC, sample }: { content: SmsContent; setC: (p: any) => void; sample: any }) {
   const text = renderSms(c, { ...sample, unsubscribe_url: "https://ntvm.co/u/ab12cd" })
   const seg = smsSegments(text)
+  const replies: ReplyOption[] = c.replies || []
+  const setR = (i: number, patch: Partial<ReplyOption>) => setC({ replies: replies.map((r, j) => j === i ? { ...r, ...patch } : r) })
+  const nextKey = String(Math.max(0, ...replies.map(r => Number(r.key) || 0)) + 1)
   return <div className="mc-split">
     <div className="mc-card"><div className="mc-form">
-      <label className="mc-field">שם שולח (מוצג)<input className="mc-ltr" value={c.sender_label} onChange={e => setC({ sender_label: e.target.value })} maxLength={11} /><small>עד 11 תווים לטיניים; הזהות הסופית תלויה באישור הספק.</small></label>
-      <label className="mc-field full">טקסט ההודעה *<textarea value={c.text} onChange={e => setC({ text: e.target.value })} rows={5} /><small><span className="mc-ltr">{"{{first_name}}"}</span> לשם פרטי. קישור מלא נספר באורך.</small></label>
-      <label className="mc-field full">דרך הסרה *<input value={c.optout_text} onChange={e => setC({ optout_text: e.target.value })} /><small>חייבת לעבוד בפועל — קישור ההסרה האישי <span className="mc-ltr">{"{{unsubscribe_url}}"}</span>. ״השב הסר״ רק אם הספק מקבל תשובות.</small></label>
+      <div className="full mc-note" style={{ margin: 0 }}>ההודעה יוצאת מהמספר הווירטואלי של נתיבים ב-019, כך שאפשר להשיב לה. תשובות נקלטות במערכת לפי תפריט התשובות שלמטה.</div>
+      <label className="mc-field full">טקסט ההודעה *<textarea value={c.text} onChange={e => setC({ text: e.target.value })} rows={5} placeholder={"נתיבים: ערב הסברה על מסלולי שירות ביום ג׳ בבני ברק.\nלשיחה עם רכז השב 1\nלפרטים נוספים השב 2"} /><small><span className="mc-ltr">{"{{first_name}}"}</span> לשם פרטי. כתבו בטקסט עצמו מה להשיב (״השב 1…״).</small></label>
+      <label className="mc-field full">דרך הסרה *<input value={c.optout_text} onChange={e => setC({ optout_text: e.target.value })} /><small>״להסרה השב הסר״ עובד ישירות — מי שמשיב ״הסר״ מוסר אוטומטית. אפשר גם קישור <span className="mc-ltr">{"{{unsubscribe_url}}"}</span> (ארוך יותר).</small></label>
+      <div className="full mc-blocks">
+        <div className="mc-block-head">תפריט תשובות<span className="mc-actions">
+          {!replies.length && <button type="button" className="lw-link" onClick={() => setC({ replies: DEFAULT_REPLIES })}>תפריט לדוגמה (1 / 2)</button>}
+          <button type="button" className="lw-link" onClick={() => setC({ replies: [...replies, { key: nextKey, label: "", callback: false, reply_text: "" }] })}>+ מקש</button></span></div>
+        {!replies.length && <p className="mc-sub" style={{ margin: 0 }}>בלי תפריט — רק ״הסר״ מטופל אוטומטית, וכל תשובה אחרת תגיע ל״תשובות לטיפול״.</p>}
+        {replies.map((r, i) => <div key={i} className="mc-form" style={{ borderTop: i ? "1px solid var(--sh-line)" : undefined, paddingTop: i ? 12 : 0, marginTop: i ? 12 : 0 }}>
+          <label className="mc-field">מקש<input className="mc-ltr" value={r.key} maxLength={10} onChange={e => setR(i, { key: e.target.value })} /></label>
+          <label className="mc-field">מה זה אומר (לדוחות)<input value={r.label} onChange={e => setR(i, { label: e.target.value })} placeholder="ביקש שיחה חוזרת" /></label>
+          <label className="mc-check full"><input type="checkbox" checked={r.callback} onChange={e => setR(i, { callback: e.target.checked })} />להכניס ל״לידים מקמפיינים״ — צריך לחזור אליו</label>
+          <label className="mc-field full">תשובה אוטומטית (לא חובה)<textarea value={r.reply_text} onChange={e => setR(i, { reply_text: e.target.value })} rows={3} placeholder="למשל: הערב יתקיים ביום ג׳ ב-20:00 ברח׳… לפרטים: https://…" />
+            <small>{r.reply_text ? `${smsSegments(r.reply_text).chars} תווים · ${smsSegments(r.reply_text).segments} הודעות לכל משיב` : "תישלח מיד למי שהשיב את המקש הזה."}</small></label>
+          <div className="full"><button type="button" className="lw-link" style={{ color: "var(--sh-red)" }} onClick={() => setC({ replies: replies.filter((_, j) => j !== i) })}>הסרת המקש</button></div>
+        </div>)}
+      </div>
     </div></div>
     <div className="mc-preview">
-      <div className="mc-preview-bar"><span>כך תיראה ההודעה</span><span>{seg.chars} תווים · {seg.segments} מקטעים · {seg.unicode ? "עברית/Unicode (70/67)" : "GSM (160/153)"}</span></div>
+      <div className="mc-preview-bar"><span>כך תיראה ההודעה</span><span>{seg.chars} תווים · {seg.segments} הודעות · {seg.unicode ? "עברית (70 לכל הודעה)" : "GSM (160)"}</span></div>
       <div className="mc-phone"><div className="mc-bubble">{text || "…"}</div></div>
-      <p className="mc-sub">האומדן הוא הערכה לפי קידוד; החיוב בפועל נקבע לפי הספק שייבחר.</p>
+      {replies.filter(r => r.reply_text).map(r => <div key={r.key} className="mc-phone" style={{ marginTop: 8 }}><div className="mc-sub" style={{ marginBottom: 4 }}>אם ישיבו {r.key}:</div><div className="mc-bubble">{r.reply_text}</div></div>)}
+      <p className="mc-sub">בעברית כל 70 תווים נספרים כהודעה (67 בהודעה ארוכה). החיוב בפועל לפי 019.</p>
     </div>
   </div>
 }
@@ -377,6 +410,17 @@ function Report({ data, reload }: { data: any; reload: () => Promise<void> }) {
         <div className="mc-card mc-kpi"><span>דולגו לפני שליחה</span><b>{n(f.skipped)}</b><small>הוסרו/בוטלה הרשאה בין האישור למסירה · {n(f.cancelled)} בוטלו בעצירה</small></div>
         <div className="mc-card mc-kpi"><span>הסרות מהקמפיין</span><b>{n(r?.unsubscribes)}</b><small>{c.archive_issue_id ? <a className="lw-link" href={`/newsletter/archive/${c.archive_issue_id}`} target="_blank">פורסם בארכיון</a> : "—"}</small></div>
       </div>
+      {r?.replies && (c.channel === "sms" || r.replies.callbacks > 0) && <><div className="mc-section"><h2>תשובות</h2><span className="mc-actions">
+          <Link className="lw-link" href={`/admin/messaging/leads?campaign=${c.id}`}>לידים מהקמפיין ({n(r.replies.callbacks)})</Link>
+          {r.replies.inbound_open > 0 && <Link className="lw-link" href={`/admin/messaging/leads?view=replies&campaign=${c.id}`}>תשובות לטיפול ({n(r.replies.inbound_open)})</Link>}</span></div>
+        <div className="mc-grid k3">
+          <div className="mc-card mc-kpi"><span>השיבו</span><b>{n(r.replies.replied)}</b><small>{pct(r.replies.replied, f.accepted)} ממי שקיבל</small></div>
+          <div className="mc-card mc-kpi"><span>ביקשו שנחזור אליהם</span><b>{n(r.replies.callbacks)}</b><small>{n(r.replies.callbacks_open)} עדיין חדשים</small></div>
+          <div className="mc-card mc-kpi"><span>תשובות שלא זוהו</span><b>{n(r.replies.inbound_open)}</b><small>ממתינות לטיפול</small></div>
+        </div>
+        {r.replies.by_key.length > 0 && <div className="lw-card" style={{ marginTop: 12 }}><div className="mc-table-wrap"><table className="mc-table"><thead><tr><th>תשובה</th><th>משמעות</th><th className="num">השיבו</th></tr></thead>
+          <tbody>{r.replies.by_key.map((x: any) => { const opt = ((content.replies || []) as ReplyOption[]).find(o => o.key === x.key); return <tr key={x.key}><td className="mc-ltr">{x.key === "callback" ? "חזרו אליי (מייל)" : x.key || "תשובה חופשית"}</td><td>{x.key === "הסר" ? "הסרה" : opt?.label || (opt?.callback ? "לחזור אליו" : "—")}</td><td className="num">{n(x.n)}</td></tr> })}</tbody></table></div></div>}
+      </>}
       {r?.reasons?.length > 0 && <><div className="mc-section"><h2>סיבות כשל ודילוג</h2></div>
         <div className="lw-card"><div className="mc-table-wrap"><table className="mc-table"><thead><tr><th>סיבה</th><th>מצב</th><th className="num">כמות</th></tr></thead>
           <tbody>{r.reasons.map((x: any, i: number) => <tr key={i}><td>{x.reason || "—"}</td><td>{({ failed: "נכשל", unknown: "לא ידוע", skipped: "דולג" } as any)[x.status]}</td><td className="num">{n(x.n)}</td></tr>)}</tbody></table></div></div></>}

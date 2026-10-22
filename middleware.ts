@@ -25,6 +25,8 @@ const PUBLIC_API = [
   "/api/newsletter/preferences", // public preference center
   "/api/newsletter/archive",     // public archive of sent issues
   "/api/messaging/unsubscribe",  // one-click unsubscribe for campaigns, private token
+  "/api/messaging/callback",     // "חזרו אליי" link in campaign email, private token
+  "/api/messaging/webhooks",     // 019 Push API — authenticated by SMS019_WEBHOOK_SECRET inside the route
 ];
 
 /**

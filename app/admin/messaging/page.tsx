@@ -55,6 +55,7 @@ export default function MessagingCenter() {
           <p>קהלים משותפים לכל הערוצים, ייבוא מסודר, וקמפיינים במייל, SMS ו-WhatsApp — כל ערוץ עם התוכן והמגבלות שלו.</p>
         </div>
         <div className="mc-actions">
+          <Link className="lw-btn" href="/admin/messaging/leads">לידים מקמפיינים</Link>
           <Link className="lw-btn" href="/admin/newsletter">הניוזלטר הקיים</Link>
           <Link className="lw-btn" href="/admin/messaging/import">ייבוא נמענים</Link>
           <button type="button" className="lw-btn" onClick={() => setNewAud(true)}>קהל חדש</button>
