@@ -37,6 +37,11 @@ export interface CoordinatorMetrics {
   reports_month: number;
   last_report_at: string | null;
   meetings_month: number;
+  /** Monday the coordinator's weekly-report form stamps for the current week. */
+  report_week_start: string;
+  report_this_week: boolean;
+  last_meeting_date: string | null;
+  next_meeting_date: string | null;
   logins_7d: number;
   actions_7d: number;
   overdue_ratio: number;
@@ -96,10 +101,18 @@ export async function coordinatorMetrics(ym?: string | null, onlyId?: number): P
       (SELECT count(*)::int FROM weekly_reports r WHERE r.coordinator_id = c.id AND r.submitted_at >= $3 AND r.submitted_at < $4) AS reports_month,
       (SELECT max(r.submitted_at) FROM weekly_reports r WHERE r.coordinator_id = c.id) AS last_report_at,
       (SELECT count(*)::int FROM meetings m WHERE m.coordinator_id = c.id AND m.date >= $3 AND m.date < $4) AS meetings_month,
+      (SELECT max(m.date) FROM meetings m WHERE m.coordinator_id = c.id) AS last_meeting_date,
+      (SELECT m.next_meeting_date FROM meetings m WHERE m.coordinator_id = c.id ORDER BY m.date DESC, m.id DESC LIMIT 1) AS next_meeting_date,
+      wk.week_start::text AS report_week_start,
+      EXISTS (SELECT 1 FROM weekly_reports r WHERE r.coordinator_id = c.id AND r.week_start = wk.week_start) AS report_this_week,
       (SELECT count(*)::int FROM audit_log a WHERE ${actorMatch} AND a.action = 'login' AND a.created_at >= now() - interval '7 days') AS logins_7d,
       (SELECT count(*)::int FROM audit_log a WHERE ${actorMatch} AND a.created_at >= now() - interval '7 days') AS actions_7d
     FROM coordinators c
     LEFT JOIN users u ON u.id = c.user_id
+    -- Same rule as the coordinator's report form (Monday of the week that
+    -- contains tomorrow, Israel time): a report sent on Sunday is stamped
+    -- with the coming Monday.
+    CROSS JOIN (SELECT date_trunc('week', (now() AT TIME ZONE 'Asia/Jerusalem')::date + 1)::date AS week_start) wk
     WHERE 1=1 ${onlyId ? "AND c.id = $5" : ""}
     ORDER BY c.name`;
   const params: any[] = [month, year, start, end];

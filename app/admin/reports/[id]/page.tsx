@@ -1,331 +1,336 @@
 "use client"
 import { useEffect, useState, use, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { SkeletonCard } from "@/components/ui/Skeleton"
-import ErrorState from "@/components/ui/ErrorState"
-import Card from "@/components/ui/Card"
-import Button from "@/components/ui/Button"
-import Badge from "@/components/ui/Badge"
 import ExportButton from "@/components/ui/ExportButton"
-import Speedometer from "@/components/ui/Speedometer"
-import { fd, ds, ini, pct, leadColor, MONTH_HE } from "@/lib/utils"
-import MeetingForm, { MTG_TYPE } from "@/components/admin/MeetingForm"
-import EngagementLight, { LIGHT } from "@/components/admin/EngagementLight"
+import { MTG_TYPE } from "@/components/admin/MeetingForm"
+import MeetingDialog from "@/components/coordinators/MeetingDialog"
+import TargetsEditor from "@/components/coordinators/TargetsEditor"
+import Modal from "@/components/ui/Modal"
+import {
+  ym, ymLabel, monthOptions, weekLabel, day, dayFull, ago, initials, lightReason, LIGHT_UI,
+  TASK_STATUS, LEAD_STATUS, EV_STATUS, ENTITY, ACTION,
+} from "@/components/coordinators/model"
+import "@/components/coordinators/coord.css"
 
-type Tab = "activity" | "tasks" | "leads" | "events" | "reports" | "meetings" | "targets"
-const TABS: [Tab, string][] = [["activity", "פעילות"], ["tasks", "משימות"], ["leads", "לידים"], ["events", "אירועים"], ["reports", "דיווחים שבועיים"], ["meetings", "פגישות"], ["targets", "יעדים"]]
-const TASK_STATUS: Record<string, string> = { todo: "לביצוע", inprogress: "בתהליך", waiting: "ממתין לתשובה", done: "בוצע" }
-const LEAD_STATUS: Record<string, string> = { new: "חדש", contacted: "יצרתי קשר", advanced: "עבר לשלב", irrelevant: "לא רלוונטי" }
-const EV_STATUS: Record<string, string> = { planning: "תכנון", pending_approval: "ממתין לאישור", approved: "מאושר", marketing: "בפרסום", done: "בוצע", cancelled: "בוטל" }
-const ENTITY: Record<string, { label: string; icon: string }> = {
-  lead: { label: "ליד", icon: "⭐" }, task: { label: "משימה", icon: "✅" }, event: { label: "אירוע", icon: "🎪" }, contact: { label: "איש קשר", icon: "👥" },
-  user: { label: "כניסה", icon: "🔑" }, custom_field: { label: "שדה", icon: "🧩" }, setting: { label: "הגדרה", icon: "⚙️" }, organization: { label: "ארגון", icon: "🏢" },
-}
-const ACTION: Record<string, string> = { create: "יצר", update: "עדכן", delete: "מחק", restore: "שחזר", view: "צפה", login: "נכנס למערכת" }
+type Tab = "overview" | "activity" | "tasks" | "leads" | "events" | "reports" | "meetings" | "targets"
+const TABS: [Tab, string][] = [["overview", "סקירה"], ["activity", "פעילות"], ["tasks", "משימות"], ["leads", "לידים"], ["events", "אירועים"], ["reports", "דיווחים"], ["meetings", "פגישות"], ["targets", "יעדים"]]
+const SECTION_HE: Record<string, string> = { tasks: "משימות", leads: "לידים", events: "אירועים", reports: "דיווחים", meetings: "פגישות", feed: "פעילות", feedCount: "ספירת פעילות", feedTypes: "סוגי פעילות" }
 
-function ym(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` }
-function ymLabel(s: string) { const [y, m] = s.split("-"); return `${MONTH_HE[Number(m) - 1]} ${y}` }
-function shiftYm(s: string, by: number) { const [y, m] = s.split("-").map(Number); return ym(new Date(y, m - 1 + by, 1)) }
-function ago(d?: string | null) {
-  if (!d) return "אף פעם"
-  const days = ds(d)
-  return days <= 0 ? "היום" : days === 1 ? "אתמול" : `לפני ${days} ימים`
-}
-function dt(d: string) { const x = new Date(d); return `${fd(d)} ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}` }
-
-function Tile({ label, value, sub, color, onClick }: { label: string; value: string | number; sub?: string; color?: string; onClick?: () => void }) {
-  return (
-    <div onClick={onClick} className={`bg-white border border-[#E2E8F0] rounded-[12px] p-3.5 ${onClick ? "cursor-pointer hover:border-[#00488D] transition-colors" : ""}`}>
-      <div className="text-[11px] font-semibold text-[#64748B]">{label}</div>
-      <div className="text-2xl font-extrabold mt-0.5 tabular-nums" style={{ color: color || "#0D2744" }}>{value}</div>
-      {sub && <div className="text-[11px] text-[#94A3B8] mt-0.5">{sub}</div>}
-    </div>
-  )
-}
+function param(name: string) { return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(name) }
+function dt(d: string) { const x = new Date(d); return `${dayFull(d)} · ${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}` }
 
 export default function CoordinatorCardPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>(() => {
-    if (typeof window === "undefined") return "activity"
-    const t = new URLSearchParams(window.location.search).get("tab") as Tab | null
-    return t && TABS.some(x => x[0] === t) ? t : "activity"
-  })
-  const [month, setMonth] = useState(ym())
+  const [tab, setTabState] = useState<Tab>(() => { const t = param("tab") as Tab | null; return t && TABS.some(x => x[0] === t) ? t : "overview" })
+  const [month, setMonthState] = useState(() => { const m = param("month"); return m && /^\d{4}-\d{2}$/.test(m) ? m : ym() })
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-  // activity feed filters
+  const [error, setError] = useState<string | null>(null)
   const [feedType, setFeedType] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
   const [page, setPage] = useState(1)
-  const [showMtgForm, setShowMtgForm] = useState(false)
-  const [openReport, setOpenReport] = useState<number | null>(null)
-  const [targetInput, setTargetInput] = useState("")
-  const [savingTarget, setSavingTarget] = useState(false)
+  const [mtgOpen, setMtgOpen] = useState(false)
+  const [openReport, setOpenReport] = useState<any>(null)
+  const [openMeeting, setOpenMeeting] = useState<any>(null)
+  const [delMeeting, setDelMeeting] = useState<any>(null)
+  const [busyTask, setBusyTask] = useState<number | null>(null)
+
+  function syncUrl(t: Tab, m: string) {
+    const u = new URL(window.location.href)
+    if (t === "overview") u.searchParams.delete("tab"); else u.searchParams.set("tab", t)
+    if (m === ym()) u.searchParams.delete("month"); else u.searchParams.set("month", m)
+    window.history.replaceState(null, "", u.toString())
+  }
+  function setTab(t: Tab) { setTabState(t); syncUrl(t, month) }
+  function setMonth(m: string) { setMonthState(m); syncUrl(tab, m) }
 
   const load = useCallback(async () => {
-    setError(false)
+    setError(null)
     try {
       const qs = new URLSearchParams({ month, feed_type: feedType, from, to, page: String(page) })
       const r = await fetch(`/api/admin/coordinators/${id}?${qs}`)
-      if (!r.ok) throw new Error()
-      const d = await r.json()
-      setData(d)
-      setTargetInput(String(d.coordinator.target_leads || 0))
-    } catch { setError(true) }
+      if (r.status === 404) { setError("הרכז לא נמצא."); return }
+      if (r.status === 401 || r.status === 403) { setError("אין הרשאה לצפות בכרטיס הזה."); return }
+      if (!r.ok) throw new Error(String(r.status))
+      setData(await r.json())
+    } catch { setError("לא ניתן לטעון את כרטיס הרכז כרגע.") }
     finally { setLoading(false) }
   }, [id, month, feedType, from, to, page])
   useEffect(() => { load() }, [load])
 
-  async function doneTask(taskId: number) {
-    await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: taskId, status: "done", status_only: true }) })
-    load()
+  async function toggleTask(t: any) {
+    setBusyTask(t.id)
+    try {
+      await fetch("/api/tasks", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: t.id, status: t.status === "done" ? "todo" : "done", status_only: true }) })
+      await load()
+    } finally { setBusyTask(null) }
   }
-  async function saveTarget() {
-    setSavingTarget(true)
-    await fetch("/api/targets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ coordinator_id: Number(id), target_leads: Number(targetInput) || 0 }) })
-    setSavingTarget(false); load()
+  async function deleteMeeting() {
+    if (!delMeeting) return
+    await fetch("/api/meetings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: delMeeting.id }) })
+    setDelMeeting(null); load()
   }
 
-  if (error) return <div className="p-6"><ErrorState retry={load} /></div>
-  if (loading || !data) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} rows={4} />)}</div>
+  const backTo = () => router.push("/admin/reports")
+
+  if (error && !data) return (
+    <div className="coord-ws">
+      <div className="c-breadcrumb"><button onClick={backTo}>ניהול רכזים</button></div>
+      <div className="c-card"><div className="c-empty">{error}<br /><button className="c-textbtn" onClick={() => { setLoading(true); load() }}>ניסיון חוזר</button></div></div>
+    </div>
+  )
+  if (loading || !data) return <div className="coord-ws"><div className="c-card"><div className="c-empty">טוען את כרטיס הרכז…</div></div></div>
 
   const c = data.coordinator
-  const l = LIGHT[c.light] || LIGHT.yellow
-  const p = pct(c.leads_month, c.target_leads)
+  const ui = LIGHT_UI[c.light] || LIGHT_UI.yellow
   const today = new Date().toISOString().slice(0, 10)
   const feed = data.feed
   const pages = Math.max(1, Math.ceil(feed.total / feed.page_size))
-  const isCurrentMonth = month === ym()
+  const failed: string[] = data.failed || []
+  const openTasks = data.tasks.filter((t: any) => t.status !== "done")
+  const nextMeeting = data.meetings[0]?.next_meeting_date || null
+  const lastReport = data.reports[0] || null
+  const p = c.target_leads ? Math.min(100, Math.round(c.leads_month / c.target_leads * 100)) : null
+  const counts: Partial<Record<Tab, number>> = { activity: feed.total, tasks: openTasks.length, leads: data.leads.length, events: data.events.length, reports: data.reports.length, meetings: data.meetings.length }
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-up">
-      <div className="text-xs text-[#64748B] mb-3"><span onClick={() => router.push("/admin/reports")} className="cursor-pointer hover:text-[#00488D]">ניהול רכזים</span> › <span className="text-[#0D2744] font-semibold">{c.name}</span></div>
+    <div className="coord-ws">
+      <div className="c-breadcrumb"><button onClick={backTo}>ניהול רכזים</button> / {c.name}</div>
 
-      {/* Header */}
-      <div className="bg-[#0D2744] rounded-[18px] p-5 mb-4 text-white flex items-center gap-5 flex-wrap" style={{ borderRight: `6px solid ${l.dot}` }}>
-        <div className="w-14 h-14 rounded-full bg-[#60A5FA] text-[#0D2744] flex items-center justify-center text-lg font-extrabold flex-shrink-0">{ini(c.name)}</div>
-        <div className="flex-1 min-w-[200px]">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="text-xl font-extrabold">{c.name}</div>
-            <EngagementLight light={c.light} withLabel size="md" />
-          </div>
-          <div className="text-xs opacity-75 mt-1">{c.area || "ללא אזור"}{c.email && ` · ${c.email}`}{c.phone && ` · ${c.phone}`}</div>
-          <div className="text-xs opacity-75 mt-1">כניסה אחרונה: <b>{ago(c.last_login_at)}</b> · פעילות אחרונה: <b>{ago(c.last_active_at)}</b> · דיווח אחרון: <b>{ago(c.last_report_at)}</b></div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Speedometer actual={c.leads_month} target={c.target_leads} size={92} dark />
+      <header className="c-profilehead">
+        <div className="c-person" style={{ gap: 16 }}>
+          <span className="c-avatar">{initials(c.name)}</span>
           <div>
-            <div className="text-[11px] opacity-70">לידים · {ymLabel(month)}</div>
-            <div className="text-3xl font-extrabold leading-tight" style={{ color: leadColor(p) }}>{p}%</div>
-            <div className="text-[11px] opacity-75">{c.leads_month} מתוך {c.target_leads || "—"}</div>
+            <h2>{c.name}</h2>
+            <div className="c-sub">{c.area || "ללא אזור"}{c.phone ? ` · ${c.phone}` : ""}{c.email ? ` · ${c.email}` : ""}</div>
+            <div className="c-sub">כניסה אחרונה: {ago(c.last_login_at)} · פעילות אחרונה: {ago(c.last_active_at)}</div>
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-1 bg-white/10 rounded-[9px] p-0.5">
-            <button onClick={() => setMonth(m => shiftYm(m, -1))} className="w-7 h-7 rounded-[7px] hover:bg-white/15">›</button>
-            <span className="px-2 text-xs font-bold min-w-[90px] text-center">{ymLabel(month)}</span>
-            <button onClick={() => setMonth(m => shiftYm(m, 1))} disabled={isCurrentMonth} className="w-7 h-7 rounded-[7px] hover:bg-white/15 disabled:opacity-30">‹</button>
-          </div>
-          <button onClick={() => window.open(`/admin/reports/weekly?coordinator_id=${c.id}&week=${today}`, "_blank")} className="text-[11px] bg-white/10 hover:bg-white/20 rounded-[9px] px-2 py-1.5">📋 דו״ח שבועי להדפסה</button>
-        </div>
-      </div>
-
-      {/* Metric tiles */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-        <Tile label="משימות פתוחות" value={c.tasks_open} sub={`${c.tasks_done_month} בוצעו החודש`} onClick={() => setTab("tasks")} />
-        <Tile label="באיחור" value={c.tasks_overdue} color={c.tasks_overdue > 0 ? "#960010" : "#166534"} sub={c.avg_close_days != null ? `סגירה ממוצעת ${c.avg_close_days} ימים` : "אין נתוני סגירה"} onClick={() => setTab("tasks")} />
-        <Tile label="לידים דרך הלינק" value={c.leads_via_link_month} sub="החודש" onClick={() => setTab("leads")} />
-        <Tile label="אינטראקציות" value={c.interactions_month} sub="עם אנשי קשר החודש" />
-        <Tile label="אירועים" value={c.events_month} sub="החודש" onClick={() => setTab("events")} />
-        <Tile label="מעורבות 7 ימים" value={`${c.logins_7d} / ${c.actions_7d}`} sub="כניסות / פעולות" color={l.fg} onClick={() => setTab("activity")} />
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-[#E2E8F0] overflow-x-auto">
-        {TABS.map(([key, label]) => {
-          const count = key === "tasks" ? data.tasks.filter((t: any) => t.status !== "done").length : key === "leads" ? data.leads.length : key === "events" ? data.events.length : key === "reports" ? data.reports.length : key === "meetings" ? data.meetings.length : key === "activity" ? feed.total : null
-          return (
-            <button key={key} onClick={() => setTab(key)}
-              className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${tab === key ? "border-[#00488D] text-[#00488D]" : "border-transparent text-[#475569] hover:text-[#0D2744]"}`}>
-              {label}{count != null && <span className="mr-1.5 text-[11px] bg-[#F1F5F9] text-[#64748B] px-1.5 py-0.5 rounded-full">{count}</span>}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* ===== ACTIVITY FEED ===== */}
-      {tab === "activity" && (
         <div>
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <select value={feedType} onChange={e => { setFeedType(e.target.value); setPage(1) }} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-              <option value="">כל הפעולות</option>
-              {(feed.types || []).map((t: any) => <option key={t.entity_type} value={t.entity_type}>{ENTITY[t.entity_type]?.label || t.entity_type} ({t.n})</option>)}
-            </select>
-            <input type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1) }} className="px-2.5 py-1.5 border border-[#E2E8F0] rounded-[9px] text-xs bg-white" />
-            <span className="text-xs text-[#94A3B8]">עד</span>
-            <input type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1) }} className="px-2.5 py-1.5 border border-[#E2E8F0] rounded-[9px] text-xs bg-white" />
-            {(feedType || from || to) && <button onClick={() => { setFeedType(""); setFrom(""); setTo(""); setPage(1) }} className="text-xs text-[#00488D] font-semibold">נקה</button>}
-            <span className="text-xs text-[#94A3B8] mr-auto">{feed.total} פעולות</span>
-            <ExportButton type="coord-activity" label="ייצוא דוח פעילות" params={{ coordinator_id: c.id }} />
+          <div className="c-sub">לידים / יעד · {ymLabel(month)}</div>
+          <div className="c-big">{c.leads_month}<span>{c.target_leads ? ` / ${c.target_leads}` : " · ללא יעד"}</span></div>
+          {p !== null && <div className="c-progress" style={{ width: 140, background: "#ffffff22" }}><i style={{ width: `${p}%`, background: "#9fc49a" }} /></div>}
+        </div>
+      </header>
+
+      <div className="c-profiletools">
+        <label className="c-periodlabel">תוצאות לחודש
+          <select className="c-period" value={month} onChange={e => setMonth(e.target.value)}>
+            {monthOptions().map(m => <option key={m} value={m}>{ymLabel(m)}</option>)}
+          </select>
+        </label>
+        <button className="c-secondary" onClick={() => window.open(`/admin/reports/weekly?coordinator_id=${c.id}&week=${today}`, "_blank")}>דוח שבועי</button>
+        <button className="c-secondary" onClick={() => window.open(`/admin/reports/monthly?month=${month}`, "_blank")}>דוח חודשי</button>
+        <button className="c-primary" onClick={() => setMtgOpen(true)}>+ סיכום פגישה</button>
+      </div>
+
+      {failed.length > 0 && <div className="c-warn">חלק מהנתונים לא נטענו ({failed.map(f => SECTION_HE[f] || f).join(", ")}). שאר הכרטיס תקין. <button className="c-textbtn" onClick={load}>ניסיון חוזר</button></div>}
+
+      <div className="c-stats">
+        <div className="c-stat"><span>תיעודי קשר</span><b>{c.interactions_month}</b><small>{ymLabel(month)} · פעילות עסקית, לא כניסות</small></div>
+        <button className="c-stat" onClick={() => setTab("tasks")}><span>באיחור / משימות פתוחות</span><b>{c.tasks_overdue} / {c.tasks_open}</b><small>מצב נוכחי, מכל התקופות{c.avg_close_days != null ? ` · סגירה ממוצעת ${c.avg_close_days} ימים (90 יום)` : ""}</small></button>
+        <button className="c-stat" onClick={() => setTab("leads")}><span>לידים דרך הקישור</span><b>{c.leads_via_link_month}</b><small>{ymLabel(month)} · מתוך {c.leads_month} לידים בחודש</small></button>
+      </div>
+
+      <nav className="c-tabs" aria-label="לשוניות כרטיס רכז">
+        {TABS.map(([k, l]) => <button key={k} className={tab === k ? "on" : ""} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>{l}{counts[k] != null && <em>{counts[k]}</em>}</button>)}
+      </nav>
+
+      {/* ===== OVERVIEW ===== */}
+      {tab === "overview" && (
+        <>
+          <div className="c-split">
+            <section className="c-card">
+              <h3>מה דורש טיפול?</h3>
+              <div className="c-row"><div><strong>{c.tasks_overdue ? `${c.tasks_overdue} משימות באיחור` : "אין משימות באיחור"}</strong><small>מתוך {c.tasks_open} שיוכי משימות פתוחות כעת</small></div><button className="c-textbtn" onClick={() => setTab("tasks")}>למשימות ←</button></div>
+              <div className="c-row"><div><strong>דיווח לשבוע {weekLabel(c.report_week_start)}</strong><small>{c.report_this_week ? "הוגש" : "טרם הוגש"}{lastReport ? ` · דיווח אחרון ב־${dayFull(lastReport.submitted_at)}` : " · אין דיווחים קודמים"}</small></div><button className="c-textbtn" onClick={() => setTab("reports")}>לדיווחים ←</button></div>
+              <div className="c-row"><div><strong>{c.target_leads ? `יעד ${ymLabel(month)}: ${c.leads_month} מתוך ${c.target_leads}` : `לא הוגדר יעד ל${ymLabel(month)}`}</strong><small>{c.target_leads ? "ההתקדמות מוצגת בנפרד ממעורבות במערכת" : "אין להסיק אחוז ביצוע לפני הגדרת יעד"}</small></div><button className="c-textbtn" onClick={() => setTab("targets")}>ליעדים ←</button></div>
+            </section>
+            <section className="c-card">
+              <h3>מעורבות במערכת · 7 ימים</h3>
+              <span className={`c-badge ${ui.tone === "green" ? "" : ui.tone}`}>{ui.label}</span>
+              <p className="c-text" style={{ margin: "12px 0" }}>{lightReason(c)}</p>
+              <div className="c-meta"><span>{c.logins_7d} כניסות</span><span>{c.actions_7d} פעולות מתועדות</span></div>
+              <p className="c-note">זהו הרמזור הקיים עם סיבה גלויה. אין בו לבדו הערכה של איכות עבודת השטח.</p>
+              <button className="c-textbtn" onClick={() => setTab("activity")}>לפעולות שתועדו ←</button>
+            </section>
           </div>
-          <Card>
-            {feed.rows.length === 0 && <div className="py-12 text-center text-sm text-[#94A3B8]">אין פעילות מתועדת{feedType || from || to ? " בסינון הזה" : " עדיין — הפעולות נרשמות מרגע השימוש במערכת"}</div>}
-            <div className="divide-y divide-[#F1F5F9]">
-              {feed.rows.map((a: any) => {
-                const e = ENTITY[a.entity_type] || { label: a.entity_type, icon: "📝" }
-                return (
-                  <div key={a.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-[#F8FAFC] transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-[#F0F7FF] flex items-center justify-center text-sm flex-shrink-0">{e.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-[#0D2744]"><b>{ACTION[a.action] || a.action}</b> {a.action !== "login" && e.label}{a.summary && <span className="text-[#475569]"> · {a.summary}</span>}</div>
-                      <div className="text-[11px] text-[#94A3B8] mt-0.5">{dt(a.created_at)}</div>
-                    </div>
-                  </div>
-                )
-              })}
+          <div className="c-sectionhead"><h3>להמשך פגישת הליווי</h3></div>
+          <section className="c-card">
+            <div className="c-row">
+              <div><strong>{nextMeeting ? `פגישה הבאה: ${dayFull(nextMeeting)}${String(nextMeeting).slice(0, 10) < today ? " (המועד עבר)" : ""}` : "פגישת המשך טרם נקבעה"}</strong><small>{data.meetings[0] ? `פגישה אחרונה: ${dayFull(data.meetings[0].date)} · ${MTG_TYPE[data.meetings[0].type] || data.meetings[0].type}` : "אין פגישות מתועדות"} · נושאים מוצעים: חסמים, משימות קודמות והתקדמות מול היעד.</small></div>
+              <button className="c-primary" onClick={() => setMtgOpen(true)}>תיעוד סיכום פגישה</button>
             </div>
-            {pages > 1 && (
-              <div className="flex items-center justify-center gap-2 py-3 border-t border-[#F1F5F9] text-xs">
-                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 rounded-lg border border-[#E2E8F0] disabled:opacity-40">הקודם</button>
-                <span className="text-[#64748B]">{page} / {pages}</span>
-                <button disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded-lg border border-[#E2E8F0] disabled:opacity-40">הבא</button>
+          </section>
+        </>
+      )}
+
+      {/* ===== ACTIVITY ===== */}
+      {tab === "activity" && (
+        <>
+          <div className="c-filterbar">
+            <select value={feedType} onChange={e => { setFeedType(e.target.value); setPage(1) }} aria-label="סוג פעולה">
+              <option value="">כל הפעולות</option>
+              {(feed.types || []).map((t: any) => <option key={t.entity_type} value={t.entity_type}>{ENTITY[t.entity_type] || t.entity_type} ({t.n})</option>)}
+            </select>
+            <label className="c-periodlabel">מתאריך<input className="c-period" type="date" value={from} onChange={e => { setFrom(e.target.value); setPage(1) }} /></label>
+            <label className="c-periodlabel">עד תאריך<input className="c-period" type="date" value={to} onChange={e => { setTo(e.target.value); setPage(1) }} /></label>
+            {(feedType || from || to) && <button className="c-textbtn" onClick={() => { setFeedType(""); setFrom(""); setTo(""); setPage(1) }}>ניקוי</button>}
+            <span className="c-sub" style={{ marginInlineStart: "auto" }}>{feed.total} פעולות</span>
+            <ExportButton type="coord-activity" label="ייצוא פעילות" params={{ coordinator_id: c.id }} />
+          </div>
+          <div className="c-scope">פעולות במערכת אינן תיעודי קשר עם שותפים. המסנן כאן חל על הפיד בלבד.</div>
+          <div className="c-card" style={{ padding: 0 }}>
+            {feed.rows.length === 0 ? <div className="c-empty">אין פעילות מתועדת{feedType || from || to ? " בסינון הזה" : ""}</div> : (
+              <div className="c-timeline">
+                {feed.rows.map((a: any) => (
+                  <div key={a.id} className="c-tl">
+                    <span className="c-sub">{dt(a.created_at)}</span>
+                    <strong>{a.action === "login" ? ACTION.login : `${ENTITY[a.entity_type] || a.entity_type} ${ACTION[a.action] || a.action}`}</strong>
+                    {a.summary && <p>{a.summary}</p>}
+                  </div>
+                ))}
               </div>
             )}
-          </Card>
-        </div>
+            {pages > 1 && (
+              <div className="c-pager">
+                <button className="c-secondary" disabled={page <= 1} onClick={() => setPage(x => x - 1)}>הקודם</button>
+                <span className="c-sub">עמוד {page} מתוך {pages}</span>
+                <button className="c-secondary" disabled={page >= pages} onClick={() => setPage(x => x + 1)}>הבא</button>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* ===== TASKS ===== */}
       {tab === "tasks" && (
-        <Card>
-          {data.tasks.length === 0 && <div className="py-12 text-center text-sm text-[#94A3B8]">אין משימות</div>}
-          <div className="divide-y divide-[#F1F5F9]">
+        <>
+          <div className="c-scope">כל המשימות המשויכות לרכז (כולל משימות משותפות), מכל התקופות · עד 100 אחרונות. פתוחות קודם.</div>
+          <div className="c-card list">
+            {data.tasks.length === 0 && <div className="c-empty">אין משימות</div>}
             {data.tasks.map((t: any) => {
-              const late = t.status !== "done" && t.due_date && String(t.due_date).slice(0, 10) < today
-              const accent = t.status === "done" ? "#166534" : late ? "#960010" : t.status === "waiting" ? "#B45309" : "#00488D"
+              const due = t.due_date ? String(t.due_date).slice(0, 10) : ""
+              const late = t.status !== "done" && due && due < today
               return (
-                <div key={t.id} className="flex items-center gap-3 px-4 py-2.5" style={{ borderRight: `3px solid ${accent}` }}>
-                  {t.status !== "done"
-                    ? <div onClick={() => doneTask(t.id)} title="סמן כבוצע" style={{ borderColor: accent, color: accent }} className="w-6 h-6 flex-shrink-0 rounded-[7px] border-2 cursor-pointer flex items-center justify-center text-xs font-bold hover:bg-[#F0F7FF]">✓</div>
-                    : <div className="w-6 h-6 flex-shrink-0 rounded-[7px] bg-[#DCFCE7] text-[#166534] flex items-center justify-center text-xs font-bold">✓</div>}
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-semibold ${t.status === "done" ? "line-through text-[#94A3B8]" : ""}`}>{t.title}</div>
-                    <div className="text-xs text-[#64748B]">{TASK_STATUS[t.status] || t.status}{t.due_date && ` · ${late ? "⚠ " : ""}${fd(String(t.due_date).slice(0, 10))}`}{t.priority === "urgent" && " · דחוף"}{t.contact_name && ` · ${t.contact_name}`}{t.event_name && ` · ${t.event_name}`}</div>
+                <div key={t.id} className="c-row">
+                  <button className={`c-taskcheck ${t.status === "done" ? "done" : ""}`} disabled={busyTask === t.id} onClick={() => toggleTask(t)} aria-label={t.status === "done" ? `פתיחה מחדש של ${t.title}` : `השלמת ${t.title}`}>{t.status === "done" ? "✓" : ""}</button>
+                  <div className="c-grow">
+                    <strong style={t.status === "done" ? { textDecoration: "line-through", color: "#93a296" } : undefined}>{t.title}</strong>
+                    <small>{due ? dayFull(due) : "ללא מועד"} · {TASK_STATUS[t.status] || t.status}{t.priority === "urgent" ? " · דחוף" : ""}{t.contact_name ? ` · ${t.contact_name}` : ""}{t.event_name ? ` · ${t.event_name}` : ""}</small>
                   </div>
-                  <div className="text-[11px] text-[#94A3B8]">{fd(t.created_at)}</div>
+                  {late && <span className="c-badge red">באיחור</span>}
+                  <button className="c-textbtn" onClick={() => router.push(`/admin/tasks?open=${t.id}`)}>פתיחה</button>
                 </div>
               )
             })}
           </div>
-        </Card>
+        </>
       )}
 
       {/* ===== LEADS ===== */}
       {tab === "leads" && (
-        <Card>
-          {data.leads.length === 0 && <div className="py-12 text-center text-sm text-[#94A3B8]">אין לידים</div>}
-          <div className="divide-y divide-[#F1F5F9]">
-            {data.leads.map((ld: any) => (
-              <div key={ld.id} onClick={() => router.push(`/admin/leads?open=${ld.id}`)} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-[#F8FAFC]">
-                <div className="w-8 h-8 rounded-full bg-[#F0F7FF] text-[#00488D] flex items-center justify-center text-xs font-bold">{ld.name?.[0]}</div>
-                <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{ld.name}</div><div className="text-xs text-[#64748B]">{ld.phone}{ld.city && ` · ${ld.city}`} · {ld.source === "link" ? "דרך הלינק" : ld.source === "event" ? "אירוע" : "ידני"}</div></div>
-                <Badge text={LEAD_STATUS[ld.status] || ld.status} />
-                <div className="text-[11px] text-[#94A3B8]">{fd(ld.created_at)}</div>
+        <>
+          <div className="c-scope">לידים אחרונים מכל התקופות · עד 100. הספירה החודשית מופיעה בראש הכרטיס.</div>
+          <div className="c-card list">
+            {data.leads.length === 0 && <div className="c-empty">אין לידים</div>}
+            {data.leads.map((l: any) => (
+              <div key={l.id} className="c-row clickable" onClick={() => router.push(`/admin/leads?open=${l.id}`)}>
+                <div className="c-grow"><strong>{l.name}</strong><small>{dayFull(l.created_at)}{l.city ? ` · ${l.city}` : ""} · {l.source === "link" ? "דרך הקישור" : l.source === "event" ? "אירוע" : "ידני"}</small></div>
+                <span className="c-badge grey">{LEAD_STATUS[l.status] || l.status}</span>
               </div>
             ))}
           </div>
-        </Card>
+        </>
       )}
 
       {/* ===== EVENTS ===== */}
       {tab === "events" && (
-        <Card>
-          {data.events.length === 0 && <div className="py-12 text-center text-sm text-[#94A3B8]">אין אירועים</div>}
-          <div className="divide-y divide-[#F1F5F9]">
-            {data.events.map((e: any) => {
-              const d = e.date ? new Date(e.date) : null
-              return (
-                <div key={e.id} onClick={() => router.push("/admin/events")} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-[#F8FAFC]">
-                  <div className="w-11 text-center flex-shrink-0">{d ? <><div className="text-base font-extrabold leading-none">{d.getDate()}</div><div className="text-[11px] text-[#64748B]">{MONTH_HE[d.getMonth()]}</div></> : <div className="text-xs text-[#94A3B8]">—</div>}</div>
-                  <div className="flex-1 min-w-0"><div className="text-sm font-semibold">{e.name}</div><div className="text-xs text-[#64748B]">{e.location}{e.actual_attendees != null && ` · ${e.actual_attendees} משתתפים`}{e.leads_collected ? ` · ${e.leads_collected} לידים` : ""}</div></div>
-                  <Badge text={EV_STATUS[e.status] || e.status} />
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-      )}
-
-      {/* ===== WEEKLY REPORTS ===== */}
-      {tab === "reports" && (
-        <div className="space-y-3">
-          {data.reports.length === 0 && <div className="py-12 text-center text-sm text-[#94A3B8]">אין דיווחים שבועיים</div>}
-          {data.reports.map((r: any) => (
-            <Card key={r.id}>
-              <div onClick={() => setOpenReport(openReport === r.id ? null : r.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-[#F8FAFC]">
-                <div className="flex-1"><div className="text-sm font-semibold">שבוע {fd(r.week_start)}</div><div className="text-xs text-[#64748B]">הוגש {new Date(r.submitted_at).toLocaleDateString("he-IL")}</div></div>
-                <div className="text-sm font-bold text-[#00488D]">{r.leads_count} לידים</div>
-                <span className="text-[#94A3B8] text-sm">{openReport === r.id ? "▲" : "▼"}</span>
-              </div>
-              {openReport === r.id && (
-                <div className="border-t border-[#E2E8F0] p-4 bg-[#F8FAFC] grid grid-cols-2 gap-4">
-                  <div><div className="text-xs font-bold text-[#374151] mb-1">הישגים מרכזיים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.achievements || "—"}</div></div>
-                  <div><div className="text-xs font-bold text-[#374151] mb-1">אתגרים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.challenges || "—"}</div></div>
-                  <div className="col-span-2"><div className="text-xs font-bold text-[#374151] mb-1">תכנון שבוע הבא</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.next_week_plan || "—"}</div></div>
-                </div>
-              )}
-            </Card>
+        <div className="c-card list">
+          {data.events.length === 0 && <div className="c-empty">אין אירועים</div>}
+          {data.events.map((e: any) => (
+            <div key={e.id} className="c-row clickable" onClick={() => router.push("/admin/events")}>
+              <div className="c-grow"><strong>{e.name}</strong><small>{e.date ? dayFull(e.date) : "ללא תאריך"}{e.location ? ` · ${e.location}` : ""}{e.actual_attendees != null ? ` · ${e.actual_attendees} משתתפים` : ""}{e.leads_collected ? ` · ${e.leads_collected} לידים` : ""}</small></div>
+              <span className={`c-badge ${e.status === "cancelled" ? "red" : e.status === "pending_approval" ? "yellow" : "grey"}`}>{EV_STATUS[e.status] || e.status}</span>
+            </div>
           ))}
         </div>
       )}
 
-      {/* ===== MEETINGS ===== */}
-      {tab === "meetings" && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-[#64748B]">{data.meetings.length} פגישות עם {c.name}</div>
-            <Button onClick={() => setShowMtgForm(true)}>+ סיכום פגישה</Button>
-          </div>
-          {showMtgForm && <MeetingForm coordinators={[{ id: c.id, name: c.name }]} fixedCoordinatorId={c.id} onSaved={() => { setShowMtgForm(false); load() }} onCancel={() => setShowMtgForm(false)} />}
-          <div className="space-y-3">
-            {data.meetings.length === 0 && !showMtgForm && <div className="py-12 text-center text-sm text-[#94A3B8]">אין פגישות מתועדות עדיין</div>}
-            {data.meetings.map((m: any) => (
-              <Card key={m.id}>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="text-xs text-[#64748B]"><b className="text-[#0D2744]">{MTG_TYPE[m.type] || m.type}</b> · {fd(m.date)}</div>
-                    <div className="flex items-center gap-2">
-                      {m.next_meeting_date && <div className="text-xs text-[#00488D] bg-[#F0F7FF] px-2 py-1 rounded-lg">פגישה הבאה: {fd(m.next_meeting_date)}</div>}
-                      <button onClick={async () => { if (confirm("למחוק?")) { await fetch("/api/meetings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id }) }); load() } }} className="text-[#CBD5E1] hover:text-[#960010] text-xs">✕</button>
-                    </div>
-                  </div>
-                  {m.agenda && <div className="text-xs font-semibold text-[#374151] mb-1">נושאים: <span className="font-normal text-[#475569]">{m.agenda}</span></div>}
-                  <div className="text-sm text-[#475569] bg-[#F9FAFB] rounded-[9px] p-3 whitespace-pre-wrap">{m.summary}</div>
-                </div>
-              </Card>
+      {/* ===== REPORTS ===== */}
+      {tab === "reports" && (
+        <>
+          <div className="c-scope">הנתון בדיווח הוא דיווח ידני של הרכז ואינו מתווסף לספירת הלידים שנוצרו במערכת.</div>
+          <div className="c-card list">
+            {data.reports.length === 0 && <div className="c-empty">אין דיווחים שבועיים</div>}
+            {data.reports.map((r: any) => (
+              <div key={r.id} className="c-row">
+                <div className="c-grow"><strong>שבוע {weekLabel(String(r.week_start).slice(0, 10))}</strong><small>הוגש ב־{dayFull(r.submitted_at)} · דיווח ידני: {r.leads_count ?? 0} לידים</small></div>
+                <button className="c-textbtn" onClick={() => setOpenReport(r)}>פתיחת דיווח ←</button>
+              </div>
             ))}
           </div>
-        </div>
+        </>
+      )}
+
+      {/* ===== MEETINGS ===== */}
+      {tab === "meetings" && (
+        <>
+          <div className="c-sectionhead"><h3>{data.meetings.length} פגישות ליווי</h3><button className="c-primary" onClick={() => setMtgOpen(true)}>+ סיכום פגישה</button></div>
+          {data.meetings.length === 0 && <div className="c-card"><div className="c-empty">אין פגישות מתועדות עדיין</div></div>}
+          {data.meetings.map((m: any) => (
+            <article key={m.id} className="c-card c-meeting">
+              <header>
+                <div><strong style={{ fontSize: 13 }}>{dayFull(m.date)} · {MTG_TYPE[m.type] || m.type}</strong></div>
+                <span className={`c-badge ${m.next_meeting_date ? "" : "yellow"}`}>{m.next_meeting_date ? `המשך: ${dayFull(m.next_meeting_date)}` : "טרם נקבע המשך"}</span>
+              </header>
+              {m.agenda && <p className="c-text" style={{ marginTop: 10 }}><b>נושאים:</b> {m.agenda}</p>}
+              <p className="c-text" style={{ marginTop: 6, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.summary}</p>
+              <footer>
+                <button className="c-textbtn" onClick={() => setOpenMeeting(m)}>פתיחת הסיכום</button>
+                <button className="c-textbtn danger" onClick={() => setDelMeeting(m)}>מחיקה…</button>
+              </footer>
+            </article>
+          ))}
+        </>
       )}
 
       {/* ===== TARGETS ===== */}
       {tab === "targets" && (
-        <Card>
-          <div className="p-5">
-            <div className="text-sm font-bold text-[#0D2744] mb-1">יעד לידים חודשי · {ymLabel(ym())}</div>
-            <div className="text-xs text-[#64748B] mb-4">היעד נשמר לחודש הנוכחי. יעד שנתי משוער: {(Number(targetInput) || 0) * 12}</div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <input type="number" value={targetInput} onChange={e => setTargetInput(e.target.value)} className="w-28 px-3 py-2 border border-[#CBD5E1] rounded-[9px] text-sm text-center focus:outline-none focus:border-[#00488D]" />
-              <Button onClick={saveTarget} disabled={savingTarget}>{savingTarget ? "שומר..." : "שמור יעד"}</Button>
-              <span className="text-xs text-[#94A3B8]">ביצוע החודש: <b className="text-[#0D2744]">{isCurrentMonth ? c.leads_month : "—"}</b></span>
-              <button onClick={() => router.push("/admin/reports?tab=targets")} className="text-xs text-[#00488D] font-semibold mr-auto">כל היעדים ›</button>
-            </div>
-          </div>
-        </Card>
+        <>
+          {month !== ym() && <div className="c-warn">בראש הכרטיס נבחר {ymLabel(month)} ({c.target_leads ? `יעד שנשמר: ${c.target_leads}` : "לא נשמר יעד"}). העריכה כאן חלה על החודש הנוכחי בלבד.</div>}
+          <TargetsEditor onlyId={c.id} onSaved={load} />
+          <button className="c-textbtn" onClick={() => router.push("/admin/reports?tab=targets")}>כל היעדים ←</button>
+        </>
       )}
+
+      <MeetingDialog open={mtgOpen} coordinators={[{ id: c.id, name: c.name }]} coordinatorId={c.id} onClose={() => setMtgOpen(false)} onSaved={() => { setMtgOpen(false); load() }} />
+
+      <Modal open={!!openReport} onClose={() => setOpenReport(null)} title={openReport ? `דיווח שבועי · ${c.name}` : ""} subtitle={openReport ? `שבוע ${weekLabel(String(openReport.week_start).slice(0, 10))} · הוגש ב־${dayFull(openReport.submitted_at)}` : ""} accent="#27634e" width="680px"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-secondary" onClick={() => setOpenReport(null)}>חזרה</button>{openReport && <button className="c-secondary" onClick={() => window.open(`/admin/reports/weekly?coordinator_id=${c.id}&week=${String(openReport.week_start).slice(0, 10)}`, "_blank")}>דוח שבועי להדפסה</button>}</div>}>
+        {openReport && <div className="coord-dialog">
+          <div className="c-meta"><span>דיווח ידני: {openReport.leads_count ?? 0} לידים</span><span>אינו מתווסף לספירת הלידים במערכת</span></div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "4px 0 8px" }}>הישגים</h3><p className="c-text">{openReport.achievements || "—"}</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>אתגרים</h3><p className="c-text">{openReport.challenges || "—"}</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>תכנון לשבוע הבא</h3><p className="c-text">{openReport.next_week_plan || "—"}</p>
+        </div>}
+      </Modal>
+
+      <Modal open={!!openMeeting} onClose={() => setOpenMeeting(null)} title="סיכום פגישה" subtitle={openMeeting ? `${dayFull(openMeeting.date)} · ${MTG_TYPE[openMeeting.type] || openMeeting.type}` : ""} accent="#27634e" width="680px"
+        footer={<div className="coord-dialog"><button className="c-secondary" onClick={() => setOpenMeeting(null)}>חזרה</button></div>}>
+        {openMeeting && <div className="coord-dialog">
+          {openMeeting.agenda && <><h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>נושאים</h3><p className="c-text">{openMeeting.agenda}</p></>}
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>סיכום</h3><p className="c-text">{openMeeting.summary || "—"}</p>
+          <div className="c-meta" style={{ marginTop: 16 }}><span>{openMeeting.next_meeting_date ? `פגישה הבאה: ${dayFull(openMeeting.next_meeting_date)}` : "לא נקבעה פגישת המשך"}</span></div>
+        </div>}
+      </Modal>
+
+      <Modal open={!!delMeeting} onClose={() => setDelMeeting(null)} title="מחיקת סיכום פגישה" subtitle={delMeeting ? dayFull(delMeeting.date) : ""} accent="#9b6250"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-primary" style={{ background: "#9b6250", borderColor: "#9b6250" }} onClick={deleteMeeting}>מחיקה</button><button className="c-secondary" onClick={() => setDelMeeting(null)}>ביטול</button></div>}>
+        <div className="coord-dialog"><p className="c-text">הסיכום יימחק לצמיתות. משימות שנוצרו ממנו נשארות במערכת.</p></div>
+      </Modal>
     </div>
   )
 }

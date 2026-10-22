@@ -1,284 +1,333 @@
 "use client"
-import { SkeletonCard } from "@/components/ui/Skeleton"
-import ErrorState from "@/components/ui/ErrorState"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { fd, ds, ini, MONTH_HE } from "@/lib/utils"
-import Card from "@/components/ui/Card"
+import Modal from "@/components/ui/Modal"
 import ExportButton from "@/components/ui/ExportButton"
-import Button from "@/components/ui/Button"
-import TargetsPanel from "@/components/admin/TargetsPanel"
-import MeetingForm, { MTG_TYPE } from "@/components/admin/MeetingForm"
-import EngagementLight, { LIGHT } from "@/components/admin/EngagementLight"
+import { MTG_TYPE } from "@/components/admin/MeetingForm"
+import MeetingDialog from "@/components/coordinators/MeetingDialog"
+import TargetsEditor from "@/components/coordinators/TargetsEditor"
+import { ym, ymLabel, monthOptions, weekLabel, dayFull, day, initials, lightReason, LIGHT_UI, EXTRA_COLS } from "@/components/coordinators/model"
+import "@/components/coordinators/coord.css"
 
-type Tab = "compare" | "meetings" | "reports" | "targets"
-function ym(d = new Date()) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}` }
-function ymLabel(s: string) { const [y, m] = s.split("-"); return `${MONTH_HE[Number(m) - 1]} ${y}` }
-function shiftYm(s: string, by: number) { const [y, m] = s.split("-").map(Number); const d = new Date(y, m - 1 + by, 1); return ym(d) }
-function ago(d?: string | null) {
-  if (!d) return "אף פעם"
-  const days = ds(d)
-  if (days <= 0) return "היום"
-  if (days === 1) return "אתמול"
-  return `לפני ${days} ימים`
+type Tab = "team" | "meetings" | "reports" | "targets"
+const TABS: [Tab, string][] = [["team", "תמונת צוות"], ["meetings", "פגישות ליווי"], ["reports", "דיווחים שבועיים"], ["targets", "יעדי לידים"]]
+const COLS_KEY = "coord-extra-cols"
+
+function readTab(): Tab {
+  if (typeof window === "undefined") return "team"
+  const t = new URLSearchParams(window.location.search).get("tab")
+  return t === "meetings" || t === "reports" || t === "targets" ? t : "team"
 }
 
 export default function CoordManagementPage() {
   const router = useRouter()
-  const [error, setError] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>(() => {
-    if (typeof window === "undefined") return "compare"
-    const t = new URLSearchParams(window.location.search).get("tab")
-    return t === "targets" || t === "reports" || t === "meetings" ? t : "compare"
-  })
+  const [tab, setTabState] = useState<Tab>(readTab)
   const [month, setMonth] = useState(ym())
   const [compare, setCompare] = useState<any>(null)
+  const [compareErr, setCompareErr] = useState(false)
+  const [meetings, setMeetings] = useState<any[] | null>(null)
+  const [reports, setReports] = useState<any[] | null>(null)
+  const [listErr, setListErr] = useState(false)
+  const [q, setQ] = useState("")
+  const [area, setArea] = useState("")
+  const [light, setLight] = useState("")
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 }>({ key: "light", dir: 1 })
-  const [meetings, setMeetings] = useState<any[]>([])
-  const [reports, setReports] = useState<any[]>([])
-  const [coords, setCoords] = useState<any[]>([])
-  const [showMtgForm, setShowMtgForm] = useState(false)
+  const [cols, setCols] = useState<string[]>([])
+  const [colsOpen, setColsOpen] = useState(false)
+  const [mtgOpen, setMtgOpen] = useState(false)
+  const [delMeeting, setDelMeeting] = useState<any>(null)
+  const [openMeeting, setOpenMeeting] = useState<any>(null)
+  const [openReport, setOpenReport] = useState<any>(null)
   const [rFilter, setRFilter] = useState("")
-  const [openReport, setOpenReport] = useState<number | null>(null)
 
-  async function load() {
-    setLoading(true); setError(false)
-    try {
-      const [mr, rr, cr] = await Promise.all([fetch("/api/meetings"), fetch("/api/reports"), fetch("/api/targets")])
-      setMeetings((await mr.json()).meetings || [])
-      setReports((await rr.json()).reports || [])
-      setCoords((await cr.json()).coordinators || [])
-    } catch (e) { console.error(e); setError(true) }
-    finally { setLoading(false) }
+  function setTab(t: Tab) {
+    setTabState(t)
+    const u = new URL(window.location.href)
+    if (t === "team") u.searchParams.delete("tab"); else u.searchParams.set("tab", t)
+    window.history.replaceState(null, "", u.toString())
   }
+
+  useEffect(() => { try { const s = localStorage.getItem(COLS_KEY); if (s) setCols(JSON.parse(s)) } catch {} }, [])
+  function saveCols(next: string[]) { setCols(next); try { localStorage.setItem(COLS_KEY, JSON.stringify(next)) } catch {} }
+
   async function loadCompare(m: string) {
+    setCompareErr(false)
     try {
       const r = await fetch(`/api/admin/coordinators/compare?month=${m}`)
       if (!r.ok) throw new Error()
       setCompare(await r.json())
-    } catch { setCompare({ coordinators: [], totals: {} }) }
+    } catch { setCompareErr(true) }
   }
-  useEffect(() => { load() }, [])
+  async function loadLists() {
+    setListErr(false)
+    try {
+      const [mr, rr] = await Promise.all([fetch("/api/meetings"), fetch("/api/reports")])
+      if (!mr.ok || !rr.ok) throw new Error()
+      setMeetings((await mr.json()).meetings || [])
+      setReports((await rr.json()).reports || [])
+    } catch { setListErr(true); setMeetings(m => m || []); setReports(r => r || []) }
+  }
   useEffect(() => { loadCompare(month) }, [month])
+  useEffect(() => { loadLists() }, [])
+
+  const all: any[] = compare?.coordinators || []
+  const areas = useMemo(() => [...new Set(all.map(r => r.area).filter(Boolean))] as string[], [all])
+  const coordsForForm = all.map(c => ({ id: c.id, name: c.name }))
 
   const LIGHT_ORDER: Record<string, number> = { red: 0, yellow: 1, green: 2 }
-  const rows: any[] = [...(compare?.coordinators || [])].sort((a, b) => {
-    const k = sort.key
-    const av = k === "light" ? LIGHT_ORDER[a.light] : (a[k] ?? -Infinity)
-    const bv = k === "light" ? LIGHT_ORDER[b.light] : (b[k] ?? -Infinity)
-    if (av === bv) return a.name.localeCompare(b.name, "he")
-    return (av > bv ? 1 : -1) * sort.dir
-  })
-  function sortBy(key: string) { setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 }) }
+  const rows = useMemo(() => {
+    const needle = q.trim()
+    return all
+      .filter(r => !needle || `${r.name} ${r.area}`.includes(needle))
+      .filter(r => !area || r.area === area)
+      .filter(r => !light || r.light === light)
+      .sort((a, b) => {
+        const k = sort.key
+        const val = (x: any) => k === "light" ? LIGHT_ORDER[x.light] : k === "name" ? x.name : k === "next_meeting_date" || k === "last_active_at" ? (x[k] ? new Date(x[k]).getTime() : -Infinity) : k === "report_this_week" ? (x.report_this_week ? 1 : 0) : (x[k] ?? -Infinity)
+        const av = val(a), bv = val(b)
+        if (av === bv) return a.name.localeCompare(b.name, "he")
+        if (typeof av === "string") return av.localeCompare(bv, "he") * sort.dir
+        return (av > bv ? 1 : -1) * sort.dir
+      })
+  }, [all, q, area, light, sort])
+  function sortBy(key: string) { setSort(s => s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: key === "name" || key === "light" ? 1 : -1 }) }
+
+  // Summary tiles — kept honest about what each number covers.
+  const withTarget = all.filter(r => r.target_leads > 0)
+  const leadsWithTarget = withTarget.reduce((s, r) => s + r.leads_month, 0)
+  const targetSum = withTarget.reduce((s, r) => s + r.target_leads, 0)
+  const leadsNoTarget = all.filter(r => !r.target_leads).reduce((s, r) => s + r.leads_month, 0)
+  const overdue = all.reduce((s, r) => s + r.tasks_overdue, 0)
+  const open = all.reduce((s, r) => s + r.tasks_open, 0)
+  const reported = all.filter(r => r.report_this_week).length
+  const weekStart = all[0]?.report_week_start || null
 
   function exportCsv() {
-    const head = ["רכז", "אזור", "מצב", "לידים", "יעד", "% יעד", "דרך לינק", "משימות פתוחות", "באיחור", "בוצעו החודש", "זמן סגירה ממוצע (ימים)", "אינטראקציות", "אירועים", "דיווחים", "פגישות", "כניסות 7 ימים", "פעולות 7 ימים", "כניסה אחרונה", "פעילות אחרונה"]
-    const lines = rows.map(r => [r.name, r.area, LIGHT[r.light]?.label, r.leads_month, r.target_leads, r.target_leads ? Math.round(r.leads_month / r.target_leads * 100) + "%" : "", r.leads_via_link_month, r.tasks_open, r.tasks_overdue, r.tasks_done_month, r.avg_close_days ?? "", r.interactions_month, r.events_month, r.reports_month, r.meetings_month, r.logins_7d, r.actions_7d, r.last_login_at ? fd(r.last_login_at) : "", r.last_active_at ? fd(r.last_active_at) : ""])
+    const head = ["רכז", "אזור", "חודש תוצאות", "מעורבות במערכת", "סיבה", "לידים", "יעד", "% יעד", "לידים דרך הקישור", "משימות פתוחות (עכשיו)", "באיחור (עכשיו)", "נסגרו בחודש", "זמן סגירה ממוצע (ימים, עד 90 יום)", "תיעודי קשר", "אירועים", "דיווחים בחודש", `דיווח לשבוע ${weekLabel(weekStart)}`, "פגישות בחודש", "פגישה הבאה", "כניסות 7 ימים", "פעולות 7 ימים", "כניסה אחרונה", "פעילות אחרונה"]
+    const lines = rows.map(r => [r.name, r.area, ymLabel(month), LIGHT_UI[r.light]?.label, lightReason(r), r.leads_month, r.target_leads || "", r.target_leads ? Math.round(r.leads_month / r.target_leads * 100) + "%" : "", r.leads_via_link_month, r.tasks_open, r.tasks_overdue, r.tasks_done_month, r.avg_close_days ?? "", r.interactions_month, r.events_month, r.reports_month, r.report_this_week ? "הוגש" : "טרם הוגש", r.meetings_month, r.next_meeting_date ? dayFull(r.next_meeting_date) : "", r.logins_7d, r.actions_7d, r.last_login_at ? dayFull(r.last_login_at) : "", r.last_active_at ? dayFull(r.last_active_at) : ""])
     const csv = "﻿" + [head, ...lines].map(l => l.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n")
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `coordinators-${month}.csv`; a.click()
   }
 
-  const filteredReports = rFilter ? reports.filter(r => r.coordinator_name === rFilter) : reports
-  const coordNames = [...new Set(reports.map(r => r.coordinator_name))] as string[]
-  const t = compare?.totals || {}
+  async function deleteMeeting() {
+    if (!delMeeting) return
+    await fetch("/api/meetings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: delMeeting.id }) })
+    setDelMeeting(null); loadLists(); loadCompare(month)
+  }
 
-  if (error) return <div className="p-6"><ErrorState retry={load} /></div>
-  if (loading) return <div className="p-4 md:p-6 lg:p-8 space-y-3">{[1, 2, 3].map(i => <SkeletonCard key={i} rows={4} />)}</div>
-
-  const th = (label: string, key?: string, cls = "") => (
-    <th onClick={key ? () => sortBy(key) : undefined}
-      className={`text-right px-3 py-2.5 text-[11px] font-bold text-[#64748B] whitespace-nowrap ${key ? "cursor-pointer hover:text-[#0D2744] select-none" : ""} ${cls}`}>
-      {label}{key && sort.key === key && <span className="mr-1 text-[#00488D]">{sort.dir === 1 ? "▲" : "▼"}</span>}
+  const th = (label: string, key: string, sub?: string) => (
+    <th aria-sort={sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : undefined}>
+      <button onClick={() => sortBy(key)}>{label}{sort.key === key && <span style={{ color: "#27634e" }}> {sort.dir === 1 ? "↑" : "↓"}</span>}{sub && <><br />{sub}</>}</button>
     </th>
   )
 
+  const filteredReports = (reports || []).filter(r => !rFilter || String(r.coordinator_id) === rFilter)
+  const reportCoords = [...new Map((reports || []).map(r => [String(r.coordinator_id), r.coordinator_name])).entries()]
+
   return (
-    <div className="p-4 md:p-6 lg:p-8 fade-up">
-      <div className="flex items-end justify-between mb-5 flex-wrap gap-3">
+    <div className="coord-ws">
+      <header className="c-heading">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0D2744]">ניהול רכזים</h1>
-          <div className="text-sm text-[#64748B] mt-0.5">מה כל רכז עשה בפועל בתוך המערכת — לחיצה על רכז פותחת את הכרטיס המלא שלו</div>
+          <h1>ניהול רכזים</h1>
+          <div className="c-sub">תוצאות, הקשר והצעד הבא עם כל רכז.</div>
         </div>
-        {compare && (
-          <div className="flex items-center gap-2 text-xs">
-            {(["green", "yellow", "red"] as const).map(l => (
-              <span key={l} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold" style={{ background: LIGHT[l].bg, color: LIGHT[l].fg }}>
-                <span className="w-2 h-2 rounded-full" style={{ background: LIGHT[l].dot }} />{t[l] ?? 0} {LIGHT[l].label}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2 mb-6 border-b border-[#E2E8F0] overflow-x-auto">
-        {([["compare", "השוואת רכזים", "📊"], ["meetings", "סיכומי פגישות", "🤝"], ["reports", "דיווחים שבועיים", "📋"], ["targets", "יעדי לידים", "🎯"]] as const).map(([key, label, icon]) => (
-          <button key={key} onClick={() => setTab(key)}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px whitespace-nowrap ${tab === key ? "border-[#00488D] text-[#00488D]" : "border-transparent text-[#475569] hover:text-[#0D2744]"}`}>
-            {icon} {label}
-          </button>
-        ))}
-      </div>
-
-      {tab === "compare" && (
-        <div>
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-            <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] rounded-[10px] p-1">
-              <button onClick={() => setMonth(m => shiftYm(m, -1))} className="w-8 h-8 rounded-[7px] hover:bg-[#F1F5F9] text-[#475569]">›</button>
-              <span className="px-3 text-sm font-bold text-[#0D2744] min-w-[110px] text-center">{ymLabel(month)}</span>
-              <button onClick={() => setMonth(m => shiftYm(m, 1))} disabled={month >= ym()} className="w-8 h-8 rounded-[7px] hover:bg-[#F1F5F9] text-[#475569] disabled:opacity-30">‹</button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => window.open(`/admin/reports/monthly?month=${month}`, "_blank")}
-                className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#E2E8F0] bg-white hover:bg-[#F5F3FF] hover:border-[#C4B5FD] hover:text-[#5B21B6] transition-colors">📊 דו״ח חודשי ארגוני</button>
-              <Button size="sm" variant="secondary" onClick={exportCsv}>⬇ ייצוא CSV</Button>
-            </div>
-          </div>
-
-          {!compare ? <SkeletonCard rows={5} /> : (
-            <Card>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                    <tr>
-                      {th("רכז", "name")}{th("מצב", "light")}{th("לידים / יעד", "leads_month")}{th("דרך לינק", "leads_via_link_month")}
-                      {th("משימות פתוחות", "tasks_open")}{th("באיחור", "tasks_overdue")}{th("בוצעו", "tasks_done_month")}{th("סגירה ממוצעת", "avg_close_days")}
-                      {th("אינטראקציות", "interactions_month")}{th("אירועים", "events_month")}{th("דיווחים", "reports_month")}{th("פגישות", "meetings_month")}
-                      {th("כניסות 7י׳", "logins_7d")}{th("פעולות 7י׳", "actions_7d")}{th("פעיל לאחרונה", "last_active_at")}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map(r => {
-                      const p = r.target_leads ? Math.min(100, Math.round(r.leads_month / r.target_leads * 100)) : null
-                      return (
-                        <tr key={r.id} onClick={() => router.push(`/admin/reports/${r.id}`)} className="border-b border-[#F1F5F9] last:border-0 hover:bg-[#F0F7FF] cursor-pointer transition-colors">
-                          <td className="px-3 py-2.5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">{ini(r.name)}</div>
-                              <div><div className="font-semibold text-[#0D2744] whitespace-nowrap">{r.name}</div><div className="text-[11px] text-[#94A3B8]">{r.area}</div></div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5"><EngagementLight light={r.light} withLabel /></td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold tabular-nums">{r.leads_month}<span className="text-[#94A3B8] font-normal"> / {r.target_leads || "—"}</span></span>
-                              {p !== null && <div className="w-14 h-1.5 bg-[#F0F4F8] rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${p}%`, background: p >= 100 ? "#166534" : p >= 60 ? "#00488D" : "#B45309" }} /></div>}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.leads_via_link_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.tasks_open}</td>
-                          <td className="px-3 py-2.5 tabular-nums font-bold" style={{ color: r.tasks_overdue > 0 ? "#960010" : "#166534" }}>{r.tasks_overdue}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.tasks_done_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums text-[#475569]">{r.avg_close_days == null ? "—" : `${r.avg_close_days} י׳`}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.interactions_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.events_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.reports_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.meetings_month}</td>
-                          <td className="px-3 py-2.5 tabular-nums" style={{ color: r.logins_7d === 0 ? "#960010" : undefined }}>{r.logins_7d}</td>
-                          <td className="px-3 py-2.5 tabular-nums">{r.actions_7d}</td>
-                          <td className="px-3 py-2.5 text-xs text-[#64748B] whitespace-nowrap">{ago(r.last_active_at || r.last_login_at)}</td>
-                        </tr>
-                      )
-                    })}
-                    {rows.length === 0 && <tr><td colSpan={15} className="px-3 py-10 text-center text-sm text-[#94A3B8]">אין רכזים</td></tr>}
-                  </tbody>
-                  {rows.length > 0 && (
-                    <tfoot className="bg-[#F8FAFC] border-t border-[#E2E8F0] text-xs font-bold text-[#0D2744]">
-                      <tr>
-                        <td className="px-3 py-2.5">סה״כ · {rows.length} רכזים</td><td />
-                        <td className="px-3 py-2.5 tabular-nums">{t.leads} / {t.target || "—"}</td><td />
-                        <td className="px-3 py-2.5 tabular-nums">{t.tasks_open}</td>
-                        <td className="px-3 py-2.5 tabular-nums" style={{ color: t.tasks_overdue > 0 ? "#960010" : "#166534" }}>{t.tasks_overdue}</td>
-                        <td colSpan={9} />
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-              <div className="px-4 py-2.5 border-t border-[#F1F5F9] text-[11px] text-[#94A3B8] leading-relaxed">
-                רמזור: <b className="text-[#166534]">פעיל</b> = 2+ כניסות ו-5+ פעולות ב-7 הימים האחרונים ופחות מ-25% משימות באיחור ·
-                <b className="text-[#991B1B]"> דורש תשומת לב</b> = ללא כניסה 7 ימים או 50%+ מהמשימות הפתוחות באיחור · <b className="text-[#B45309]">חלקי</b> = כל השאר.
-                פעולות = כל פעולה שנרשמה ביומן המערכת (ליד, משימה, אירוע, דיווח, כניסה).
-              </div>
-            </Card>
+        <div className="c-actions">
+          {tab === "team" && (
+            <label className="c-periodlabel">תוצאות לחודש
+              <select className="c-period" value={month} onChange={e => setMonth(e.target.value)}>
+                {monthOptions().map(m => <option key={m} value={m}>{ymLabel(m)}</option>)}
+              </select>
+            </label>
           )}
+          <button className="c-primary" onClick={() => setMtgOpen(true)}>+ סיכום פגישה</button>
         </div>
+      </header>
+
+      <nav className="c-tabs" aria-label="ניהול רכזים">
+        {TABS.map(([k, l]) => <button key={k} className={tab === k ? "on" : ""} aria-current={tab === k ? "page" : undefined} onClick={() => setTab(k)}>{l}</button>)}
+      </nav>
+
+      {/* ===== TEAM ===== */}
+      {tab === "team" && (
+        <>
+          {compareErr && <div className="c-warn">לא ניתן לטעון את נתוני הצוות. <button className="c-textbtn" onClick={() => loadCompare(month)}>ניסיון חוזר</button></div>}
+          <div className="c-stats">
+            <div className="c-stat">
+              <span>לידים בקרב רכזים עם יעד</span>
+              <b>{compare ? (targetSum ? `${leadsWithTarget} / ${targetSum}` : "—") : "…"}</b>
+              <small>{ymLabel(month)} · {withTarget.length} רכזים עם יעד{leadsNoTarget ? `; ${leadsNoTarget} לידים נוספים ללא יעד` : ""}</small>
+            </div>
+            <div className="c-stat">
+              <span>שיוכי משימות באיחור</span>
+              <b>{compare ? `${overdue} מתוך ${open}` : "…"}</b>
+              <small>מצב נוכחי · משימה משותפת יכולה להופיע אצל כמה רכזים</small>
+            </div>
+            <div className="c-stat">
+              <span>דיווח שבועי הוגש</span>
+              <b>{compare ? `${reported} מתוך ${all.length}` : "…"}</b>
+              <small>לשבוע {weekLabel(weekStart)}</small>
+            </div>
+          </div>
+
+          <div className="c-filterbar">
+            <input className="c-search" value={q} onChange={e => setQ(e.target.value)} placeholder="חיפוש רכז או אזור…" aria-label="חיפוש רכז או אזור" />
+            <select value={area} onChange={e => setArea(e.target.value)} aria-label="אזור"><option value="">כל האזורים</option>{areas.map(a => <option key={a} value={a}>{a}</option>)}</select>
+            <select value={light} onChange={e => setLight(e.target.value)} aria-label="מעורבות"><option value="">כל מצבי המעורבות</option>{Object.entries(LIGHT_UI).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+            <button className="c-secondary" onClick={() => setColsOpen(true)}>עמודות{cols.length ? ` (${cols.length})` : ""}</button>
+            <button className="c-secondary" onClick={() => window.open(`/admin/reports/monthly?month=${month}`, "_blank")}>דוח חודשי</button>
+            <button className="c-secondary" onClick={exportCsv} disabled={!rows.length}>ייצוא CSV</button>
+          </div>
+
+          <div className="c-tablebox">
+            <div className="c-scroll">
+              <table className="c-table">
+                <thead>
+                  <tr>
+                    {th("רכז / אזור", "name")}
+                    {th("לידים / יעד", "leads_month", ymLabel(month))}
+                    {th("באיחור / פתוחות", "tasks_overdue", "עכשיו")}
+                    {th("דיווח לשבוע", "report_this_week", weekLabel(weekStart))}
+                    {th("פגישה הבאה", "next_meeting_date")}
+                    {th("מעורבות במערכת", "light", "7 ימים אחרונים")}
+                    {cols.map(k => { const c = EXTRA_COLS.find(x => x.key === k); return c ? <th key={k}><button onClick={() => sortBy(k)}>{c.label}{sort.key === k && <span style={{ color: "#27634e" }}> {sort.dir === 1 ? "↑" : "↓"}</span>}<br />{c.period}</button></th> : null })}
+                    <th><span className="sr-only">פתיחה</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!compare && !compareErr && <tr><td colSpan={7 + cols.length}><div className="c-empty">טוען…</div></td></tr>}
+                  {compare && rows.length === 0 && <tr><td colSpan={7 + cols.length}><div className="c-empty">{all.length ? "אין רכזים שמתאימים לסינון" : "אין רכזים במערכת"}</div></td></tr>}
+                  {rows.map(r => {
+                    const p = r.target_leads ? Math.min(100, Math.round(r.leads_month / r.target_leads * 100)) : null
+                    const ui = LIGHT_UI[r.light] || LIGHT_UI.yellow
+                    const nextFuture = r.next_meeting_date && String(r.next_meeting_date).slice(0, 10) >= new Date().toISOString().slice(0, 10)
+                    return (
+                      <tr key={r.id}>
+                        <td>
+                          <div className="c-person">
+                            <span className="c-avatar">{initials(r.name)}</span>
+                            <div><button className="c-name" onClick={() => router.push(`/admin/reports/${r.id}?month=${month}`)}>{r.name}</button><small>{r.area || "ללא אזור"}</small></div>
+                          </div>
+                        </td>
+                        <td>
+                          {r.target_leads ? <><span className="c-num"><b>{r.leads_month}</b> / {r.target_leads}</span><div className="c-progress"><i style={{ width: `${p}%` }} /></div></>
+                            : <><span className="c-num"><b>{r.leads_month}</b> / לא הוגדר</span><small>דורש הגדרת יעד</small></>}
+                        </td>
+                        <td><span className="c-num"><b>{r.tasks_overdue}</b> / {r.tasks_open}</span><small>שיוכי משימות</small></td>
+                        <td><span className={`c-badge ${r.report_this_week ? "" : "yellow"}`}>{r.report_this_week ? "הוגש" : "טרם הוגש"}</span><small>{r.last_report_at ? `אחרון: ${dayFull(r.last_report_at)}` : "אין דיווחים"}</small></td>
+                        <td>{r.next_meeting_date ? <><span className="c-num">{day(r.next_meeting_date)}</span>{!nextFuture && <small>המועד עבר</small>}</> : <span className="c-sub">לא נקבעה</span>}</td>
+                        <td><span className={`c-badge ${ui.tone === "green" ? "" : ui.tone}`}>{ui.label}</span><small>{lightReason(r)}</small></td>
+                        {cols.map(k => { const c = EXTRA_COLS.find(x => x.key === k); return c ? <td key={k}><span className="c-num">{c.fmt ? c.fmt(r) : r[k]}</span></td> : null })}
+                        <td><button className="c-textbtn" onClick={() => router.push(`/admin/reports/${r.id}?month=${month}`)}>לכרטיס ←</button></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="c-legend">
+              הרמזור מתאר מעורבות מתועדת במערכת, לא הערכת עובד כוללת: <b>פעילה</b> = 2+ כניסות, 5+ פעולות ופחות מ־25% משימות באיחור · <b>דורש תשומת לב</b> = ללא כניסה ב־7 ימים או 50%+ מהמשימות באיחור · <b>חלקית</b> = כל השאר. יעד חסר אינו 0% ביצוע. מדדים נוספים זמינים בבחירת העמודות.
+            </div>
+          </div>
+        </>
       )}
 
+      {/* ===== MEETINGS ===== */}
       {tab === "meetings" && (
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-[#64748B]">{meetings.length} פגישות מתועדות</div>
-            <Button onClick={() => setShowMtgForm(true)}>+ סיכום פגישה חדש</Button>
-          </div>
-          {showMtgForm && <MeetingForm coordinators={coords} onSaved={() => { setShowMtgForm(false); load() }} onCancel={() => setShowMtgForm(false)} />}
-          <div className="space-y-3">
-            {meetings.length === 0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין פגישות מתועדות עדיין</div>}
-            {meetings.map(m => (
-              <Card key={m.id}>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push(`/admin/reports/${m.coordinator_id}?tab=meetings`)}>
-                      <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-sm font-bold flex-shrink-0">{ini(m.coordinator_name || "")}</div>
-                      <div>
-                        <div className="text-sm font-bold">{m.coordinator_name}</div>
-                        <div className="text-xs text-[#64748B]">{MTG_TYPE[m.type] || m.type} · {fd(m.date)} {m.area && `· ${m.area}`}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {m.next_meeting_date && <div className="text-xs text-[#00488D] bg-[#F0F7FF] px-2 py-1 rounded-lg">פגישה הבאה: {fd(m.next_meeting_date)}</div>}
-                      <button onClick={async () => { if (confirm("למחוק?")) await fetch("/api/meetings", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: m.id }) }).then(() => load()) }}
-                        className="text-[#CBD5E1] hover:text-[#960010] text-xs">✕</button>
-                    </div>
+        <>
+          <div className="c-scope">פגישות ליווי אחרונות מכל התקופות. לכל רכז מוצג מועד ההמשך שנקבע בפגישה האחרונה.</div>
+          {listErr && <div className="c-warn">חלק מהנתונים לא נטענו. <button className="c-textbtn" onClick={loadLists}>ניסיון חוזר</button></div>}
+          {meetings === null && <div className="c-card"><div className="c-empty">טוען…</div></div>}
+          {meetings?.length === 0 && <div className="c-card"><div className="c-empty">אין פגישות מתועדות עדיין.<br /><button className="c-textbtn" onClick={() => setMtgOpen(true)}>תיעוד סיכום פגישה ראשון</button></div></div>}
+          {meetings?.map(m => (
+            <article key={m.id} className="c-card c-meeting">
+              <header>
+                <div className="c-person">
+                  <span className="c-avatar">{initials(m.coordinator_name)}</span>
+                  <div>
+                    <button className="c-name" onClick={() => router.push(`/admin/reports/${m.coordinator_id}?tab=meetings`)}>{m.coordinator_name}</button>
+                    <div className="c-sub">{dayFull(m.date)} · {MTG_TYPE[m.type] || m.type}{m.area ? ` · ${m.area}` : ""}</div>
                   </div>
-                  {m.agenda && <div className="text-xs font-semibold text-[#374151] mb-1">נושאים: <span className="font-normal text-[#475569]">{m.agenda}</span></div>}
-                  <div className="text-sm text-[#475569] bg-[#F9FAFB] rounded-[9px] p-3 whitespace-pre-wrap">{m.summary}</div>
                 </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+                <span className={`c-badge ${m.next_meeting_date ? "" : "yellow"}`}>{m.next_meeting_date ? `המשך: ${dayFull(m.next_meeting_date)}` : "טרם נקבע המשך"}</span>
+              </header>
+              {m.agenda && <p className="c-text" style={{ marginTop: 12 }}><b>נושאים:</b> {m.agenda}</p>}
+              <p className="c-text" style={{ marginTop: 6, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.summary}</p>
+              <footer>
+                <button className="c-textbtn" onClick={() => setOpenMeeting(m)}>פתיחת הסיכום</button>
+                <button className="c-textbtn danger" onClick={() => setDelMeeting(m)}>מחיקה…</button>
+              </footer>
+            </article>
+          ))}
+        </>
       )}
 
+      {/* ===== REPORTS ===== */}
       {tab === "reports" && (
-        <div>
-          <div className="flex gap-2 mb-4 items-center">
-            <select value={rFilter} onChange={e => setRFilter(e.target.value)} className="px-3 py-1.5 border border-[#E2E8F0] rounded-[9px] text-sm bg-white">
-              <option value="">כל הרכזים</option>
-              {coordNames.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <span className="text-xs text-[#94A3B8]">{filteredReports.length} דיווחים</span><ExportButton type="reports" label="ייצוא דיווחים" />
+        <>
+          <div className="c-scope">הדיווח השבועי הוא מה שהרכז כתב. מספר הלידים שדווח ידנית מוצג בנפרד ואינו מתווסף ללידים שנוצרו במערכת.</div>
+          <div className="c-filterbar">
+            <select value={rFilter} onChange={e => setRFilter(e.target.value)} aria-label="רכז"><option value="">כל הרכזים</option>{reportCoords.map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>
+            <span className="c-sub">{filteredReports.length} דיווחים</span>
+            <span style={{ marginInlineStart: "auto" }} />
+            <ExportButton type="reports" label="ייצוא דיווחים" />
           </div>
-          <div className="space-y-3">
-            {filteredReports.map(r => (
-              <Card key={r.id}>
-                <div onClick={() => setOpenReport(openReport === r.id ? null : r.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-[#F8FAFC] transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-[#DBEAFE] text-[#00488D] flex items-center justify-center text-xs font-bold flex-shrink-0">{ini(r.coordinator_name || "")}</div>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold">{r.coordinator_name}</div>
-                    <div className="text-xs text-[#64748B]">שבוע {fd(r.week_start)} · {r.area}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold text-[#00488D]">{r.leads_count} לידים</div>
-                    <div className="text-xs text-[#64748B]">{new Date(r.submitted_at).toLocaleDateString("he-IL")}</div>
-                  </div>
-                  <span className="text-[#94A3B8] text-sm">{openReport === r.id ? "▲" : "▼"}</span>
+          {reports === null && <div className="c-card"><div className="c-empty">טוען…</div></div>}
+          {reports && filteredReports.length === 0 && <div className="c-card"><div className="c-empty">אין דיווחים</div></div>}
+          {filteredReports.map(r => (
+            <article key={r.id} className="c-card" style={{ marginBottom: 12 }}>
+              <div className="c-row">
+                <div className="c-person">
+                  <span className="c-avatar">{initials(r.coordinator_name)}</span>
+                  <div><button className="c-name" onClick={() => router.push(`/admin/reports/${r.coordinator_id}?tab=reports`)}>{r.coordinator_name}</button><small>שבוע {weekLabel(String(r.week_start).slice(0, 10))} · הוגש ב־{dayFull(r.submitted_at)}</small></div>
                 </div>
-                {openReport === r.id && (
-                  <div className="border-t border-[#E2E8F0] p-4 bg-[#F8FAFC] grid grid-cols-2 gap-4">
-                    <div><div className="text-xs font-bold text-[#374151] mb-1">הישגים מרכזיים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.achievements || "—"}</div></div>
-                    <div><div className="text-xs font-bold text-[#374151] mb-1">אתגרים</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.challenges || "—"}</div></div>
-                    <div className="col-span-2"><div className="text-xs font-bold text-[#374151] mb-1">תכנון שבוע הבא</div><div className="text-sm text-[#475569] bg-white rounded-[9px] p-3 border border-[#E2E8F0]">{r.next_week_plan || "—"}</div></div>
-                  </div>
-                )}
-              </Card>
-            ))}
-            {filteredReports.length === 0 && <div className="text-center py-12 text-sm text-[#94A3B8]">אין דיווחים</div>}
-          </div>
-        </div>
+                <div className="flex items-center gap-3">
+                  <span className="c-badge grey">דיווח ידני: {r.leads_count ?? 0} לידים</span>
+                  <button className="c-textbtn" onClick={() => setOpenReport(r)}>פתיחת דיווח ←</button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </>
       )}
 
-      {tab === "targets" && <TargetsPanel />}
+      {/* ===== TARGETS ===== */}
+      {tab === "targets" && <TargetsEditor onSaved={() => loadCompare(month)} />}
+
+      {/* ===== DIALOGS ===== */}
+      <MeetingDialog open={mtgOpen} coordinators={coordsForForm} onClose={() => setMtgOpen(false)} onSaved={() => { setMtgOpen(false); loadLists(); loadCompare(month) }} />
+
+      <Modal open={colsOpen} onClose={() => setColsOpen(false)} title="בחירת עמודות" subtitle="המדדים המשניים נשמרים זמינים; כל עמודה מסומנת בתקופה שלה" accent="#27634e"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-primary" onClick={() => setColsOpen(false)}>סיום</button><button className="c-secondary" onClick={() => saveCols([])}>איפוס</button></div>}>
+        <div className="coord-dialog c-columns">
+          {EXTRA_COLS.map(c => (
+            <label key={c.key}><input type="checkbox" checked={cols.includes(c.key)} onChange={e => saveCols(e.target.checked ? [...cols, c.key] : cols.filter(x => x !== c.key))} />{c.label} <span className="c-sub">· {c.period}</span></label>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal open={!!openMeeting} onClose={() => setOpenMeeting(null)} title={openMeeting ? `סיכום פגישה · ${openMeeting.coordinator_name}` : ""} subtitle={openMeeting ? `${dayFull(openMeeting.date)} · ${MTG_TYPE[openMeeting.type] || openMeeting.type}` : ""} accent="#27634e" width="680px"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-secondary" onClick={() => setOpenMeeting(null)}>חזרה</button>{openMeeting && <button className="c-textbtn" onClick={() => router.push(`/admin/reports/${openMeeting.coordinator_id}?tab=meetings`)}>לכרטיס הרכז ←</button>}</div>}>
+        {openMeeting && <div className="coord-dialog">
+          {openMeeting.agenda && <><h3 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 8px" }}>נושאים</h3><p className="c-text">{openMeeting.agenda}</p></>}
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>סיכום</h3><p className="c-text">{openMeeting.summary || "—"}</p>
+          <div className="c-meta" style={{ marginTop: 16 }}><span>{openMeeting.next_meeting_date ? `פגישה הבאה: ${dayFull(openMeeting.next_meeting_date)}` : "לא נקבעה פגישת המשך"}</span></div>
+        </div>}
+      </Modal>
+
+      <Modal open={!!openReport} onClose={() => setOpenReport(null)} title={openReport ? `דיווח שבועי · ${openReport.coordinator_name}` : ""} subtitle={openReport ? `שבוע ${weekLabel(String(openReport.week_start).slice(0, 10))} · הוגש ב־${dayFull(openReport.submitted_at)}` : ""} accent="#27634e" width="680px"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-secondary" onClick={() => setOpenReport(null)}>חזרה</button>{openReport && <button className="c-secondary" onClick={() => window.open(`/admin/reports/weekly?coordinator_id=${openReport.coordinator_id}&week=${String(openReport.week_start).slice(0, 10)}`, "_blank")}>דוח שבועי להדפסה</button>}</div>}>
+        {openReport && <div className="coord-dialog">
+          <div className="c-meta"><span>דיווח ידני: {openReport.leads_count ?? 0} לידים</span><span>אינו מתווסף לספירת הלידים במערכת</span></div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "4px 0 8px" }}>הישגים</h3><p className="c-text">{openReport.achievements || "—"}</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>אתגרים</h3><p className="c-text">{openReport.challenges || "—"}</p>
+          <h3 style={{ fontSize: 14, fontWeight: 700, margin: "16px 0 8px" }}>תכנון לשבוע הבא</h3><p className="c-text">{openReport.next_week_plan || "—"}</p>
+        </div>}
+      </Modal>
+
+      <Modal open={!!delMeeting} onClose={() => setDelMeeting(null)} title="מחיקת סיכום פגישה" subtitle={delMeeting ? `${delMeeting.coordinator_name} · ${dayFull(delMeeting.date)}` : ""} accent="#9b6250"
+        footer={<div className="coord-dialog flex gap-2"><button className="c-primary" style={{ background: "#9b6250", borderColor: "#9b6250" }} onClick={deleteMeeting}>מחיקה</button><button className="c-secondary" onClick={() => setDelMeeting(null)}>ביטול</button></div>}>
+        <div className="coord-dialog"><p className="c-text">הסיכום יימחק לצמיתות. משימות שנוצרו ממנו נשארות במערכת.</p></div>
+      </Modal>
     </div>
   )
 }
