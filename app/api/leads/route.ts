@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
 import { sendToSilfrus } from "@/lib/silfrus";
 import { createLead } from "@/lib/leads-create";
+import { isValidIsraeliId, israeliIdError } from "@/lib/israeli-id";
 
 export async function GET(req: NextRequest) {
   const me = await currentUser(req);
@@ -76,6 +77,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  if (d.id_number != null && d.id_number !== "" && !isValidIsraeliId(d.id_number)) {
+    return NextResponse.json({ error: israeliIdError }, { status: 400 });
+  }
   // The signed referral is authoritative; ignore client-supplied ownership.
   if(d.referral_token){
     try{const referral=await resolveReferral(d.referral_token);if(!referral)return NextResponse.json({error:'הקישור אינו תקין או שפג תוקפו'},{status:400});d.coordinator_id=referral.coordinatorId;d.owner_name='';d.contact_id=referral.contactId;d.source='link';d.event_id=null}catch{return NextResponse.json({error:'לא ניתן לאמת את הקישור כרגע'},{status:503})}
