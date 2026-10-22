@@ -92,6 +92,25 @@ describe("opening", () => {
     const r = await say("בלה בלה");
     expect(last(r)).toContain("לא הבנתי");
   });
+  it("one 'not understood' hint per 30 minutes, then silence", async () => {
+    await say("היי");
+    expect(last(await say("אישר את זה הליצן"))).toContain("לא הבנתי");
+    expect(await say("סתם ירד מהעץ")).toEqual([]);
+    expect(await say("סיימתי")).toEqual([]);
+    advance(31 * 60 * 1000);
+    expect(last(await say("משהו אחר"))).toContain("לא הבנתי");
+  });
+  it("chatter gets no answer at all", async () => {
+    await say("היי");
+    for (const t of [".", "🙏", "תודה", "דייי חחח", "סבבה", "חחחח"]) expect(await say(t), t).toEqual([]);
+  });
+  it("a real command still works right after a silenced message", async () => {
+    await say("היי");
+    await say("בלה");
+    await say("בלה בלה");
+    const r = await say("המשימות שלי");
+    expect(last(r)).toContain("המשימות הפתוחות שלך");
+  });
 });
 
 describe("lead", () => {

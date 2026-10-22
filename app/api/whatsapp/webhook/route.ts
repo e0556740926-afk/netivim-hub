@@ -61,6 +61,11 @@ export async function POST(req: NextRequest) {
   // chat — Green API reports that as outgoingMessageReceived with the chat
   // being the instance's own number. Bot replies are sent through the API
   // (outgoingAPIMessageReceived), so they never loop back here.
+  // Only the instance this site is configured for. After a number switch the
+  // old instance may still point its webhook here — its chats (someone's
+  // personal WhatsApp) must never reach the bot.
+  const instanceId = body?.instanceData?.idInstance;
+  if (process.env.GREENAPI_ID_INSTANCE && instanceId != null && String(instanceId) !== String(process.env.GREENAPI_ID_INSTANCE)) return ok();
   const ownWid: string | undefined = body?.instanceData?.wid;
   const selfChat = body?.typeWebhook === "outgoingMessageReceived" && !!ownWid && chatId === ownWid;
   if (body?.typeWebhook !== "incomingMessageReceived" && !selfChat) return ok();
@@ -82,8 +87,15 @@ export async function POST(req: NextRequest) {
         // keep the raw shape for debugging, then point them at text.
         await logMessage(phoneKey, "in", `[${body?.messageData?.typeMessage || "unknown"}]`, waMessageId || null, user.name, "bot", "other", { messageData: body?.messageData });
         const settings0 = await getBotSettings();
-        if (process.env.WHATSAPP_BOT_ENABLED === "true" && settings0.enabled && body?.messageData?.typeMessage !== "reactionMessage") {
-          await sendWhatsApp(phoneKey, "אני מבין רק טקסט וכפתורים 🙂 כתבו *תפריט* כדי להתחיל.");
+        // Voice notes / photos / stickers: one short note per 30 minutes at most, never one per message.
+        if (process.env.WHATSAPP_BOT_ENABLED === "true" && settings0.enabled && !["reactionMessage", "stickerMessage"].includes(body?.messageData?.typeMessage)) {
+          const [recent] = await sql`SELECT 1 AS x FROM whatsapp_messages WHERE phone = ${phoneKey} AND direction = 'out'
+            AND (body LIKE 'אני מבין רק טקסט%' OR body LIKE 'לא הבנתי%') AND created_at > now() - interval '30 minutes' LIMIT 1`;
+          if (!recent) {
+            const note = "אני מבין רק טקסט וכפתורים 🙂 כתבו *תפריט* כדי להתחיל.";
+            const r = await sendWhatsApp(phoneKey, note);
+            await logMessage(phoneKey, "out", note, (r as any).id || null, "בוט", r.ok ? "sent" : "failed");
+          }
         }
         return ok();
       }

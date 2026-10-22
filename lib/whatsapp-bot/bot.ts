@@ -72,11 +72,21 @@ export type Draft = {
   taskId?: number;
   leadHits?: LeadRow[];
   suspended?: { state: string; lead?: LeadDraft; task?: TaskDraft };
+  /** last time the bot answered "לא הבנתי" — one hint per HINT_COOLDOWN_MS, then silence */
+  hintAt?: number;
 };
 
 export const DRAFT_TTL_MS = 30 * 60 * 1000;
 export const RESUME_TTL_MS = 24 * 3600 * 1000;
 export const WELCOME_AFTER_MS = 12 * 3600 * 1000;
+export const HINT_COOLDOWN_MS = 30 * 60 * 1000;
+
+/** "תודה", "סבבה", "🙏", ".", "חחח" — acknowledgements and chatter that need no answer. */
+export function isChatter(text: string): boolean {
+  const k = keyOf(text);
+  if (!/\p{L}|\d/u.test(k)) return true; // only emoji / punctuation
+  return /^(תודה( רבה)?|תנקס|סבבה|סבבה תודה|אחלה|יופי|מעולה|מצוין|מצויין|טוב|בסדר|אוקי|אוקיי|ok|קיבלתי|הבנתי|נהדר|כל הכבוד|ח+|ה+ה+|lol|דיי+( ח+)?|יאללה ביי|ביי|לילה טוב|שבוע טוב|שבת שלום|בהצלחה)$/u.test(k);
+}
 
 // ── buttons ───────────────────────────────────────────────────────
 const B = {
@@ -534,8 +544,13 @@ export async function handleMessage(deps: BotDeps, user: BotUser, phone: string,
     await leadText(text, emptyLead(), false);
     return finish();
   }
-  const greeted = sess && age < WELCOME_AFTER_MS && ["welcome", "idle", "actions"].includes(sess.state);
-  if (!greeted) { welcome(); return finish(); }
+  const greeted = sess && age < WELCOME_AFTER_MS && ["welcome", "idle", "actions", "task_list"].includes(sess.state);
+  // Chatter ("תודה", "🙏", ".") and repeated misses get silence, not a hint per message:
+  // people also forward voice notes, photos and side remarks — one nudge is enough.
+  if (greeted && isChatter(text)) return finish();
+  if (greeted && draft.hintAt && now.getTime() - draft.hintAt < HINT_COOLDOWN_MS) return finish();
+  if (!greeted) { if (isChatter(text) && sess) return finish(); welcome(); return finish(); }
+  draft.hintAt = now.getTime();
   ask(state === "actions" ? "actions" : "idle", {
     text: state === "actions" ? "לא הבנתי 🙂 כתבו מספר מ-1 עד 6, או לחצו על כפתור." : "לא הבנתי 🙂\nלחצו על *פעולות*, או כתבו מה תרצו — ליד, משימה, יומן.",
     buttons: state === "actions" ? [B.leadNew, B.taskNew, B.myTasks] : [B.actions, B.help],
