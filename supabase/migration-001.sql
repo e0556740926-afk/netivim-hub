@@ -939,3 +939,7 @@ CREATE TABLE IF NOT EXISTS whatsapp_scheduled (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS whatsapp_scheduled_due_idx ON whatsapp_scheduled(status, send_at);
+
+-- groups list cache for the bot settings screen (2026-10-23)
+ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cache jsonb;
+ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cached_at timestamptz;

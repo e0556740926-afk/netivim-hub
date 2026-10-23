@@ -65,6 +65,8 @@ export async function ensureBotTables(): Promise<void> {
   )`;
   await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'text'`;
   await sql`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS meta jsonb`;
+  await sql`ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cache jsonb`;
+  await sql`ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cached_at timestamptz`;
   ensured = true;
 }
 

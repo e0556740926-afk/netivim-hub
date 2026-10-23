@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
+import { loadWaGroups, onWaGroups } from "./wa-groups-client"
 import { chatIdFromPhone, MAX_SCHEDULED_LENGTH, REPEAT_LABEL, type Repeat } from "@/lib/whatsapp-bot/group-utils"
 
 /** "⏰ הודעות מתוזמנות" — schedule a WhatsApp message to a group (or one number), once or repeating. */
@@ -35,20 +36,20 @@ export default function WaScheduled() {
   const [msg, setMsg] = useState("")
   const [showHistory, setShowHistory] = useState(false)
 
-  async function loadGroups() {
+  async function loadGroups(refresh = false) {
     setGroupsErr("")
-    try {
-      const r = await fetch("/api/admin/whatsapp-bot/groups")
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.error || "שגיאה")
-      setGroups(d.groups || [])
-    } catch (e: any) { setGroupsErr(e.message) }
+    const d = await loadWaGroups(refresh)
+    setGroups(d.groups)
+    setGroupsErr(d.groups.length ? "" : d.error || "")
   }
   async function loadItems() {
     const r = await fetch("/api/admin/whatsapp-bot/scheduled")
     if (r.ok) setItems(await r.json())
   }
-  useEffect(() => { loadGroups(); loadItems() }, [])
+  useEffect(() => {
+    loadGroups(); loadItems()
+    return onWaGroups(d => { setGroups(d.groups); setGroupsErr(d.groups.length ? "" : d.error || "") })
+  }, [])
 
   const chatId = target === "phone" ? chatIdFromPhone(phone) : target
   const targetName = target === "phone" ? phone : groups.find(g => g.id === target)?.name || ""
@@ -96,8 +97,8 @@ export default function WaScheduled() {
               <option value="phone">📱 מספר טלפון…</option>
             </select>
           </label>
-          {groupsErr && <div style={{ fontSize: 12, color: C.bad }}>{groupsErr} <button type="button" onClick={loadGroups} style={small()}>נסו שוב</button></div>}
-          {!groupsErr && groups.length === 0 && <div style={{ fontSize: 12, color: C.warn }}>הבוט לא חבר באף קבוצה. הוסיפו את 055-9388266 לקבוצה ורעננו.</div>}
+          {groupsErr && <div style={{ fontSize: 12, color: C.bad }}>{groupsErr} <button type="button" onClick={() => loadGroups(true)} style={small()}>נסו שוב</button></div>}
+          {!groupsErr && groups.length === 0 && <div style={{ fontSize: 12, color: C.warn }}>הבוט לא חבר באף קבוצה. הוסיפו את 055-9388266 לקבוצה ו<button type="button" onClick={() => loadGroups(true)} style={small()}>רעננו</button></div>}
           {target === "phone" && <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="05X-XXXXXXX" inputMode="tel" style={{ ...input, direction: "ltr", textAlign: "right" }} />}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <label style={{ fontSize: 12, color: C.slate, flex: "1 1 160px" }}>מתי

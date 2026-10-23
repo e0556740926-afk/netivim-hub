@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { displayPhone, toCsv } from "@/lib/whatsapp-bot/group-utils"
+import { loadWaGroups, onWaGroups, type WaGroupsResult } from "./wa-groups-client"
 
 /** "👥 ייצוא אנשי קשר מקבוצה" — pulls a WhatsApp group's members (phones) and exports them to CSV. */
 
@@ -16,9 +17,14 @@ export default function WaGroupExport() {
   const [err, setErr] = useState("")
   const [copied, setCopied] = useState(false)
 
+  const [listErr, setListErr] = useState("")
+  const [refreshing, setRefreshing] = useState(false)
+  const apply = (d: WaGroupsResult) => { setGroups(d.groups); setListErr(d.groups.length ? "" : d.error || "") }
   useEffect(() => {
-    fetch("/api/admin/whatsapp-bot/groups").then(r => r.json()).then(d => setGroups(d.groups || [])).catch(() => {})
+    loadWaGroups().then(apply)
+    return onWaGroups(apply)
   }, [])
+  async function refresh() { setRefreshing(true); await loadWaGroups(true); setRefreshing(false) }
 
   async function pull() {
     if (!groupId) return
@@ -63,8 +69,11 @@ export default function WaGroupExport() {
           {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
         <button type="button" onClick={pull} disabled={!groupId || loading} style={{ ...btn(true), opacity: !groupId || loading ? .5 : 1 }}>{loading ? "שולף…" : "שלוף אנשי קשר"}</button>
+        <button type="button" onClick={refresh} disabled={refreshing} style={btn()} title="טען מחדש את רשימת הקבוצות">{refreshing ? "…" : "↻ רענן"}</button>
         {err && <span style={{ fontSize: 12, color: C.bad }}>{err}</span>}
       </div>
+      {listErr && <div style={{ padding: "0 18px 12px", fontSize: 12, color: C.bad }}>{listErr}</div>}
+      {!listErr && groups.length === 0 && <div style={{ padding: "0 18px 12px", fontSize: 12, color: C.warn }}>לא נמצאו קבוצות. ודאו שהבוט (055-9388266) נוסף לקבוצה ולחצו "רענן". קבוצה חדשה מופיעה לפעמים רק אחרי שנשלחה בה הודעה.</div>}
 
       {data && (
         <div style={{ borderTop: `1px solid ${C.bg}` }}>
