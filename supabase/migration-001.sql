@@ -918,3 +918,24 @@ ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAUL
 ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS meta jsonb;
 CREATE INDEX IF NOT EXISTS whatsapp_messages_phone_created_idx ON whatsapp_messages(phone, created_at);
 INSERT INTO arrival_channels (label) VALUES ('בוט וואטסאפ') ON CONFLICT (label) DO NOTHING;
+
+-- ═══ WhatsApp scheduled messages (2026-10-23) ═══
+-- Also created on first use by lib/whatsapp-bot/scheduled.ts#ensureScheduledTable.
+CREATE TABLE IF NOT EXISTS whatsapp_scheduled (
+  id bigserial PRIMARY KEY,
+  chat_id text NOT NULL,
+  target_type text NOT NULL DEFAULT 'group',
+  target_name text NOT NULL DEFAULT '',
+  body text NOT NULL,
+  send_at timestamptz NOT NULL,
+  repeat text NOT NULL DEFAULT 'none',
+  status text NOT NULL DEFAULT 'scheduled',
+  sent_count int NOT NULL DEFAULT 0,
+  last_sent_at timestamptz,
+  last_error text,
+  created_by bigint,
+  created_by_name text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS whatsapp_scheduled_due_idx ON whatsapp_scheduled(status, send_at);

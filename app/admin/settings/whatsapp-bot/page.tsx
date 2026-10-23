@@ -2,6 +2,8 @@
 import WorkspaceHeader from "@/components/ui/WorkspaceHeader"
 import { useEffect, useState } from "react"
 import StaffBroadcast from "@/components/admin/StaffBroadcast"
+import WaScheduled from "@/components/admin/WaScheduled"
+import WaGroupExport from "@/components/admin/WaGroupExport"
 
 /** Bot settings screen: connection, toggles, who can use the bot, weekly numbers and the conversation log. */
 
@@ -151,6 +153,10 @@ export default function WhatsAppBotSettings() {
       </div>
 
       <StaffBroadcast staff={staff} onSent={() => load()} />
+
+      <WaScheduled />
+
+      <WaGroupExport />
 
       <div style={card}>
         <div style={h2}>7 הימים האחרונים</div>
