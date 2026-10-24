@@ -943,3 +943,22 @@ CREATE INDEX IF NOT EXISTS whatsapp_scheduled_due_idx ON whatsapp_scheduled(stat
 -- groups list cache for the bot settings screen (2026-10-23)
 ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cache jsonb;
 ALTER TABLE whatsapp_bot_settings ADD COLUMN IF NOT EXISTS groups_cached_at timestamptz;
+
+-- ═══ WhatsApp scheduled messages: batches + photo/video attachments (2026-10-24) ═══
+-- Also created on first use by lib/whatsapp-bot/media.ts and scheduled.ts.
+CREATE TABLE IF NOT EXISTS wa_media (
+  id uuid PRIMARY KEY,
+  name text NOT NULL,
+  mime text NOT NULL,
+  size int NOT NULL,
+  parts int NOT NULL,
+  parts_done int[] NOT NULL DEFAULT '{}',
+  ready boolean NOT NULL DEFAULT false,
+  store_name text NOT NULL,
+  created_by bigint,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_id uuid;
+ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_name text;
+ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_mime text;
+ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS batch_id uuid;

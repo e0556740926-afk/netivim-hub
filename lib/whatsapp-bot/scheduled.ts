@@ -1,6 +1,7 @@
 import sql from "@/lib/db";
 import { greenApi } from "@/lib/whatsapp";
 import { nextRun, type Repeat } from "./group-utils";
+import { mediaUrl } from "./media";
 
 /**
  * Scheduled WhatsApp messages (to a group or a person). Rows are created on
@@ -29,12 +30,19 @@ export async function ensureScheduledTable(): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now()
   )`;
   await sql`CREATE INDEX IF NOT EXISTS whatsapp_scheduled_due_idx ON whatsapp_scheduled(status, send_at)`;
+  await sql`ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_id uuid`;
+  await sql`ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_name text`;
+  await sql`ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_mime text`;
+  await sql`ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS batch_id uuid`;
   ensured = true;
 }
 
 /** Sends one scheduled row right away and moves it on (next repeat, sent, or failed). */
 export async function sendScheduledNow(row: any, opts: { manual?: boolean } = {}): Promise<{ ok: boolean; error?: string }> {
-  const r = await greenApi("sendMessage", { chatId: row.chat_id, message: row.body });
+  // With an attachment: the file goes out with the text as its caption.
+  const r = row.media_id
+    ? await greenApi("sendFileByUrl", { chatId: row.chat_id, urlFile: mediaUrl(row.media_id), fileName: row.media_name || "file", caption: row.body || "" }, 30000)
+    : await greenApi("sendMessage", { chatId: row.chat_id, message: row.body });
   const id = r.data?.idMessage as string | undefined;
   if (r.ok && id) {
     // A manual "send now" of a repeating message is an extra send — the schedule stays as it was.
@@ -42,7 +50,7 @@ export async function sendScheduledNow(row: any, opts: { manual?: boolean } = {}
     if (next) await sql`UPDATE whatsapp_scheduled SET status = 'scheduled', send_at = ${next.toISOString()}, sent_count = sent_count + 1, last_sent_at = now(), last_error = NULL, updated_at = now() WHERE id = ${row.id}`;
     else await sql`UPDATE whatsapp_scheduled SET status = 'sent', sent_count = sent_count + 1, last_sent_at = now(), last_error = NULL, updated_at = now() WHERE id = ${row.id}`;
     await sql`INSERT INTO whatsapp_messages (phone, case_id, direction, body, wa_message_id, sender_name, status, kind)
-      VALUES (${String(row.chat_id).replace(/@.*$/, "")}, ${null}, 'out', ${String(row.body).slice(0, 2000)}, ${id}, ${"מתוזמן · " + (row.target_name || "")}, 'sent', 'scheduled')`.catch(() => {});
+      VALUES (${String(row.chat_id).replace(/@.*$/, "")}, ${null}, 'out', ${(row.media_id ? `[📎 ${row.media_name || "קובץ"}] ` : "") + String(row.body || "").slice(0, 2000)}, ${id}, ${"מתוזמן · " + (row.target_name || "")}, 'sent', 'scheduled')`.catch(() => {});
     return { ok: true };
   }
   const error = String(r.error || "השליחה נכשלה").slice(0, 300);

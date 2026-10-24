@@ -18,6 +18,7 @@ const PUBLIC_API = [
   "/api/event-registration", // public registration only; validates the published form server-side
   "/api/arrival-channels",  // needed by public lead-capture forms (/j, /s) — read-only, no PII
   "/api/whatsapp/webhook",  // called by Green API's servers, not a browser session — no cookie to check
+  "/api/wa-media",          // GET only: attachments of scheduled WhatsApp messages, fetched by Green API; random-UUID URL is the key
   "/api/integrations/salesforce/status", // called by Make.com — authenticated by SF_SYNC_SECRET inside the route
   // Newsletter/messaging endpoints reached from emails and public pages —
   // each authenticates itself (signed webhook, private token, or public data):
