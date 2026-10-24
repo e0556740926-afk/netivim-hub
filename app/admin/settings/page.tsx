@@ -24,6 +24,12 @@ export default function SettingsPage() {
   const { user: me } = useAuth()
   const [loading, setLoading] = useState(true)
   const [users, setUsers] = useState<any[]>([])
+  const [deletedUsers, setDeletedUsers] = useState<any[]>([])
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [toDelete, setToDelete] = useState<any>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [delErr, setDelErr] = useState("")
+  const [notice, setNotice] = useState("")
   const [coords, setCoords] = useState<any[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editUser, setEditUser] = useState<any>(null)
@@ -53,9 +59,9 @@ export default function SettingsPage() {
     setLoading(true); setError(false)
     try {
       const [ur, cr] = await Promise.all([fetch("/api/users"), fetch("/api/targets")])
-      const { users } = await ur.json()
+      const { users, deleted } = await ur.json()
       const { coordinators } = await cr.json()
-      setUsers(users||[]); loadCalTokens(users||[])
+      setUsers(users||[]); setDeletedUsers(deleted||[]); loadCalTokens(users||[])
       setCoords(coordinators||[])
     } catch (e) { console.error(e); setError(true) }
     finally { setLoading(false) }
@@ -113,10 +119,27 @@ export default function SettingsPage() {
     setTargetSaving(false); setTargetSaved(true)
   }
 
-  async function del(id: number) {
-    if (id === me?.id) { alert("לא ניתן למחוק את עצמך"); return }
-    if (!confirm("למחוק משתמש זה?")) return
-    await fetch("/api/users", { method:"DELETE", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id}) })
+  function del(id: number) {
+    if (id === me?.id) { setNotice("לא ניתן למחוק את עצמך"); return }
+    setDelErr(""); setToDelete(users.find(u => u.id === id) || null)
+  }
+  async function confirmDelete() {
+    if (!toDelete) return
+    setDeleting(true); setDelErr("")
+    try {
+      const r = await fetch("/api/users", { method:"DELETE", headers:{"Content-Type":"application/json"}, body:JSON.stringify({id: toDelete.id}) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || "המחיקה נכשלה")
+      setNotice(`✓ ${toDelete.name} נמחק/ה`)
+      setToDelete(null)
+      if (showForm && editUser?.id === toDelete.id) setShowForm(false)
+      load()
+    } catch (e: any) { setDelErr(e.message) } finally { setDeleting(false) }
+  }
+  async function restore(u: any) {
+    const r = await fetch("/api/users", { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ action:"restore", id: u.id }) })
+    const d = await r.json().catch(() => ({}))
+    setNotice(r.ok ? `✓ ${u.name} שוחזר/ה` : d.error || "השחזור נכשל")
     load()
   }
 
@@ -133,6 +156,8 @@ export default function SettingsPage() {
       <a href="/admin/settings/automation" className="ui-card"><b>אוטומציות</b><span>תזמונים וכללי טיפול</span></a>
       <a href="/admin/settings/whatsapp-bot" className="ui-card"><b>בוט וואטסאפ</b><span>חיבור, תזכורות ויומן שיחות</span></a>
     </nav>
+
+    {notice && <div onClick={()=>setNotice("")} className={`mb-4 px-4 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer border ${notice.startsWith("✓")?"bg-[#edf4eb] border-[#c8dac7] text-[#28634e]":"bg-[#FFF0F0] border-[#f0c9ce] text-[#a74450]"}`}>{notice}</div>}
 
     {/* User form */}
     {showForm && <Card className="mb-5 border-2 border-[#28634e]"><div className="p-5">
@@ -280,6 +305,40 @@ export default function SettingsPage() {
         </div>)}
       </div></Card>
     </>}
+
+    {deletedUsers.length > 0 && <div className="mt-6">
+      <button onClick={()=>setShowDeleted(v=>!v)} className="text-xs font-bold text-[#63756b] hover:text-[#193d33]">
+        {showDeleted ? "▲" : "▼"} משתמשים שנמחקו ({deletedUsers.length})
+      </button>
+      {showDeleted && <Card className="mt-2"><div className="p-4">
+        {deletedUsers.map(u=><div key={u.id} className="flex items-center gap-3 py-2.5 border-b border-[#edf1e9] last:border-0">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-[#63756b]">{u.name}</div>
+            <div className="text-xs text-[#94A3B8]">{u.email} · {ROLE_LABEL[u.role]||u.role}{u.deleted_at?` · נמחק ${fd(String(u.deleted_at).slice(0,10))}`:""}</div>
+          </div>
+          <button onClick={()=>restore(u)} className="px-3 py-1.5 rounded-[8px] text-xs font-semibold border border-[#e1e8df] hover:bg-[#edf4eb] text-[#28634e]">↺ שחזר</button>
+        </div>)}
+      </div></Card>}
+    </div>}
+
+    {/* Delete confirmation */}
+    <Modal
+      open={!!toDelete}
+      onClose={()=>!deleting && setToDelete(null)}
+      title={`למחוק את ${toDelete?.name || ""}?`}
+      accent="#a74450"
+      footer={<div className="flex gap-2">
+        <button onClick={confirmDelete} disabled={deleting} className="flex-1 py-2.5 bg-[#a74450] text-white rounded-[10px] text-sm font-bold disabled:opacity-50">{deleting?"מוחק...":"כן, למחוק"}</button>
+        <button onClick={()=>setToDelete(null)} disabled={deleting} className="flex-1 py-2.5 border border-[#e1e8df] rounded-[10px] text-sm font-semibold">ביטול</button>
+      </div>}
+    >
+      <div className="space-y-2 text-sm">
+        <div>המשתמש לא יוכל להיכנס למערכת, ויוסר מרשימות השיוך, מהתזכורות ומההתראות. אם הוא מחובר כרגע — הוא ינותק.</div>
+        <div className="text-[#63756b]">הלידים, המשימות, הדיווחים וההיסטוריה שלו נשמרים. אפשר לשחזר אותו בכל רגע מ"משתמשים שנמחקו" בתחתית העמוד.</div>
+        {toDelete?.role === "coordinator" && <div className="text-[#946014]">💡 כדאי להעביר את הלידים והמשימות הפתוחות שלו לרכז אחר.</div>}
+        {delErr && <div className="text-[#a74450] font-semibold">{delErr}</div>}
+      </div>
+    </Modal>
 
     {/* New-coordinator onboarding checklist */}
     <Modal

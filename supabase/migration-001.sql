@@ -962,3 +962,6 @@ ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_id uuid;
 ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_name text;
 ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS media_mime text;
 ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS batch_id uuid;
+
+-- Soft delete for users (deleted from the settings screen, restorable)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz;

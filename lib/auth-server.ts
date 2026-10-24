@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { verifySession, SESSION_COOKIE, SessionUser } from "@/lib/session";
+import { isBlockedEmail } from "@/lib/user-status";
 
 export const VIEW_AS_COOKIE = "netivim_view_as";
 
@@ -35,7 +36,7 @@ function applyViewAsOverride(req: NextRequest, real: SessionUser): SessionUser {
  */
 export async function currentUser(req: NextRequest): Promise<SessionUser | null> {
   const own = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (own) return applyViewAsOverride(req, own);
+  if (own) return (await isBlockedEmail(own.email)) ? null : applyViewAsOverride(req, own);
 
   try {
     const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
@@ -47,6 +48,7 @@ export async function currentUser(req: NextRequest): Promise<SessionUser | null>
         role: String((token as any).role || "coordinator"),
         area: String((token as any).area || ""),
       };
+      if (await isBlockedEmail(real.email)) return null;
       return applyViewAsOverride(req, real);
     }
   } catch { /* ignore */ }
