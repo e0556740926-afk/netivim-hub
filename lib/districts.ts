@@ -16,7 +16,7 @@ const CITY_DISTRICT: Record<string, keyof typeof DISTRICTS> = {
   "ראש העין": "center", "אלעד": "center", "מודיעין": "center", "לוד": "center", "רמלה": "center", "ראשון לציון": "center",
   "חולון": "center", "בת ים": "center", "רחובות": "center", "נס ציונה": "center", "יבנה": "center", "גדרה": "center",
   "אור יהודה": "center", "יהוד": "center", "קרית אונו": "center", "גבעת שמואל": "center", "גני תקווה": "center",
-  "כפר חב\"ד": "center", "כפר חבד": "center", "נתניה": "center", "רעננה": "center", "כפר סבא": "center", "הרצליה": "center",
+  "כפר חב\"ד": "center", "כפר חבד": "center", "נתניה": "north", "רעננה": "center", "כפר סבא": "center", "הרצליה": "center",
   "הוד השרון": "center", "רמת השרון": "center", "באר יעקב": "center", "מזכרת בתיה": "center", "קרית עקרון": "center",
   "עמנואל": "center", "אריאל": "center", "קדומים": "center", "שוהם": "center", "אור עקיבא": "center",
   // דרום
