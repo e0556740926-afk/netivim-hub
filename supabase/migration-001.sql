@@ -661,14 +661,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS partner_organizations_name_unique
   ON partner_organizations (lower(regexp_replace(btrim(name), '\s+', ' ', 'g')));
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS partner_organization_id integer REFERENCES partner_organizations(id);
 CREATE INDEX IF NOT EXISTS contacts_partner_organization_id_idx ON contacts(partner_organization_id);
--- Preserve all existing contacts; names are consolidated without removing rows.
-INSERT INTO partner_organizations(name)
-SELECT DISTINCT regexp_replace(btrim(org), '\s+', ' ', 'g')
-FROM contacts WHERE org IS NOT NULL AND btrim(org) <> ''
-ON CONFLICT DO NOTHING;
-UPDATE contacts c SET partner_organization_id=o.id,org=o.name
-FROM partner_organizations o
-WHERE c.partner_organization_id IS NULL AND lower(regexp_replace(btrim(c.org), '\s+', ' ', 'g'))=lower(o.name);
+-- (2026-10-22) The one-time backfill of partner_organizations from contacts.org
+-- was removed: contacts.org held city names, not organizations. The list was
+-- emptied on request (backup: backup_partner_organizations_20261022,
+-- backup_contacts_org_20261022) and is now maintained by hand.
+-- -- Preserve all existing contacts; names are consolidated without removing rows.
+-- INSERT INTO partner_organizations(name)
+-- SELECT DISTINCT regexp_replace(btrim(org), '\s+', ' ', 'g')
+-- FROM contacts WHERE org IS NOT NULL AND btrim(org) <> ''
+-- ON CONFLICT DO NOTHING;
+-- UPDATE contacts c SET partner_organization_id=o.id,org=o.name
+-- FROM partner_organizations o
+-- WHERE c.partner_organization_id IS NULL AND lower(regexp_replace(btrim(c.org), '\s+', ' ', 'g'))=lower(o.name);
 
 -- ═══ Messaging center (2026-10-21) — see supabase/migration-messaging.sql ═══
 -- ══════════════════════════════════════════════════════════════════
@@ -965,3 +969,8 @@ ALTER TABLE whatsapp_scheduled ADD COLUMN IF NOT EXISTS batch_id uuid;
 
 -- Soft delete for users (deleted from the settings screen, restorable)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+
+-- ═══ Contacts: city + district (2026-10-25) ═══
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS city text NOT NULL DEFAULT '';
+ALTER TABLE contacts ADD COLUMN IF NOT EXISTS district text NOT NULL DEFAULT '';  -- center | jerusalem | south | north | ''
+CREATE INDEX IF NOT EXISTS contacts_district_idx ON contacts(district);

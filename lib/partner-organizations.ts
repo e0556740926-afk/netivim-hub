@@ -21,8 +21,12 @@ export async function resolveContactOrganization(d:any,creating:boolean){
     return undefined
   }
   if(!creating&&!('partner_organization_id' in d)&&!('org' in d))return undefined
+  // No organization chosen is allowed (the registry is curated by hand and
+  // may be empty): the contact is simply "ללא שיוך". null = explicitly none.
+  const noOrgId=d.partner_organization_id===null||d.partner_organization_id===''||d.partner_organization_id===undefined
+  if(noOrgId&&!String(d.org??'').trim()){d.org='';d.partner_organization_id=null;return null}
   let rows:any[]
-  if('partner_organization_id' in d){
+  if('partner_organization_id' in d&&!noOrgId){
     const id=Number(d.partner_organization_id)
     if(!Number.isSafeInteger(id)||id<=0)throw new OrganizationError('יש לבחור עמותה או מוסד קיימים',400)
     rows=await sql`SELECT id,name FROM partner_organizations WHERE id=${id} LIMIT 1`
