@@ -974,3 +974,5 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS city text NOT NULL DEFAULT '';
 ALTER TABLE contacts ADD COLUMN IF NOT EXISTS district text NOT NULL DEFAULT '';  -- center | jerusalem | south | north | ''
 CREATE INDEX IF NOT EXISTS contacts_district_idx ON contacts(district);
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
+ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status = ANY (ARRAY['active','inactive','deleted']));

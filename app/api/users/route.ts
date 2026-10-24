@@ -17,6 +17,12 @@ let ensured = false;
 async function ensureDeletedAt() {
   if (ensured) return;
   await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`;
+  // The original CHECK only allowed active/inactive — widen it once so 'deleted' is accepted.
+  const [c] = await sql`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conrelid = 'users'::regclass AND conname = 'users_status_check'`;
+  if (c && !String(c.def).includes("deleted")) {
+    await sql`ALTER TABLE users DROP CONSTRAINT users_status_check`;
+    await sql`ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status = ANY (ARRAY['active','inactive','deleted']))`;
+  }
   ensured = true;
 }
 
