@@ -57,3 +57,45 @@ export function byteRange(header:string|null,size:number){
  if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start<0||start>=size||end<start)throw new KnowledgeError('טווח לא תקין',416)
  return {start,end,partial:true}
 }
+
+// Light formatting for script sections. Plain text stays plain; these line prefixes add structure:
+// "> " line to say, "### " sub-heading, "! " note, "- "/"• " bullets, "1. " numbered, "| a | b |" table, **bold** inline.
+export type ScriptBlock =
+ | {type:'p'|'quote'|'h'|'note';text:string}
+ | {type:'ul'|'ol';items:string[]}
+ | {type:'table';head:string[];rows:string[][]}
+const cells=(line:string)=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim())
+export function scriptBlocks(body:string):ScriptBlock[]{
+ const out:ScriptBlock[]=[];let last:ScriptBlock|null=null
+ const push=(b:ScriptBlock)=>{out.push(b);last=b}
+ for(const raw of (body||'').replace(/\r\n?/g,'\n').split('\n')){
+  const line=raw.trim()
+  if(!line){last=null;continue}
+  let m:RegExpMatchArray|null
+  const prev=last as ScriptBlock|null
+  if(line.startsWith('|')){
+   if(/^\|[\s:|-]+\|?$/.test(line))continue
+   if(prev?.type==='table')prev.rows.push(cells(line));else push({type:'table',head:cells(line),rows:[]})
+  }else if((m=line.match(/^(?:[-•*])\s+(.*)$/))){
+   if(prev?.type==='ul')prev.items.push(m[1]);else push({type:'ul',items:[m[1]]})
+  }else if((m=line.match(/^\d+[.)]\s+(.*)$/))){
+   if(prev?.type==='ol')prev.items.push(m[1]);else push({type:'ol',items:[m[1]]})
+  }else if((m=line.match(/^>\s?(.*)$/))){
+   if(prev?.type==='quote')prev.text+='\n'+m[1];else push({type:'quote',text:m[1]})
+  }else if((m=line.match(/^#{1,4}\s+(.*)$/)))push({type:'h',text:m[1]})
+  else if((m=line.match(/^!\s+(.*)$/))){
+   if(prev?.type==='note')prev.text+='\n'+m[1];else push({type:'note',text:m[1]})
+  }else if(prev?.type==='p')prev.text+='\n'+line
+  else push({type:'p',text:line})
+ }
+ return out
+}
+// Clean text for the "copy" button: no formatting markers.
+export function scriptPlain(body:string):string{
+ const strip=(s:string)=>s.replace(/\*\*(.+?)\*\*/g,'$1')
+ return scriptBlocks(body).map(b=>
+  b.type==='ul'?b.items.map(i=>`• ${strip(i)}`).join('\n'):
+  b.type==='ol'?b.items.map((i,n)=>`${n+1}. ${strip(i)}`).join('\n'):
+  b.type==='table'?[b.head,...b.rows].map(r=>r.map(strip).join(' — ')).join('\n'):
+  'text' in b?strip(b.text):'').join('\n\n')
+}

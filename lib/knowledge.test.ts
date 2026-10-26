@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest'
-import {assetSpec,byteRange,CHUNK_SIZE,MAX_ASSET_SIZE,parseKnowledge,videoEmbed} from './knowledge'
+import {scriptBlocks,scriptPlain,assetSpec,byteRange,CHUNK_SIZE,MAX_ASSET_SIZE,parseKnowledge,videoEmbed} from './knowledge'
 const draft={title:'שיחת היכרות',kind:'script',sections:[{title:'פתיחה',body:'שלום!'}],status:'published'}
 describe('Knowledge content validation',()=>{
  it('accepts a complete script',()=>expect(parseKnowledge(draft).sections[0].body).toBe('שלום!'))
@@ -25,4 +25,14 @@ describe('Private file boundaries',()=>{
  it('supports initial and suffix ranges',()=>{expect(byteRange(null,10)).toEqual({start:0,end:9,partial:false});expect(byteRange('bytes=-3',10)).toEqual({start:7,end:9,partial:true});expect(byteRange('bytes=3-',10).end).toBe(9)})
  it.each(['bytes=10-','bytes=5-2','bytes=0-1,3-4','bytes=-0','bytes=-','not-a-range'])('rejects invalid range %s',r=>expect(()=>byteRange(r,10)).toThrow())
  it('clips a range to the actual file end',()=>expect(byteRange(`bytes=0-${CHUNK_SIZE}`,4)).toEqual({start:0,end:3,partial:true}))
+})
+
+describe('Script formatting',()=>{
+ const body='### פתיחה\n> "שלום, מדבר [שם]"\n> המשך\n\n- א\n- ב\n1. אחד\n2. שניים\n| הוא אומר | עונים |\n|---|---|\n| **אתם מגייסים** | לא |\n! הערה\nטקסט רגיל\nשורה שנייה'
+ const b=scriptBlocks(body)
+ it('parses every block type',()=>expect(b.map(x=>x.type)).toEqual(['h','quote','ul','ol','table','note','p']))
+ it('merges consecutive quote lines',()=>expect(b[1]).toEqual({type:'quote',text:'"שלום, מדבר [שם]"\nהמשך'}))
+ it('skips table separator rows',()=>expect(b[4]).toEqual({type:'table',head:['הוא אומר','עונים'],rows:[['**אתם מגייסים**','לא']]}))
+ it('keeps legacy plain text as one paragraph',()=>expect(scriptBlocks('שורה\nעוד שורה')).toEqual([{type:'p',text:'שורה\nעוד שורה'}]))
+ it('copies without markers',()=>expect(scriptPlain('> **שלום**\n| a | b |')).toBe('שלום\n\na — b'))
 })
