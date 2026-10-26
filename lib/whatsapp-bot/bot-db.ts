@@ -53,6 +53,32 @@ async function botArrivalChannelId(): Promise<number | null> {
   }
 }
 
+/**
+ * "מקור פנייה" for a lead sent through the bot = the person who sent it, like
+ * the site's form requires. A coordinator already has a source of their own
+ * (created with the account); a manager gets one by name on first use.
+ */
+async function senderLeadSourceId(user: BotUser): Promise<number | null> {
+  try {
+    if (!(await hasColumn("leads", "lead_source_id"))) return null;
+    if (isCoord(user)) {
+      const [r] = await sql`SELECT id FROM lead_sources WHERE coordinator_id = ${user.coordinator_id} ORDER BY active DESC, id LIMIT 1`;
+      if (r) return Number(r.id);
+    }
+    const label = String(user.name || "").trim();
+    if (!label) return null;
+    const [hit] = await sql`SELECT id FROM lead_sources WHERE btrim(label) = ${label} ORDER BY active DESC, id LIMIT 1`;
+    if (hit) return Number(hit.id);
+    await sql`INSERT INTO lead_sources (label, coordinator_id, slug)
+      VALUES (${label}, ${isCoord(user) ? user.coordinator_id : null}, ${"src-user-" + user.id}) ON CONFLICT (label) DO NOTHING`;
+    const [r] = await sql`SELECT id FROM lead_sources WHERE label = ${label} LIMIT 1`;
+    return r ? Number(r.id) : null;
+  } catch (e) {
+    console.error("[wa-bot] lead source", e);
+    return null;
+  }
+}
+
 async function ownTaskWhere(user: BotUser, id: number): Promise<TaskRow | null> {
   const hasAssigned = await hasColumn("tasks", "assigned_to");
   const rows = hasAssigned
@@ -142,6 +168,7 @@ export function makeBotDeps(opts: { userPhone: string; instancePhone?: string | 
         coordinator_id: coord ? user.coordinator_id : null,
         owner_name: coord ? "" : user.name,
         arrival_channel_id: await botArrivalChannelId(),
+        lead_source_id: await senderLeadSourceId(user),
       }, { id: user.id, name: user.name });
       if (r.duplicate) {
         const [d] = await sql`SELECT coordinator_id FROM leads WHERE id = ${r.duplicate.id}`;

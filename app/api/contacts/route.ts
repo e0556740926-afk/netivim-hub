@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { contactRequiredError } from "@/lib/contact-validation";
 import {resolveContactOrganization,OrganizationError,organizationRegistryReady} from "@/lib/partner-organizations";
 import { DISTRICTS, isDistrict } from "@/lib/districts";
 import sql from "@/lib/db";
@@ -37,6 +38,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
+  { const err = contactRequiredError(d); if (err) return NextResponse.json({ error: err }, { status: 400 }); }
   const creator=await currentUser(req);
   if(creator?.role==='coordinator'){
     const [own]=await sql`SELECT id,name FROM coordinators WHERE user_id=${creator.id} LIMIT 1`;
@@ -69,6 +71,8 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   const d = await req.json();
+  // Full edits from the forms carry all three; partial updates (e.g. a status change) are left alone.
+  if ('name' in d && 'phone' in d && 'role' in d) { const err = contactRequiredError(d); if (err) return NextResponse.json({ error: err }, { status: 400 }); }
   let organization:any;
   try{organization=await resolveContactOrganization(d,req.method==='POST')}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'שיוך ארגון נכשל'},{status:e instanceof OrganizationError?e.status:500})}
   if('coordinator_id' in d){

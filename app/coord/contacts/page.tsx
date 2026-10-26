@@ -1,5 +1,6 @@
 "use client"
 import OrganizationDirectory from "@/components/partners/OrganizationDirectory"
+import { contactRequiredError } from "@/lib/contact-validation"
 import {useToast} from "@/components/ui/Toast"
 import EmptyState from "@/components/ui/EmptyState"
 import { SkeletonCard } from "@/components/ui/Skeleton"
@@ -133,8 +134,7 @@ export default function CoordContacts() {
   }
 
   async function save(force=false){
-    if(!form.name.trim()){toastError('יש להזין שם איש קשר');return}
-    if(!registryReady||!form.partner_organization_id){toastError('יש לבחור עמותה או מוסד קיימים');return}
+    {const err=contactRequiredError(form);if(err){toastError(err);return}}
     setSaving(true)
     try{const res=await fetch('/api/contacts',{method:editId?'PATCH':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(editId?{...form,id:editId}:{...form,force})});const data=await res.json();
       if(res.status===409&&data.duplicate&&!editId){setSaving(false);if(confirm(`איש קשר עם טלפון זה כבר קיים (${data.duplicate.name}). להוסיף בכל זאת?`))return save(true);return}
@@ -198,13 +198,13 @@ export default function CoordContacts() {
     </div>
 
     {/* Add/Edit form */}
-    <Sheet open={showForm} onClose={()=>setShowForm(false)} title={editId?"עריכת איש קשר":"איש קשר חדש"} subtitle="שיוך לעמותה או מוסד קיימים מהמאגר" labelledBy="coord-contact-form">
+    <Sheet open={showForm} onClose={()=>setShowForm(false)} title={editId?"עריכת איש קשר":"איש קשר חדש"} subtitle="שדות חובה: שם, טלפון ותפקיד" labelledBy="coord-contact-form">
       <div className="space-y-2">
         <input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="שם מלא *" className="w-full px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
         <div className="grid grid-cols-2 gap-2">
-          <label className="partner-coord-org-select">עמותה / מוסד *<select aria-label="בחירת עמותה או מוסד קיימים" value={form.partner_organization_id||''} disabled={!registryReady} onChange={e=>{const o=organizations.find(o=>String(o.id)===e.target.value);setForm(f=>({...f,org:o?.name||'',partner_organization_id:o?.id||null}))}}><option value="">בחירת ארגון קיים</option>{organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>את פרטי הארגון מנהלים בלשונית עמותות ומוסדות.</small></label>
-          <input value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} placeholder="תפקיד" className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
-          <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="טלפון" className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
+          <label className="partner-coord-org-select">עמותה / מוסד<select aria-label="בחירת עמותה או מוסד קיימים" value={form.partner_organization_id||''} disabled={!registryReady} onChange={e=>{const o=organizations.find(o=>String(o.id)===e.target.value);setForm(f=>({...f,org:o?.name||'',partner_organization_id:o?.id||null}))}}><option value="">ללא שיוך לעמותה</option>{organizations.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select><small>לא חובה. את פרטי הארגון מנהלים בלשונית עמותות ומוסדות.</small></label>
+          <input value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value}))} placeholder="תפקיד *" className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
+          <input value={form.phone} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="טלפון *" inputMode="tel" className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
           <input value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="דואל" className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm focus:outline-none focus:border-[#28634e]"/>
           <select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))} className="px-3 py-2 border border-[#c6d2c7] rounded-[9px] text-sm bg-white">
             {Object.entries(TYPE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}
