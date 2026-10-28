@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatIdFromPhone, displayPhone, nextRun, normalizeParticipants, phoneFromWid, toCsv, validateScheduled } from "../group-utils";
+import { chatIdFromPhone, displayPhone, nextRun, normalizeParticipants, phoneFromWid, toCsv, validateScheduled, splitCaption } from "../group-utils";
 
 describe("group members", () => {
   it("reads phones from phoneNumber or id, skips @lid and duplicates", () => {
@@ -60,6 +60,17 @@ describe("israel time and media", () => {
     const base = { chatId: "120363000000000000@g.us", sendAt: "2026-10-23T12:00:00Z" };
     expect(validateScheduled({ ...base, body: "", mediaId: "abc" }, now)).toBeNull();
     expect(validateScheduled({ ...base, body: "" }, now)).toContain("ריקה");
-    expect(validateScheduled({ ...base, body: "x".repeat(1100), mediaId: "abc" }, now)).toContain("1024");
+    expect(validateScheduled({ ...base, body: "x".repeat(1100), mediaId: "abc" }, now)).toBeNull();
+    expect(validateScheduled({ ...base, body: "x".repeat(5000) }, now)).toBeNull();
+  });
+});
+
+describe("splitCaption", () => {
+  it("keeps short text as the caption", () => {
+    expect(splitCaption("שלום")).toEqual({ caption: "שלום", followUp: "" });
+  });
+  it("sends long text as a separate message after the file", () => {
+    const long = "א".repeat(1500);
+    expect(splitCaption(long)).toEqual({ caption: "", followUp: long });
   });
 });

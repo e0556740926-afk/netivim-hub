@@ -30,16 +30,10 @@ function nextRun(sendAt: Date, repeat: string, now: Date): Date | null {
 
 const APP_URL = (process.env.NEXTAUTH_URL || "https://netivimportal.org").replace(/\/$/, "");
 
-/** Text → sendMessage; with an attachment → sendFileByUrl (text becomes the caption). */
-async function send(row: any): Promise<{ ok: boolean; id?: string; error?: string }> {
-  if (!GREENAPI_ID || !GREENAPI_TOKEN) return { ok: false, error: "no_config" };
-  const media = !!row.media_id;
-  const method = media ? "sendFileByUrl" : "sendMessage";
-  const payload = media
-    ? { chatId: row.chat_id, urlFile: `${APP_URL}/api/wa-media/${row.media_id}`, fileName: row.media_name || "file", caption: row.body || "" }
-    : { chatId: row.chat_id, message: row.body };
+/** One Green API call. */
+async function call(method: string, payload: any, timeoutMs: number): Promise<{ ok: boolean; id?: string; error?: string }> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), media ? 25000 : 8000);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${(process.env.GREENAPI_API_URL || "https://api.green-api.com").replace(/\/$/, "")}/waInstance${GREENAPI_ID}/${method}/${GREENAPI_TOKEN}`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: ctrl.signal,
@@ -51,6 +45,24 @@ async function send(row: any): Promise<{ ok: boolean; id?: string; error?: strin
   } finally {
     clearTimeout(t);
   }
+}
+
+/** Mirrors MAX_CAPTION_LENGTH in lib/whatsapp-bot/group-utils.ts. */
+const MAX_CAPTION_LENGTH = 1024;
+
+/**
+ * Text → sendMessage. With an attachment → sendFileByUrl with the text as its
+ * caption; text too long for a caption follows the file as its own message.
+ */
+async function send(row: any): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!GREENAPI_ID || !GREENAPI_TOKEN) return { ok: false, error: "no_config" };
+  if (!row.media_id) return call("sendMessage", { chatId: row.chat_id, message: row.body }, 8000);
+  const text = String(row.body || "");
+  const long = text.length > MAX_CAPTION_LENGTH;
+  const file = await call("sendFileByUrl", { chatId: row.chat_id, urlFile: `${APP_URL}/api/wa-media/${row.media_id}`, fileName: row.media_name || "file", caption: long ? "" : text }, 25000);
+  if (!file.ok || !long) return file;
+  const msg = await call("sendMessage", { chatId: row.chat_id, message: text }, 8000);
+  return msg.ok ? file : { ok: false, error: `הקובץ נשלח, הטקסט נכשל: ${msg.error || "שגיאה"}`.slice(0, 300) };
 }
 
 export default async () => {

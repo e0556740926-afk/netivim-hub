@@ -1,6 +1,6 @@
 import sql from "@/lib/db";
 import { greenApi } from "@/lib/whatsapp";
-import { nextRun, type Repeat } from "./group-utils";
+import { nextRun, splitCaption, type Repeat } from "./group-utils";
 import { mediaUrl } from "./media";
 
 /**
@@ -39,10 +39,19 @@ export async function ensureScheduledTable(): Promise<void> {
 
 /** Sends one scheduled row right away and moves it on (next repeat, sent, or failed). */
 export async function sendScheduledNow(row: any, opts: { manual?: boolean } = {}): Promise<{ ok: boolean; error?: string }> {
-  // With an attachment: the file goes out with the text as its caption.
-  const r = row.media_id
-    ? await greenApi("sendFileByUrl", { chatId: row.chat_id, urlFile: mediaUrl(row.media_id), fileName: row.media_name || "file", caption: row.body || "" }, 30000)
-    : await greenApi("sendMessage", { chatId: row.chat_id, message: row.body });
+  // With an attachment: the file goes out with the text as its caption — or,
+  // when the text is too long for a caption, the file first and the text right after.
+  let r: Awaited<ReturnType<typeof greenApi>>;
+  if (row.media_id) {
+    const { caption, followUp } = splitCaption(row.body);
+    r = await greenApi("sendFileByUrl", { chatId: row.chat_id, urlFile: mediaUrl(row.media_id), fileName: row.media_name || "file", caption }, 30000);
+    if (r.ok && r.data?.idMessage && followUp) {
+      const t = await greenApi("sendMessage", { chatId: row.chat_id, message: followUp });
+      if (!t.ok || !t.data?.idMessage) r = { ...t, ok: false, error: `הקובץ נשלח, הטקסט נכשל: ${t.error || "שגיאה"}` };
+    }
+  } else {
+    r = await greenApi("sendMessage", { chatId: row.chat_id, message: row.body });
+  }
   const id = r.data?.idMessage as string | undefined;
   if (r.ok && id) {
     // A manual "send now" of a repeating message is an extra send — the schedule stays as it was.

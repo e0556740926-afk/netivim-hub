@@ -158,7 +158,8 @@ export default function WaScheduled() {
           </div>
         )}
         {drafts.map((d, i) => {
-          const tooLong = d.media ? d.body.length > MAX_CAPTION_LENGTH : d.body.length > MAX_SCHEDULED_LENGTH
+          const tooLong = d.body.length > MAX_SCHEDULED_LENGTH
+          const splitNote = !!d.media && d.body.length > MAX_CAPTION_LENGTH
           return (
             <div key={d.key} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, marginBottom: 10, background: C.bg }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
@@ -187,8 +188,9 @@ export default function WaScheduled() {
                 style={{ ...input, width: "100%", resize: "vertical", lineHeight: 1.5, borderColor: tooLong ? C.bad : C.border }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
                 <MediaPicker media={d.media} onPick={f => attach(d.key, f)} onRemove={() => { if (d.media?.preview) URL.revokeObjectURL(d.media.preview); setMedia(d.key, null) }} />
-                <span style={{ fontSize: 11, color: tooLong ? C.bad : C.slate }}>{d.body.length}/{d.media ? MAX_CAPTION_LENGTH : MAX_SCHEDULED_LENGTH}</span>
+                <span style={{ fontSize: 11, color: tooLong ? C.bad : C.slate }}>{d.body.length.toLocaleString("he-IL")} תווים{tooLong ? ` · עד ${MAX_SCHEDULED_LENGTH.toLocaleString("he-IL")}` : ""}</span>
               </div>
+              {splitNote && <div style={{ fontSize: 11, color: C.warn, marginTop: 4 }}>טקסט ארוך מ-{MAX_CAPTION_LENGTH} תווים לא נכנס מתחת לתמונה בוואטסאפ — הוא יישלח כהודעה נפרדת מיד אחרי הקובץ.</div>}
             </div>
           )
         })}

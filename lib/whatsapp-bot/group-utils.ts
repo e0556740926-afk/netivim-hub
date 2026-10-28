@@ -61,16 +61,26 @@ export function nextRun(sendAt: Date, repeat: Repeat, now: Date): Date | null {
   return new Date(t);
 }
 
-export const MAX_SCHEDULED_LENGTH = 3000;
-/** WhatsApp cuts captions under a photo/video at about 1,024 characters. */
+/** Effectively no limit — WhatsApp's own ceiling for one message is ~65k characters. */
+export const MAX_SCHEDULED_LENGTH = 60000;
+/**
+ * WhatsApp cuts captions under a photo/video at about 1,024 characters. Longer
+ * text is not refused: the file goes out without a caption and the text follows
+ * right after it as its own message (see splitCaption).
+ */
 export const MAX_CAPTION_LENGTH = 1024;
+
+/** With an attachment: does the text fit as the caption, or go as a separate message after the file? */
+export function splitCaption(body: string | null | undefined): { caption: string; followUp: string } {
+  const text = String(body || "");
+  return text.length > MAX_CAPTION_LENGTH ? { caption: "", followUp: text } : { caption: text, followUp: "" };
+}
 
 export function validateScheduled(d: { chatId?: string; body?: string; sendAt?: string; repeat?: string; mediaId?: string | null }, now = new Date()): string | null {
   if (!d.chatId || !/^\d{9,15}@(c|g)\.us$|^[\d-]+@g\.us$/.test(d.chatId)) return "בחרו קבוצה או מספר טלפון תקין";
   const body = String(d.body || "").trim();
   if (!body && !d.mediaId) return "ההודעה ריקה — כתבו טקסט או צרפו תמונה/סרטון";
-  if (d.mediaId && body.length > MAX_CAPTION_LENGTH) return `טקסט מתחת לתמונה/סרטון — עד ${MAX_CAPTION_LENGTH} תווים`;
-  if (body.length > MAX_SCHEDULED_LENGTH) return `ההודעה ארוכה מדי (עד ${MAX_SCHEDULED_LENGTH} תווים)`;
+  if (body.length > MAX_SCHEDULED_LENGTH) return `ההודעה ארוכה מדי (עד ${MAX_SCHEDULED_LENGTH.toLocaleString("he-IL")} תווים)`;
   const t = Date.parse(String(d.sendAt || ""));
   if (!Number.isFinite(t)) return "בחרו תאריך ושעה";
   if (t < now.getTime() - 60_000) return "המועד שבחרתם כבר עבר";
