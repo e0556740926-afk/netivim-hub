@@ -91,7 +91,18 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
         ownerName = (cr[0] as any)?.name || "";
       }
       const [firstName, ...rest] = String(d.name || "").trim().split(" ");
-      await sendToSilfrus({
+      // Labels for the Salesforce consultation process (best-effort lookups).
+      const label = async (q: Promise<any[]>) => { try { return ((await q)[0] as any)?.label || ""; } catch { return ""; } };
+      const [leadSource, arrivalChannel, event, referrerName] = await Promise.all([
+        d.lead_source_id ? label(sql`SELECT label FROM lead_sources WHERE id=${d.lead_source_id}`) : "",
+        d.arrival_channel_id ? label(sql`SELECT label FROM arrival_channels WHERE id=${d.arrival_channel_id}`) : "",
+        d.event_id ? label(sql`SELECT name AS label FROM events WHERE id=${d.event_id}`) : "",
+        d.contact_id ? label(sql`SELECT name AS label FROM contacts WHERE id=${Number(d.contact_id)}`) : "",
+      ]);
+      const sf = await sendToSilfrus({
+        leadId: rows[0].id,
+        city: d.city || "",
+        leadSource, arrivalChannel, event, referrerName,
         firstName: firstName || d.name || "",
         lastName: rest.join(" "),
         phone: d.phone,
@@ -101,6 +112,11 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
         age: d.age || "",
         notes: d.notes || "",
       });
+      // The new Make scenario answers with the consultation-process id — link the lead now.
+      if (sf.sfId && (await hasColumn("leads", "sf_record_id"))) {
+        await sql`UPDATE leads SET sf_record_id = ${sf.sfId}, sf_status = COALESCE(sf_status, 'חדש'), sf_synced_at = now() WHERE id = ${rows[0].id}`;
+        rows[0].sf_record_id = sf.sfId;
+      }
     } catch (e) { console.error("[silfrus sync]", e); }
   }
 
