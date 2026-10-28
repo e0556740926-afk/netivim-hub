@@ -976,3 +976,9 @@ ALTER TABLE contacts ADD COLUMN IF NOT EXISTS district text NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS contacts_district_idx ON contacts(district);
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
 ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status = ANY (ARRAY['active','inactive','deleted']));
+
+-- ═══ Salesforce delivery state — 2026-10-28 ═══
+-- Whether a lead reached Salesforce (ok / pending / exists / failed) and why not, so failures can be re-sent from the leads screen.
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_state text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_error text;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_at timestamptz;

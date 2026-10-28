@@ -4,7 +4,8 @@ import { sendPush } from "@/lib/push";
 import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
-import { sendToSilfrus, sendToLeadScenario, LEAD_WEBHOOK_URL } from "@/lib/silfrus";
+import { sendToSilfrus, sendToLeadScenario, LEAD_WEBHOOK_URL, type LeadScenarioResult } from "@/lib/silfrus";
+import { recordSync } from "@/lib/salesforce-push";
 
 export type Actor = { id?: number; name?: string; email?: string } | null;
 
@@ -29,7 +30,7 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
   // with its id, which is stored on the lead below. If Make can't be reached
   // the lead is still saved (best-effort; the daily status sync links it later).
   const toSalesforce = d.source === "link" || d.source === "manual";
-  let sfNew: { sfId?: string } | null = null;
+  let sfResult: LeadScenarioResult | null = null;
   if (toSalesforce && LEAD_WEBHOOK_URL) {
     try {
       // "ערוץ מקור" = whoever entered the lead: the logged-in user, or the owner of the link it came through.
@@ -45,8 +46,8 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
         age: d.age || "", city: d.city || "", notes: d.notes || "", ownerName: sender,
       });
       if (r.exists) return { duplicate: { id: 0, name: "איש קשר שכבר קיים בסילפרוס" } };
-      if (r.ok) sfNew = { sfId: r.sfId };
-    } catch (e) { console.error("[silfrus check]", e); }
+      sfResult = r;
+    } catch (e) { console.error("[silfrus check]", e); sfResult = { ok: false, reason: String(e) }; }
   }
 
   const [hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel, hasContact] = await Promise.all([
@@ -130,13 +131,11 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
     } catch (e) { console.error("[silfrus sync]", e); }
   }
 
-  if (sfNew?.sfId) {
-    try {
-      if (await hasColumn("leads", "sf_record_id")) {
-        await sql`UPDATE leads SET sf_record_id = ${sfNew.sfId}, sf_status = COALESCE(sf_status, 'חדש'), sf_synced_at = now() WHERE id = ${rows[0].id}`;
-        rows[0].sf_record_id = sfNew.sfId;
-      }
-    } catch (e) { console.error("[silfrus link]", e); }
+  // Record whether it reached Salesforce (ok / pending / failed) — failures show in the leads screen with a re-send button.
+  if (sfResult) {
+    const state = await recordSync(rows[0].id, sfResult);
+    if (sfResult.sfId) rows[0].sf_record_id = sfResult.sfId;
+    if (state) rows[0].sf_sync_state = state;
   }
 
   return { lead: rows[0] };

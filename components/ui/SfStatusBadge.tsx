@@ -11,8 +11,36 @@ const COLORS: Record<string, { bg: string; fg: string }> = {
   "נכנס למסגרת": { bg: "#c8dac7", fg: "#14532D" },
 }
 
+/** Delivery state for a lead that has no Salesforce status yet (sf_sync_state). */
+const SYNC: Record<string, { label: string; bg: string; fg: string }> = {
+  failed: { label: "לא נכנס לסילפרוס", bg: "#fdecec", fg: "#a32020" },
+  pending: { label: "ממתין לסילפרוס", bg: "#faf1e3", fg: "#946014" },
+  exists: { label: "קיים בסילפרוס", bg: "#F3F4F6", fg: "#4B5563" },
+}
+
+export function SfSyncPill({ lead }: { lead: any }) {
+  const s = SYNC[lead?.sf_sync_state]
+  if (!s || lead?.sf_status) return null
+  const when = lead.sf_sync_at ? ` · ${new Date(lead.sf_sync_at).toLocaleString("he-IL")}` : ""
+  return (
+    <span title={(lead.sf_sync_error || s.label) + when} style={{ background: s.bg, color: s.fg }}
+      className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap">
+      {lead.sf_sync_state === "failed" ? "✕ " : "☁ "}{s.label}
+    </span>
+  )
+}
+
 export default function SfStatusBadge({ lead, detailed = false }: { lead: any; detailed?: boolean }) {
-  if (!lead?.sf_status) return null
+  if (!lead?.sf_status) {
+    if (!SYNC[lead?.sf_sync_state]) return null
+    if (!detailed) return <SfSyncPill lead={lead} />
+    return (
+      <div className="text-sm space-y-0.5">
+        <SfSyncPill lead={lead} />
+        {lead.sf_sync_error && <div className="text-xs text-[#a32020]">{lead.sf_sync_error}</div>}
+      </div>
+    )
+  }
   const c = COLORS[lead.sf_status] || { bg: "#edf1e9", fg: "#334155" }
   const extra = [lead.sf_sub_status, lead.sf_framework || lead.sf_referral_destination, lead.sf_inactive_reason]
     .filter(Boolean).join(" · ")

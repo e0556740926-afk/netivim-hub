@@ -93,6 +93,7 @@ export default function AdminLeads() {
   const [filterStatus, setFilterStatus] = useUrlState("status")
   const [filterSource, setFilterSource] = useUrlState("source")
   const [filterMonth, setFilterMonth] = useUrlState("month")
+  const [filterSf, setFilterSf] = useUrlState("sf")
 
   const [cols, setCols] = useState<ColKey[]>(DEFAULT_COLS)
   const [colsOpen, setColsOpen] = useState(false)
@@ -221,16 +222,23 @@ export default function AdminLeads() {
     if (aggregate) { c.all = 0; for (const r of aggregate) { c[r.status] = Number(r.n) || 0; c.all += Number(r.n) || 0 } }
     return c
   }, [base, aggregate])
-  const filteredRaw = useMemo(() => filterStatus ? base.filter(l => l.status === filterStatus) : base, [base, filterStatus])
+  // Salesforce delivery filter: "missing" = should be in Salesforce (link/manual) but isn't linked; "failed" = a send that was refused.
+  const sfMissing = (l: any) => !l.sf_record_id && (l.source === "link" || l.source === "manual") && l.sf_sync_state !== "exists"
+  const filteredRaw = useMemo(() => {
+    let r = filterStatus ? base.filter(l => l.status === filterStatus) : base
+    if (filterSf === "missing") r = r.filter(sfMissing)
+    else if (filterSf === "failed") r = r.filter(l => l.sf_sync_state === "failed")
+    return r
+  }, [base, filterStatus, filterSf])
   const { sorted: filtered, sortKey, sortDir, toggleSort } = useSort(filteredRaw, "created_at", "desc")
   const pg = usePagination(filtered, 50)
-  const hasFilters = !!(q || filterOwner || filterStatus || filterSource || filterMonth)
+  const hasFilters = !!(q || filterOwner || filterStatus || filterSource || filterMonth || filterSf)
   // One URL replace for all filters (several setters in a row would each rebuild from the same stale query).
   const clearFilters = () => router.replace(pathname, { scroll: false })
 
   // A changed search/filter clears the selection, so a bulk action never
   // silently hits rows the user can no longer see. Paging keeps it.
-  const filterKey = [q, filterOwner, filterStatus, filterSource, filterMonth].join("|")
+  const filterKey = [q, filterOwner, filterStatus, filterSource, filterMonth, filterSf].join("|")
   useEffect(() => { setSelected(new Set()); pg.setPage(1) /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filterKey])
 
   const ownerLabel = (v: string) => v.startsWith("admin_") ? v.replace("admin_", "") : coords.find(c => String(c.id) === v)?.name || v
@@ -240,6 +248,7 @@ export default function AdminLeads() {
     filterStatus && { k: "status", label: `סטטוס: ${STATUS_LABEL[filterStatus] || filterStatus}`, clear: () => setFilterStatus("") },
     filterSource && { k: "source", label: `מקור: ${leadSources.find(s => String(s.id) === filterSource)?.label || filterSource}`, clear: () => setFilterSource("") },
     filterMonth && { k: "month", label: `חודש: ${filterMonth.slice(5, 7)}/${filterMonth.slice(0, 4)}`, clear: () => setFilterMonth("") },
+    filterSf && { k: "sf", label: filterSf === "failed" ? "סילפרוס: נכשלו" : "סילפרוס: לא נכנסו", clear: () => setFilterSf("") },
   ].filter(Boolean) as { k: string; label: string; clear: () => void }[]
 
   const visibleCols = COLS.filter(c => cols.includes(c.key))
@@ -356,6 +365,21 @@ export default function AdminLeads() {
     finally { setBulkBusy(false) }
   }
 
+  const SF_STATE_LABEL: Record<string, string> = { ok: "נכנסו", pending: "ממתינים", exists: "כבר קיימים בסילפרוס", failed: "נכשלו", skipped: "דולגו (כבר מקושרים)" }
+  async function resendToSf(ids: number[]) {
+    setBulkBusy(true)
+    try {
+      const d = await api("/api/leads/salesforce", "POST", { ids })
+      const parts = Object.entries(d.summary || {}).map(([k, n]) => `${SF_STATE_LABEL[k] || k}: ${n}`)
+      const failed = (d.results || []).find((r: any) => r.state === "failed")
+      if (failed) toastError(`שליחה לסילפרוס · ${parts.join(" · ")}${failed.error ? ` — ${failed.error}` : ""}`)
+      else success(`שליחה לסילפרוס · ${parts.join(" · ")}`)
+      setSelected(new Set())
+      await load(true)
+    } catch (e: any) { toastError(e.message) }
+    finally { setBulkBusy(false) }
+  }
+
   // ── render helpers ──────────────────────────────────────────
   function assignOptions(empty: string) {
     return <>
@@ -442,6 +466,11 @@ export default function AdminLeads() {
           <select className="lw-select" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} aria-label="חודש">
             <option value="">כל החודשים</option>
             {months.map(m => <option key={m} value={m}>{m.slice(5, 7)}/{m.slice(0, 4)}</option>)}
+          </select>
+          <select className="lw-select" value={filterSf} onChange={e => setFilterSf(e.target.value)} aria-label="סילפרוס">
+            <option value="">סילפרוס: הכול</option>
+            <option value="missing">לא נכנסו לסילפרוס</option>
+            <option value="failed">נכשלו בשליחה</option>
           </select>
           <div className="lw-cols" ref={colsRef}>
             <button type="button" className="lw-btn" aria-expanded={colsOpen} aria-haspopup="true" onClick={() => setColsOpen(o => !o)}>עמודות</button>
@@ -552,6 +581,7 @@ export default function AdminLeads() {
           <button type="button" className="lw-btn" disabled={!bulkStatus || bulkBusy} onClick={() => bulk({ action: "status", status: bulkStatus }, `הסטטוס עודכן ל"${STATUS_LABEL[bulkStatus]}"`)}>החלת סטטוס</button>
           {canDelete && <button type="button" className="lw-btn lw-btn-ghost" disabled={bulkBusy}
             onClick={() => setConfirmDelete({ ids: [...selected], names: leads.filter(l => selected.has(l.id)).slice(0, 3).map(l => l.name) })}>מחיקה…</button>}
+          <button type="button" className="lw-btn" disabled={bulkBusy} onClick={() => resendToSf([...selected])}>{bulkBusy ? "שולח…" : "שליחה לסילפרוס"}</button>
           <span className="lw-spacer" />
           <button type="button" className="lw-btn lw-btn-ghost" onClick={() => setSelected(new Set())}>ביטול בחירה</button>
         </div>
@@ -644,6 +674,8 @@ export default function AdminLeads() {
           <button type="button" className="lw-btn" onClick={() => { setEditing(false); setEditErr(""); setEdit(editFrom(openLead)) }}>ביטול</button>
         </> : <>
           {openLead.phone && <a className="lw-btn" href={waLink(openLead.phone)} target="_blank" rel="noopener noreferrer" style={{ color: "#1d6a3f" }}>WhatsApp</a>}
+          {canBulk && !openLead.sf_record_id && openLead.sf_sync_state !== "exists" && (openLead.source === "link" || openLead.source === "manual") &&
+            <button type="button" className="lw-btn" disabled={bulkBusy} onClick={() => resendToSf([openLead.id])}>{bulkBusy ? "שולח…" : "שליחה לסילפרוס"}</button>}
           {canWrite && <button type="button" className="lw-btn lw-btn-primary" onClick={() => { setEdit(editFrom(openLead)); setEditing(true) }}>עריכה</button>}
           {canWrite && <button type="button" className="lw-btn lw-btn-danger" onClick={() => { if (confirm(`למחוק את ${openLead.name}? אפשר לבטל מיד אחרי המחיקה.`)) deleteLead(openLead) }}>מחיקה</button>}
         </>) : undefined}>
@@ -666,6 +698,7 @@ export default function AdminLeads() {
             <div className="ld-row"><span>אירוע</span><b>{openLead.event_name || none}</b></div>
             <div className="ld-row"><span>שותף מפנה</span><b>{openLead.partner_name ? `${openLead.partner_name}${openLead.partner_org ? ` · ${openLead.partner_org}` : ""}` : none}</b></div>
             <div className="ld-row"><span>דרך הכניסה למערכת</span><b>{SOURCE_LABEL[openLead.source] || none}</b></div>
+            <div className="ld-row"><span>סילפרוס</span><b>{openLead.sf_status || openLead.sf_sync_state ? <SfStatusBadge lead={openLead} detailed /> : none}</b></div>
             <div className="ld-row"><span>תחום עניין</span><b>{INTEREST_LABEL[openLead.interest] || openLead.interest || none}</b></div>
           </section>
           <section className="ld-sec" aria-labelledby="ld-notes">
