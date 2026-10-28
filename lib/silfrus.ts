@@ -1,8 +1,8 @@
-const WEBHOOK_URL = process.env.SILFRUS_WEBHOOK_URL;
 /**
- * New Make scenario ("נתיבים שטח ← סילפרוס: ליד חדש"). When set, it takes
- * precedence over the legacy SILFRUS_WEBHOOK_URL: richer payload, and the
- * webhook answers with the Salesforce record id so the lead is linked at once.
+ * Make scenario "נתיבים שטח ← סילפרוס: ליד חדש" — the only path from this
+ * system to Salesforce. (The old SILFRUS_WEBHOOK_URL Make webhook was removed
+ * on 28.10.2026.) The webhook answers with the Salesforce record id so the
+ * lead is linked at once.
  */
 export const LEAD_WEBHOOK_URL = process.env.SF_LEAD_WEBHOOK_URL;
 
@@ -23,48 +23,6 @@ interface SilfrusLeadArgs {
   arrivalChannel?: string;
   event?: string;
   referrerName?: string;
-}
-
-/**
- * Pushes one lead to Silfrus (Salesforce) through a Make.com webhook.
- *
- * Never throws — a failed sync must not break lead creation. Silently
- * skips if SILFRUS_WEBHOOK_URL isn't configured, same pattern as
- * email/WhatsApp.
- */
-export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; reason?: string; sfId?: string; exists?: boolean }> {
-  if (LEAD_WEBHOOK_URL) return sendToLeadScenario(a, LEAD_WEBHOOK_URL);
-  if (!WEBHOOK_URL) {
-    console.log("[silfrus] SILFRUS_WEBHOOK_URL not set — skipping");
-    return { ok: false, reason: "no_webhook" };
-  }
-  try {
-    const res = await fetch(WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify([{
-        mail: a.email || "",
-        phone: a.phone,
-        medium: a.ownerName,
-        source: "נתיבים שטח",
-        campaign: "",
-        last_name: a.lastName,
-        "First name": a.firstName,
-        id_number: a.idNumber || "",
-        age: a.age != null ? String(a.age) : "",
-        notes: a.notes || "",
-      }]),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("[silfrus] send failed:", err);
-      return { ok: false, reason: err };
-    }
-    return { ok: true };
-  } catch (e) {
-    console.error("[silfrus] error:", e);
-    return { ok: false, reason: String(e) };
-  }
 }
 
 export type LeadScenarioResult = { ok: boolean; reason?: string; sfId?: string; exists?: boolean; contactId?: string };

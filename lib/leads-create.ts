@@ -4,7 +4,7 @@ import { sendPush } from "@/lib/push";
 import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
-import { sendToSilfrus, sendToLeadScenario, LEAD_WEBHOOK_URL, type LeadScenarioResult } from "@/lib/silfrus";
+import { sendToLeadScenario, LEAD_WEBHOOK_URL, type LeadScenarioResult } from "@/lib/silfrus";
 import { recordSync } from "@/lib/salesforce-push";
 
 export type Actor = { id?: number; name?: string; email?: string } | null;
@@ -48,6 +48,9 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
       if (r.exists) return { duplicate: { id: 0, name: "איש קשר שכבר קיים בסילפרוס" } };
       sfResult = r;
     } catch (e) { console.error("[silfrus check]", e); sfResult = { ok: false, reason: String(e) }; }
+  } else if (toSalesforce) {
+    // No scenario configured — still save the lead, but flag it so it can be re-sent from the leads screen.
+    sfResult = { ok: false, reason: "החיבור לסילפרוס (SF_LEAD_WEBHOOK_URL) לא מוגדר" };
   }
 
   const [hasId, hasOwnerCol, hasEmail, hasIsParent, hasLeadSource, hasArrivalChannel, hasContact] = await Promise.all([
@@ -106,29 +109,6 @@ export async function createLead(d: any, me: Actor): Promise<{ lead?: any; dupli
       }
       if (target?.phone) await sendWhatsApp(target.phone, newLeadMsg(p));
     } catch (e) { console.error("[notify lead]", e); }
-  }
-
-  // Sync to Silfrus (Salesforce) — leads added via the personal link
-  // or entered manually on the site. Event-sourced leads are not sent.
-  if (toSalesforce && !LEAD_WEBHOOK_URL) {
-    try {
-      let ownerName = d.owner_name || "";
-      if (!ownerName && d.coordinator_id) {
-        const cr = await sql`SELECT name FROM coordinators WHERE id=${d.coordinator_id} LIMIT 1`;
-        ownerName = (cr[0] as any)?.name || "";
-      }
-      const [firstName, ...rest] = String(d.name || "").trim().split(" ");
-      await sendToSilfrus({
-        firstName: firstName || d.name || "",
-        lastName: rest.join(" "),
-        phone: d.phone,
-        email: d.email || "",
-        ownerName,
-        idNumber: d.id_number || "",
-        age: d.age || "",
-        notes: d.notes || "",
-      });
-    } catch (e) { console.error("[silfrus sync]", e); }
   }
 
   // Record whether it reached Salesforce (ok / pending / failed) — failures show in the leads screen with a re-send button.

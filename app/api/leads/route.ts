@@ -7,7 +7,6 @@ import { sendWhatsApp, newLeadMsg } from "@/lib/whatsapp";
 import { hasColumn } from "@/lib/schema";
 import { logAudit } from "@/lib/audit";
 import { currentUser } from "@/lib/auth-server";
-import { sendToSilfrus } from "@/lib/silfrus";
 import { createLead } from "@/lib/leads-create";
 import { isValidIsraeliId, israeliIdError } from "@/lib/israeli-id";
 
