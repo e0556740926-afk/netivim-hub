@@ -171,6 +171,7 @@ export function makeBotDeps(opts: { userPhone: string; instancePhone?: string | 
         lead_source_id: await senderLeadSourceId(user),
       }, { id: user.id, name: user.name });
       if (r.duplicate) {
+        if (!r.duplicate.id) return { duplicate: { name: r.duplicate.name, mine: true } }; // exists in Salesforce
         const [d] = await sql`SELECT coordinator_id FROM leads WHERE id = ${r.duplicate.id}`;
         return { duplicate: { name: r.duplicate.name, mine: !coord || Number(d?.coordinator_id) === user.coordinator_id } };
       }

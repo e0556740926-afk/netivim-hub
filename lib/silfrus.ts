@@ -4,7 +4,7 @@ const WEBHOOK_URL = process.env.SILFRUS_WEBHOOK_URL;
  * precedence over the legacy SILFRUS_WEBHOOK_URL: richer payload, and the
  * webhook answers with the Salesforce record id so the lead is linked at once.
  */
-const LEAD_WEBHOOK_URL = process.env.SF_LEAD_WEBHOOK_URL;
+export const LEAD_WEBHOOK_URL = process.env.SF_LEAD_WEBHOOK_URL;
 
 interface SilfrusLeadArgs {
   firstName: string;
@@ -32,7 +32,7 @@ interface SilfrusLeadArgs {
  * skips if SILFRUS_WEBHOOK_URL isn't configured, same pattern as
  * email/WhatsApp.
  */
-export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; reason?: string; sfId?: string }> {
+export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; reason?: string; sfId?: string; exists?: boolean }> {
   if (LEAD_WEBHOOK_URL) return sendToLeadScenario(a, LEAD_WEBHOOK_URL);
   if (!WEBHOOK_URL) {
     console.log("[silfrus] SILFRUS_WEBHOOK_URL not set — skipping");
@@ -67,7 +67,15 @@ export async function sendToSilfrus(a: SilfrusLeadArgs): Promise<{ ok: boolean; 
   }
 }
 
-async function sendToLeadScenario(a: SilfrusLeadArgs, url: string): Promise<{ ok: boolean; reason?: string; sfId?: string }> {
+export type LeadScenarioResult = { ok: boolean; reason?: string; sfId?: string; exists?: boolean; contactId?: string };
+
+/**
+ * The new Make scenario: looks the person up in Salesforce by phone and by
+ * ID number. Found → answers {exists:true} and creates nothing. Not found →
+ * creates the Contact + "תהליך ייעוץ" and answers with the process id.
+ */
+export async function sendToLeadScenario(a: SilfrusLeadArgs, url = LEAD_WEBHOOK_URL || ""): Promise<LeadScenarioResult> {
+  if (!url) return { ok: false, reason: "no_webhook" };
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -78,16 +86,13 @@ async function sendToLeadScenario(a: SilfrusLeadArgs, url: string): Promise<{ ok
         last_name: a.lastName,
         phone: a.phone,
         phone_digits: String(a.phone || "").replace(/\D/g, ""),
+        id_number: String(a.idNumber || "").replace(/\D/g, ""),
         email: a.email || "",
-        id_number: a.idNumber || "",
         age: a.age != null && a.age !== "" ? String(a.age) : "",
         city: a.city || "",
         notes: a.notes || "",
         sender: a.ownerName || "",
-        lead_source: a.leadSource || "",
-        arrival_channel: a.arrivalChannel || "",
-        event: a.event || "",
-        referrer_name: a.referrerName || "",
+        referral_source: "מערכת שטח",
       }),
       signal: AbortSignal.timeout(8_000),
     });
@@ -96,9 +101,12 @@ async function sendToLeadScenario(a: SilfrusLeadArgs, url: string): Promise<{ ok
       console.error("[silfrus] lead scenario failed:", res.status, text);
       return { ok: false, reason: text };
     }
-    let sfId: string | undefined;
-    try { sfId = JSON.parse(text)?.sf_id || undefined; } catch { /* "Accepted" — scenario not answering yet */ }
-    return { ok: true, sfId };
+    try {
+      const j = JSON.parse(text);
+      return { ok: true, exists: !!j?.exists, sfId: j?.sf_id || undefined, contactId: j?.contact_id || undefined };
+    } catch {
+      return { ok: true }; // "Accepted" — scenario queued, no answer
+    }
   } catch (e) {
     console.error("[silfrus] lead scenario error:", e);
     return { ok: false, reason: String(e) };

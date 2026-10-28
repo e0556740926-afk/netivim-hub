@@ -11,13 +11,14 @@ import { hasColumn } from "@/lib/schema";
  * writes its process status onto the matching lead here.
  *
  * Matching: by sf_record_id once a lead is linked; otherwise by phone
- * (last 9 digits), picking the most recent not-yet-linked lead. The
+ * (last 9 digits) or ID number, picking the most recent not-yet-linked lead. The
  * first successful match stores sf_record_id, so later updates are exact.
  */
 
 export interface SfStatusUpdate {
   sfId: string;
   phone?: string;
+  idNumber?: string;
   status?: string;
   subStatus?: string;
   advisor?: string;
@@ -43,11 +44,16 @@ export function normalizeSfPayload(p: any): SfStatusUpdate | null {
   return {
     sfId,
     phone: pick("phone", "Advisee_Phone__c"),
+    idNumber: pick("id_number", "Id_Number__c", "Advisee_Israeli_Id__c"),
     status: pick("status", "Status__c"),
     subStatus: pick("sub_status", "subStatus", "Sub_Status__c"),
     advisor: pick("advisor", "Advisor__r.Name", "advisor_name"),
     framework: pick("framework", "Framework_Entered__c"),
-    referralDestination: pick("referral_destination", "Referral_Destination__c"),
+    referralDestination: [
+      pick("referral_destination", "Referral_Destination__c"),
+      pick("org_type", "Org_Type__c"),
+      pick("destination", "Refferal_Army_Destination__c", "Refferal_Mechina_Destination__c", "Refferal_Yeshiva_Destination__c"),
+    ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(" · ") || undefined,
     inactiveReason: pick("inactive_reason", "Inactive_Reason__c"),
     light: pick("light", "Light__c"),
     lastModified: pick("last_modified", "LastModifiedDate", "SystemModstamp"),
@@ -59,7 +65,7 @@ export function phoneKey(phone?: string): string {
   return d.length >= 9 ? d.slice(-9) : "";
 }
 
-export type ApplyResult = { ok: boolean; leadId?: number; matchedBy?: "sf_id" | "phone"; reason?: string };
+export type ApplyResult = { ok: boolean; leadId?: number; matchedBy?: "sf_id" | "phone" | "id_number"; reason?: string };
 
 export async function applySfStatus(u: SfStatusUpdate): Promise<ApplyResult> {
   if (!(await hasColumn("leads", "sf_record_id"))) return { ok: false, reason: "migration_pending" };
@@ -72,16 +78,29 @@ export async function applySfStatus(u: SfStatusUpdate): Promise<ApplyResult> {
 
   if (!leadId) {
     const key = phoneKey(u.phone);
-    if (!key) return { ok: false, reason: "no_match_no_phone" };
-    const byPhone = await sql`
-      SELECT id FROM leads
-      WHERE deleted_at IS NULL AND sf_record_id IS NULL
-        AND right(regexp_replace(phone, '\\D', '', 'g'), 9) = ${key}
-      ORDER BY created_at DESC LIMIT 1`;
-    if (!byPhone.length) return { ok: false, reason: "no_match" };
-    leadId = (byPhone[0] as any).id;
-    matchedBy = "phone";
+    if (key) {
+      const byPhone = await sql`
+        SELECT id FROM leads
+        WHERE deleted_at IS NULL AND sf_record_id IS NULL
+          AND right(regexp_replace(phone, '\\D', '', 'g'), 9) = ${key}
+        ORDER BY created_at DESC LIMIT 1`;
+      if (byPhone.length) { leadId = (byPhone[0] as any).id; matchedBy = "phone"; }
+    }
   }
+
+  if (!leadId) {
+    const tz = String(u.idNumber || "").replace(/\D/g, "");
+    if (tz.length >= 5) {
+      const byTz = await sql`
+        SELECT id FROM leads
+        WHERE deleted_at IS NULL AND sf_record_id IS NULL AND COALESCE(id_number, '') <> ''
+          AND lpad(regexp_replace(id_number, '\\D', '', 'g'), 9, '0') = ${tz.padStart(9, "0")}
+        ORDER BY created_at DESC LIMIT 1`;
+      if (byTz.length) { leadId = (byTz[0] as any).id; matchedBy = "id_number"; }
+    }
+  }
+
+  if (!leadId) return { ok: false, reason: "no_match" };
 
   // Ignore out-of-order deliveries: only apply if this update is not older than what we hold.
   const modified = u.lastModified ? new Date(u.lastModified) : new Date();
