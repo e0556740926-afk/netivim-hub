@@ -63,5 +63,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "17 * * * *",
+  schedule: "0 7-18 * * *", // hourly during the day, on the same minute as the other jobs so they share one DB wake-up; the bot webhook itself runs around the clock regardless
 };

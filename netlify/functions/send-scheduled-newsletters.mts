@@ -2,7 +2,7 @@ import type { Config } from "@netlify/functions";
 import { neon } from "@neondatabase/serverless";
 
 /**
- * Runs every 15 minutes. Finds newsletter issues with status='scheduled'
+ * Runs every 15 minutes during the day (07:00–18:45 UTC). Finds newsletter issues with status='scheduled'
  * whose scheduled_at has arrived, and sends them.
  *
  * Deliberately self-contained: Netlify Scheduled Functions build in a
@@ -123,5 +123,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "*/15 * * * *", // every 15 minutes
+  schedule: "*/15 7-18 * * *", // every 15 minutes, daytime only (see send-campaigns)
 };

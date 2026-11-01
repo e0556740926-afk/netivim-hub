@@ -26,5 +26,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "*/5 * * * *",
+  schedule: "*/15 7-18 * * *", // every 15 min, 07:00–18:45 UTC ≈ 09:00–20:45 Israel in winter (10:00–21:45 in summer) — lets the DB sleep overnight
 };

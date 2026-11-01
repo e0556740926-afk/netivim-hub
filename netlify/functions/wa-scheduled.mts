@@ -3,7 +3,7 @@ import { neon } from "@neondatabase/serverless";
 
 /**
  * Sends scheduled WhatsApp messages (bot settings screen → "הודעות מתוזמנות")
- * every 5 minutes. Rows are claimed atomically (status scheduled → sending,
+ * every 15 minutes, daytime only (see config below). Rows are claimed atomically (status scheduled → sending,
  * FOR UPDATE SKIP LOCKED) so overlapping runs never send twice. Repeating
  * messages move to their next slot; one-offs become 'sent'; failures 'failed'.
  * A row stuck in 'sending' for 15+ minutes is marked failed, not resent —
@@ -109,5 +109,5 @@ export default async () => {
 };
 
 export const config: Config = {
-  schedule: "*/5 * * * *",
+  schedule: "*/15 7-18 * * *", // same daytime window as send-campaigns — nothing is scheduled before 10:00 or after 20:00
 };
