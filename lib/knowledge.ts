@@ -1,11 +1,16 @@
 export const KNOWLEDGE_TYPES = {script:'תסריט שיחה',video:'סרטון',presentation:'מצגת',document:'מסמך'} as const
 export type KnowledgeType = keyof typeof KNOWLEDGE_TYPES
 export type KnowledgeSection = {title:string;body:string}
+export const KNOWLEDGE_AREAS={scripts:'תסריטי שיחה',learning:'למידה',campaigns:'קמפיינים',events:'אירועים שהיו'} as const
+export const KNOWLEDGE_DEPARTMENTS={community:'אגף קהילות',guidance:'מרכז הייעוץ וההכוון',shared:'תוכן משותף',unassigned:'טרם סווג לאגף'} as const
+export type KnowledgeMedia={asset_id:string;kind:'image'|'video'|'document';name:string;caption:string}
+export type KnowledgePortal={area:keyof typeof KNOWLEDGE_AREAS;department:keyof typeof KNOWLEDGE_DEPARTMENTS;media:KnowledgeMedia[];event_id:number|null;campaign_id:number|null;event_date:string;location:string;campaign_status:'planned'|'active'|'ended';start_date:string;end_date:string;goal:string}
+export function portalOf(item:Pick<KnowledgeItem,'kind'|'portal'>):KnowledgePortal{return {area:item.kind==='script'?'scripts':'learning',department:'unassigned',media:[],event_id:null,campaign_id:null,event_date:'',location:'',campaign_status:'planned',start_date:'',end_date:'',goal:'',...item.portal}}
 export type KnowledgeItem = {
  id:string;title:string;summary:string;topic:string;kind:KnowledgeType;sections:KnowledgeSection[];
  video_url:string;asset_id:string|null;pdf_asset_id:string|null;status:'draft'|'published'|'archived';
  audience:'all'|'selected';audience_ids:number[];version:number;updated_at:string;published_at:string|null;
- favorite:boolean;asset_name?:string;pdf_name?:string
+ favorite:boolean;asset_name?:string;pdf_name?:string;portal?:KnowledgePortal
 }
 export class KnowledgeError extends Error {constructor(message:string,public status=400){super(message)}}
 const text=(v:unknown,max:number)=>typeof v==='string'?v.trim().slice(0,max):''
@@ -34,20 +39,36 @@ export function parseKnowledge(value:unknown){
  if(video_url&&!videoEmbed(video_url))throw new KnowledgeError('יש להזין קישור תקין ל־YouTube או Vimeo')
  const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v)?v:null
  const asset_id=uuid(b.asset_id),pdf_asset_id=uuid(b.pdf_asset_id)
+ const portal=portalOf(b as KnowledgeItem)
+ if(!Object.hasOwn(KNOWLEDGE_AREAS,portal.area)||!Object.hasOwn(KNOWLEDGE_DEPARTMENTS,portal.department))throw new KnowledgeError('שיוך הפורטל לא תקין')
+ if((portal.area==='scripts'&&kind!=='script')||(portal.area==='learning'&&kind==='script'))throw new KnowledgeError('סוג התוכן אינו מתאים לאזור שנבחר')
+ if(!Array.isArray(portal.media)||portal.media.length>40)throw new KnowledgeError('אפשר לצרף עד 40 קבצים לפריט')
+ portal.media=portal.media.map(m=>{const id=uuid(m?.asset_id);if(!id||!['image','video','document'].includes(m.kind))throw new KnowledgeError('קובץ מצורף לא תקין');return {asset_id:id,kind:m.kind,name:text(m.name,180),caption:text(m.caption,300)}})
+ if(new Set(portal.media.map(m=>m.asset_id)).size!==portal.media.length)throw new KnowledgeError('קובץ צורף יותר מפעם אחת')
+ const ref=(v:unknown)=>{if(v===null||v===undefined||v==='')return null;if(!Number.isSafeInteger(v)||Number(v)<=0)throw new KnowledgeError('קישור לרשומת מקור לא תקין');return Number(v)}
+ portal.event_id=portal.area==='events'?ref(portal.event_id):null;portal.campaign_id=portal.area==='campaigns'?ref(portal.campaign_id):null
+ for(const key of ['event_date','start_date','end_date'] as const){const value=portal[key];if(value&&(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(new Date(value).getTime())||new Date(value).toISOString().slice(0,10)!==value))throw new KnowledgeError('תאריך לא תקין');portal[key]=value||''}
+ if(portal.start_date&&portal.end_date&&portal.end_date<portal.start_date)throw new KnowledgeError('תאריך הסיום קודם להתחלה')
+ if(!['planned','active','ended'].includes(portal.campaign_status))throw new KnowledgeError('סטטוס קמפיין לא תקין')
+ portal.goal=text(portal.goal,1200);portal.location=text(portal.location,180)
  if(status==='published'){
-  if(kind==='script'&&!sections.some(s=>s.body))throw new KnowledgeError('יש להוסיף תוכן לתסריט')
-  if(kind==='video'&&!video_url&&!asset_id)throw new KnowledgeError('יש להוסיף קישור לסרטון או קובץ וידאו')
-  if(['presentation','document'].includes(kind)&&!asset_id)throw new KnowledgeError('יש להעלות קובץ לפני הפרסום')
+  if(portal.area==='scripts'&&!sections.some(s=>s.body))throw new KnowledgeError('יש להוסיף תוכן לתסריט')
+  if(portal.area==='learning'&&kind==='video'&&!video_url&&!asset_id)throw new KnowledgeError('יש להוסיף קישור לסרטון או קובץ וידאו')
+  if(portal.area==='learning'&&['presentation','document'].includes(kind)&&!asset_id)throw new KnowledgeError('יש להעלות קובץ לפני הפרסום')
+  if(portal.area==='campaigns'&&!portal.goal&&!sections.some(s=>s.body))throw new KnowledgeError('יש להוסיף מטרה או מסרים לקמפיין')
+  if(portal.area==='events'&&(!portal.event_date||!portal.media.some(m=>m.kind==='image'||m.kind==='video')))throw new KnowledgeError('יש להוסיף תאריך ותמונות או סרטונים לאלבום')
+  if(portal.area==='events'&&portal.event_date>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'}))throw new KnowledgeError('האלבום מיועד לאירועים שהתקיימו בלבד')
  }
  const version=Number(b.version||0);if(!Number.isSafeInteger(version)||version<0)throw new KnowledgeError('גרסה לא תקינה')
- return {title,summary:text(b.summary,1200),topic:text(b.topic,80),kind,sections:kind==='script'?sections:[],video_url:kind==='video'?video_url:'',asset_id:kind==='script'?null:asset_id,pdf_asset_id:kind==='presentation'?pdf_asset_id:null,status,audience,audience_ids:audience==='selected'?audience_ids:[],version}
+ return {title,summary:text(b.summary,1200),topic:text(b.topic,80),kind,sections:kind==='script'?sections:[],video_url:kind==='video'?video_url:'',asset_id:kind==='script'?null:asset_id,pdf_asset_id:kind==='presentation'?pdf_asset_id:null,status,audience,audience_ids:audience==='selected'?audience_ids:[],version,portal}
 }
 export const CHUNK_SIZE=2*1024*1024
 export const MAX_ASSET_SIZE=100*1024*1024
-export const FILE_TYPES:Record<string,string>={pdf:'application/pdf',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',mp4:'video/mp4',webm:'video/webm'}
+export const FILE_TYPES:Record<string,string>={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',pdf:'application/pdf',ppt:'application/vnd.ms-powerpoint',pptx:'application/vnd.openxmlformats-officedocument.presentationml.presentation',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',mp4:'video/mp4',webm:'video/webm'}
 export function assetSpec(name:string,size:number){
  const ext=name.split('.').pop()?.toLowerCase()||'',mime=FILE_TYPES[ext]
- if(!mime||!Number.isSafeInteger(size)||size<=0||size>MAX_ASSET_SIZE)throw new KnowledgeError('קבצים נתמכים: PDF, PowerPoint, Word, MP4 ו־WebM. עד 100MB לקובץ.')
+ if(!mime||!Number.isSafeInteger(size)||size<=0||size>MAX_ASSET_SIZE)throw new KnowledgeError('קבצים נתמכים: JPG, PNG, WebP, PDF, PowerPoint, Word, MP4 ו־WebM. עד 2MB לתמונה ועד 100MB לקובץ אחר.')
+ if(mime.startsWith('image/')&&size>CHUNK_SIZE)throw new KnowledgeError('תמונות JPG, PNG או WebP: עד 2MB לתמונה')
  return {name:name.replace(/[\r\n/\\]/g,'_').slice(0,180),mime,size,parts:Math.ceil(size/CHUNK_SIZE)}
 }
 export function byteRange(header:string|null,size:number){

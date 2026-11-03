@@ -1,0 +1,14 @@
+app/admin/knowledge/page.tsx
+app/coord/knowledge/page.tsx
+components/knowledge/KnowledgePortal.tsx
+components/knowledge/PortalEditorFields.tsx
+components/knowledge/PortalMedia.tsx
+components/knowledge/portal.css
+components/knowledge/KnowledgeCenter.tsx
+components/ui/Modal.tsx
+lib/knowledge.ts
+lib/knowledge-server.ts
+lib/knowledge-portal.test.ts
+lib/knowledge-portal-api.test.ts
+supabase/migration-knowledge-portal.sql
+docs/ORGANIZATIONAL-KNOWLEDGE.he.md

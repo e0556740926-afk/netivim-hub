@@ -1,2 +1,2 @@
-import KnowledgeCenter from '@/components/knowledge/KnowledgeCenter'
-export default function Page(){return <KnowledgeCenter/>}
+import KnowledgePortal from '@/components/knowledge/KnowledgePortal'
+export default function Page(){return <KnowledgePortal/>}

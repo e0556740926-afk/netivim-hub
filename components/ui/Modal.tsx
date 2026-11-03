@@ -27,7 +27,7 @@ export default function Modal({open,onClose,title,subtitle,children,footer,accen
       if(Array.from(document.querySelectorAll('dialog[open]')).some(d=>!element.contains(d)))return
       if(e.key==="Escape"){e.preventDefault();e.stopPropagation();close.current();return}
       if(e.key!=="Tab") return
-      const items=Array.from(element.querySelectorAll<HTMLElement>(focusable)).filter(n=>n.getClientRects().length>0)
+      const items=Array.from(element.querySelectorAll<HTMLElement>(focusable)).filter(n=>!n.matches(':disabled')&&n.getClientRects().length>0)
       const first=items[0], last=items.at(-1)
       if(!first){e.preventDefault();element.focus();return}
       if(e.shiftKey && (document.activeElement===first || document.activeElement===element)){e.preventDefault();last?.focus()}

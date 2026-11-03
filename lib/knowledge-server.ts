@@ -16,7 +16,8 @@ async function visible(id:string,user:{id:number;role:string}){
  if(!uuid(id))throw new KnowledgeError('התוכן לא נמצא',404)
  const [item]=await sql`SELECT k.*,a.name asset_name,p.name pdf_name,EXISTS(SELECT 1 FROM knowledge_favorites f WHERE f.item_id=k.id AND f.user_id=${user.id}) favorite
  FROM knowledge_items k LEFT JOIN knowledge_assets a ON a.id=k.asset_id LEFT JOIN knowledge_assets p ON p.id=k.pdf_asset_id
- WHERE k.id=${id}::uuid AND (${user.role==='admin'} OR (k.status='published' AND (k.audience='all' OR ${user.id}=ANY(k.audience_ids))))`
+ WHERE k.id=${id}::uuid AND (${user.role==='admin'} OR (k.status='published' AND (k.audience='all' OR ${user.id}=ANY(k.audience_ids))
+ AND (COALESCE(k.portal->>'department','unassigned') IN ('shared','unassigned') OR EXISTS(SELECT 1 FROM knowledge_department_members d WHERE d.user_id=${user.id} AND d.department=k.portal->>'department'))))`
  if(!item)throw new KnowledgeError('התוכן לא נמצא או שאין הרשאה לצפות בו',404)
  return item
 }
@@ -29,12 +30,13 @@ async function assertAsset(id:string|null,role:string,userId:number,kind:string,
  if(!id)return
  const a=await asset(id)
  if(!a.ready||a.creator_id!==userId){
-  const [used]=await sql`SELECT id FROM knowledge_items WHERE (asset_id=${id}::uuid OR pdf_asset_id=${id}::uuid) LIMIT 1`
+  const [used]=await sql`SELECT id FROM knowledge_items WHERE (asset_id=${id}::uuid OR pdf_asset_id=${id}::uuid OR portal->'media' @> ${JSON.stringify([{asset_id:id}])}::jsonb) LIMIT 1`
   if(!a.ready||role!=='admin'||!used)throw new KnowledgeError('הקובץ לא הושלם או שאינו שייך לתוכן זמין')
  }
  if(pdf&&a.mime!=='application/pdf')throw new KnowledgeError('תצוגת מצגת מחייבת קובץ PDF')
+ if(kind==='image'&&!a.mime.startsWith('image/'))throw new KnowledgeError('יש לבחור קובץ תמונה')
  if(kind==='video'&&!a.mime.startsWith('video/'))throw new KnowledgeError('יש לבחור קובץ וידאו')
- if(kind!=='video'&&a.mime.startsWith('video/'))throw new KnowledgeError('סוג הקובץ אינו מתאים לתוכן')
+ if(!['image','video'].includes(kind)&&(a.mime.startsWith('video/')||a.mime.startsWith('image/')))throw new KnowledgeError('סוג הקובץ אינו מתאים לתוכן')
 }
 export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<Response>{
  try{
@@ -47,14 +49,36 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
   if(root==='options'&&req.method==='GET'){
    manager(user.role)
    const users=await sql`SELECT id,name FROM users WHERE role='coordinator' ORDER BY name`
-   return json({users})
+   const events=await sql`SELECT id,name,date,location FROM events WHERE date<=CURRENT_DATE ORDER BY date DESC LIMIT 300`
+   const campaigns=await sql`SELECT id,name,status FROM msg_campaigns ORDER BY id DESC LIMIT 300`
+   return json({users,events,campaigns})
+  }
+  if(root==='members'){
+   manager(user.role)
+   if(req.method==='GET'){const people=await sql`SELECT u.id,u.name,u.role,COALESCE(array_agg(d.department) FILTER(WHERE d.department IS NOT NULL),'{}') departments FROM users u LEFT JOIN knowledge_department_members d ON d.user_id=u.id GROUP BY u.id,u.name,u.role ORDER BY u.name`;return json({people})}
+   if(req.method==='PUT'){
+    const b=await body(req),userId=Number(b.user_id),departments=b.departments
+    if(!Number.isSafeInteger(userId)||userId<=0||!Array.isArray(departments)||departments.length>2||departments.some((d:unknown)=>!['community','guidance'].includes(String(d))))throw new KnowledgeError('שיוך עובד לא תקין')
+    const [exists]=await sql`SELECT id FROM users WHERE id=${userId}`;if(!exists)throw new KnowledgeError('העובד לא נמצא',404)
+    await sql.transaction([sql`SELECT pg_advisory_xact_lock(61008,${userId})`,sql`DELETE FROM knowledge_department_members WHERE user_id=${userId}`,sql`INSERT INTO knowledge_department_members(user_id,department) SELECT ${userId},unnest(${[...new Set(departments)]}::text[])`])
+    return json({ok:true})
+   }
   }
   if(root==='items'){
    if(!id&&req.method==='GET'){
-    const items=await sql`SELECT k.id,k.title,k.summary,k.topic,k.kind,k.video_url,k.asset_id,k.pdf_asset_id,k.status,k.audience,k.audience_ids,k.version,k.updated_at,k.published_at,'[]'::jsonb sections,a.name asset_name,p.name pdf_name,EXISTS(SELECT 1 FROM knowledge_favorites f WHERE f.item_id=k.id AND f.user_id=${user.id}) favorite
+    const q=req.nextUrl.searchParams,search=(q.get('q')||'').slice(0,100),area=q.get('area')||'all',department=q.get('department')||'all',kind=q.get('kind')||'all',status=q.get('status')||'all',favorites=q.get('favorites')==='true',page=Math.max(0,Math.min(10000,Number(q.get('page'))||0))
+    if(!Number.isInteger(page))throw new KnowledgeError('עמוד לא תקין')
+    const items=await sql`SELECT COUNT(*) OVER()::int total_count,k.id,k.title,k.summary,k.topic,k.kind,k.video_url,k.asset_id,k.pdf_asset_id,k.status,k.audience,k.audience_ids,k.version,k.updated_at,k.published_at,k.portal,'[]'::jsonb sections,a.name asset_name,p.name pdf_name,EXISTS(SELECT 1 FROM knowledge_favorites f WHERE f.item_id=k.id AND f.user_id=${user.id}) favorite
      FROM knowledge_items k LEFT JOIN knowledge_assets a ON a.id=k.asset_id LEFT JOIN knowledge_assets p ON p.id=k.pdf_asset_id
-     WHERE ${user.role==='admin'} OR (k.status='published' AND (k.audience='all' OR ${user.id}=ANY(k.audience_ids))) ORDER BY k.updated_at DESC LIMIT 500`
-    return json({items,canManage:user.role==='admin'})
+     WHERE (${user.role==='admin'} OR (k.status='published' AND (k.audience='all' OR ${user.id}=ANY(k.audience_ids))
+      AND (COALESCE(k.portal->>'department','unassigned') IN ('shared','unassigned') OR EXISTS(SELECT 1 FROM knowledge_department_members d WHERE d.user_id=${user.id} AND d.department=k.portal->>'department'))))
+     AND (${search}='' OR k.title ILIKE ${'%'+search+'%'} OR k.summary ILIKE ${'%'+search+'%'} OR k.topic ILIKE ${'%'+search+'%'})
+     AND (${area}='all' OR COALESCE(k.portal->>'area',CASE WHEN k.kind='script' THEN 'scripts' ELSE 'learning' END)=${area})
+     AND (${department}='all' OR COALESCE(k.portal->>'department','unassigned')=${department} OR (${department} IN ('community','guidance') AND k.portal->>'department'='shared'))
+     AND (${kind}='all' OR k.kind=${kind}) AND (${status}='all' OR k.status=${status})
+     AND (${!favorites} OR EXISTS(SELECT 1 FROM knowledge_favorites f WHERE f.user_id=${user.id} AND f.item_id=k.id))
+     ORDER BY k.updated_at DESC,k.id DESC LIMIT 24 OFFSET ${page*24}`
+    return json({items,total:items[0]?.total_count||0,page,canManage:user.role==='admin'})
    }
    if(id&&action==='favorite'&&['PUT','DELETE'].includes(req.method)){
     await visible(id,user)
@@ -70,6 +94,9 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
     if(id)await visible(id,user)
     await assertAsset(f.asset_id,user.role,user.id,f.kind)
     await assertAsset(f.pdf_asset_id,user.role,user.id,f.kind,true)
+    for(const media of f.portal.media)await assertAsset(media.asset_id,user.role,user.id,media.kind)
+    if(f.portal.event_id){const [event]=await sql`SELECT id FROM events WHERE id=${f.portal.event_id} AND date<=CURRENT_DATE`;if(!event)throw new KnowledgeError('יש לבחור אירוע שהתקיים')}
+    if(f.portal.campaign_id){const [campaign]=await sql`SELECT id FROM msg_campaigns WHERE id=${f.portal.campaign_id}`;if(!campaign)throw new KnowledgeError('הקמפיין המקושר לא נמצא')}
     if(f.audience_ids.length){
      const recipients=await sql`SELECT id FROM users WHERE role='coordinator' AND id=ANY(${f.audience_ids}::integer[])`
      if(recipients.length!==f.audience_ids.length)throw new KnowledgeError('אחד מהרכזים שנבחרו אינו זמין. רעננו את הרשימה')
@@ -77,13 +104,13 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
     let saved
     if(id){
      [saved]=await sql`UPDATE knowledge_items SET title=${f.title},summary=${f.summary},topic=${f.topic},kind=${f.kind},sections=${JSON.stringify(f.sections)}::jsonb,
-      video_url=${f.video_url},asset_id=${f.asset_id}::uuid,pdf_asset_id=${f.pdf_asset_id}::uuid,status=${f.status},audience=${f.audience},audience_ids=${f.audience_ids}::integer[],version=version+1,updated_at=now(),
+      video_url=${f.video_url},asset_id=${f.asset_id}::uuid,pdf_asset_id=${f.pdf_asset_id}::uuid,status=${f.status},audience=${f.audience},audience_ids=${f.audience_ids}::integer[],portal=${JSON.stringify(f.portal)}::jsonb,version=version+1,updated_at=now(),
       published_at=CASE WHEN ${f.status}='published' THEN COALESCE(published_at,now()) ELSE published_at END WHERE id=${id}::uuid AND version=${f.version} RETURNING id`
      if(!saved)throw new KnowledgeError('התוכן עודכן בחלון אחר. יש לסגור, לרענן ולפתוח מחדש לפני שמירה.',409)
     }else{
      const key=randomUUID()
-     ;[saved]=await sql`INSERT INTO knowledge_items(id,title,summary,topic,kind,sections,video_url,asset_id,pdf_asset_id,status,audience,audience_ids,creator_id,published_at)
-      VALUES(${key}::uuid,${f.title},${f.summary},${f.topic},${f.kind},${JSON.stringify(f.sections)}::jsonb,${f.video_url},${f.asset_id}::uuid,${f.pdf_asset_id}::uuid,${f.status},${f.audience},${f.audience_ids}::integer[],${user.id},CASE WHEN ${f.status}='published' THEN now() ELSE NULL END) RETURNING id`
+     ;[saved]=await sql`INSERT INTO knowledge_items(id,title,summary,topic,kind,sections,video_url,asset_id,pdf_asset_id,status,audience,audience_ids,creator_id,published_at,portal)
+      VALUES(${key}::uuid,${f.title},${f.summary},${f.topic},${f.kind},${JSON.stringify(f.sections)}::jsonb,${f.video_url},${f.asset_id}::uuid,${f.pdf_asset_id}::uuid,${f.status},${f.audience},${f.audience_ids}::integer[],${user.id},CASE WHEN ${f.status}='published' THEN now() ELSE NULL END,${JSON.stringify(f.portal)}::jsonb) RETURNING id`
     }
     return json({item:await visible(saved.id,user)})
    }
@@ -118,8 +145,9 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
     }
     if(!action&&req.method==='GET'){
      if(!a.ready)throw new KnowledgeError('הקובץ עדיין אינו זמין',404)
-     const [allowed]=await sql`SELECT id FROM knowledge_items WHERE (asset_id=${id}::uuid OR pdf_asset_id=${id}::uuid)
-      AND (${user.role==='admin'} OR (status='published' AND (audience='all' OR ${user.id}=ANY(audience_ids)))) LIMIT 1`
+     const [allowed]=await sql`SELECT id FROM knowledge_items k WHERE (asset_id=${id}::uuid OR pdf_asset_id=${id}::uuid OR portal->'media' @> ${JSON.stringify([{asset_id:id}])}::jsonb)
+      AND (${user.role==='admin'} OR (status='published' AND (audience='all' OR ${user.id}=ANY(audience_ids))
+      AND (COALESCE(k.portal->>'department','unassigned') IN ('shared','unassigned') OR EXISTS(SELECT 1 FROM knowledge_department_members d WHERE d.user_id=${user.id} AND d.department=k.portal->>'department')))) LIMIT 1`
      if(!allowed&&!(user.role==='admin'&&a.creator_id===user.id))throw new KnowledgeError('הקובץ לא נמצא',404)
      let range
      try{range=byteRange(req.headers.get('range'),a.size)}catch{return new Response(null,{status:416,headers:{'Content-Range':`bytes */${a.size}`,'Cache-Control':'no-store'}})}
@@ -135,7 +163,7 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
        controller.enqueue(new Uint8Array(bytes.slice(from,to)));part++
       }catch(e){controller.error(e)}
      }})
-     const disposition=req.nextUrl.searchParams.has('download')?'attachment':a.mime==='application/pdf'||a.mime.startsWith('video/')?'inline':'attachment'
+     const disposition=req.nextUrl.searchParams.has('download')?'attachment':a.mime==='application/pdf'||a.mime.startsWith('video/')||a.mime.startsWith('image/')?'inline':'attachment'
      return new Response(stream,{status:partial?206:200,headers:{'Content-Type':a.mime,'Content-Length':String(end-start+1),'Accept-Ranges':'bytes',...(partial?{'Content-Range':`bytes ${start}-${end}/${a.size}`} : {}),'Content-Disposition':`${disposition}; filename="download.${a.name.split('.').pop()?.replace(/[^a-z0-9]/gi,'')||'bin'}"; filename*=UTF-8''${encodeURIComponent(a.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}})
     }
    }
@@ -145,6 +173,7 @@ export async function knowledgeRoute(req:NextRequest,path:string[]=[]):Promise<R
   if(e instanceof KnowledgeError)return json({error:e.message},e.status)
   console.error('Knowledge center request failed',e instanceof Error?e.message:'unknown')
   const message=e instanceof Error?e.message:''
+  if(/column .*portal.*does not exist/i.test(message))return json({error:'יש להתקין את מיגרציית הפורטל הארגוני לפני השימוש.'},503)
   if(/relation .*knowledge_.*does not exist/i.test(message))return json({error:'מרכז הידע ממתין להתקנת בסיס הנתונים. יש להחיל את מיגרציית מרכז הידע.'},503)
   if(/Blobs|store.*config|credentials|siteID|token/i.test(message))return json({error:'אחסון הקבצים אינו מוגדר בסביבה זו. ההעלאה זמינה בפריסה המחוברת ל־Netlify.'},503)
   return json({error:'לא ניתן להשלים את הפעולה. נסו שוב.'},500)
