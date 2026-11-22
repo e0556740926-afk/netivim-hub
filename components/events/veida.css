@@ -4,7 +4,8 @@
  position:relative;min-height:100vh;color:var(--cream);font-family:"Assistant",Arial,sans-serif;-webkit-font-smoothing:antialiased;
  background:radial-gradient(90% 55% at 60% 18%,#0D5560 0%,#063C44 45%,#00262B 100%) fixed,#00262B}
 .vd-root *,.vd-root *::before,.vd-root *::after{box-sizing:border-box}
-.vd-root h1,.vd-root h2,.vd-root p,.vd-root dl,.vd-root dd,.vd-root fieldset{margin:0;padding:0;border:0}
+/* Zero-specificity reset, so each element's own margin below still applies. */
+:where(.vd-root) :where(h1,h2,p,dl,dd,fieldset){margin:0;padding:0;border:0}
 .vd-frame{position:fixed;inset:12px;border:1px solid rgba(201,162,94,.55);border-radius:16px;pointer-events:none;z-index:30}
 
 /* logo */
@@ -51,8 +52,8 @@
 .vd-band span{font-weight:800;font-size:15px;padding:0 12px;white-space:nowrap}
 .vd-band span+span{border-right:1.5px solid rgba(0,38,43,.6)}
 .vd-band .vd-donly{display:none}
-.vd-when{display:flex;justify-content:center;gap:10px;font-size:15px;color:rgba(248,244,237,.86);margin-top:14px}
-.vd-when b{color:var(--gold);font-weight:600}
+.vd-when{display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;gap:6px 10px;font-size:16px;line-height:24px;color:rgba(248,244,237,.86);margin-top:16px}
+.vd-when b{color:var(--gold);font-weight:800;font-size:18px}
 .vd-about{font-size:17px;line-height:28px;color:rgba(248,244,237,.84);margin-top:34px}
 
 .vd-formcol{padding:0 32px 64px}

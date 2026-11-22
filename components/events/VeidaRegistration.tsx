@@ -97,7 +97,7 @@ export default function VeidaRegistration({slug,record}:{slug:string;record:Rec}
     <p className="vd-tag vd-rise" style={{animationDelay:'1.3s'}}>ידידים<i>.</i> שותפים<i>.</i> מובילים<i>.</i></p>
     {iso&&<div className="vd-band vd-rise" style={{animationDelay:'1.45s'}}><span>יום {weekday(iso)}</span><span>{hebrewDate(iso)}</span><span>{shortDate(iso)}</span>{ev.time&&<span className="vd-donly">כניסה {ev.time}</span>}</div>}
     {(ev.time||venue)&&<p className="vd-when">{ev.time&&<><span>כניסה</span><b>{ev.time}</b></>}{ev.time&&venue&&<span>·</span>}{venue&&<span>{venue}</span>}</p>}
-    <p className="vd-about">ערב של מפגש עם השותפים של נתיבים – רבנים, יועצים חינוכיים, מנהיגי קהילות ואנשי עסקים שמלווים איתנו לאורך השנה צעירים בדרך אל המסגרת הנכונה להם. נתחיל במתחם התחנות, ונמשיך יחד באולם.</p>
+    <p className="vd-about">ועידת נתיבים מכנסת את שותפינו מכל הארץ – רבנים, אנשי חינוך, מנהיגי קהילות ואנשי עסקים – לערב של היכרות, הוקרה ועשייה משותפת למען צעירי הציבור החרדי.</p>
    </section>}
    <section className="vd-formcol" aria-labelledby="vd-title">
     {!done?<>
