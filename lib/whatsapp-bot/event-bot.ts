@@ -44,7 +44,7 @@ function eventDetails(g:EventGuest){
  const i=info(g)
  return [`*${g.eventName}*`,whenLine({date:g.event.date,time:g.event.time,location:i.venue})||'המועד יפורסם בקרוב',
   i.address&&`כתובת: ${i.address}`,i.nav&&`ניווט: ${i.nav}`,i.parking&&`חניה: ${i.parking}`,i.transport&&`תחבורה ציבורית: ${i.transport}`,
-  i.program&&`בתוכנית: ${i.program}`,i.access&&`נגישות: ${i.access}`,!i.venue&&'המקום המדויק יישלח לנרשמים בקרוב.'].filter(Boolean).join('\n')
+  i.program&&`בתוכנית: ${i.program}`,i.access&&`נגישות: ${i.access}`].filter(Boolean).join('\n')
 }
 function menu(g:EventGuest):BotReply{
  const lines=g.kind==='registrant'

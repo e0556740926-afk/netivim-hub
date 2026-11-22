@@ -84,7 +84,8 @@ export default function VeidaRegistration({slug,record}:{slug:string;record:Rec}
  const set=(k:keyof typeof v)=>(e:React.ChangeEvent<HTMLInputElement>)=>{setV(s=>({...s,[k]:e.target.value}));setBad(b=>({...b,[k]:''}))}
  const field=(k:string,label:string,input:React.ReactNode,extra?:React.ReactNode)=><div className={`vd-f${bad[k]?' vd-bad':''}`} data-k={k}><label htmlFor={`vd-${k}`}>{label}</label>{input}{bad[k]&&<span className="vd-err" role="alert">{bad[k]}</span>}{extra}</div>
  const firstName=v.name.trim().split(/\s+/)[0]||''
- const venue=ev.location||'המקום יפורסם בקרוב'
+ // The place is not published on the page unless the event has one set.
+ const venue=ev.location||''
 
  return <div className="vd-root" dir="rtl">
   <div className="vd-frame" aria-hidden="true"/>
@@ -94,15 +95,15 @@ export default function VeidaRegistration({slug,record}:{slug:string;record:Rec}
     <p className="vd-eyebrow">מרכז נתיבים · אגף שטח וקהילות</p>
     <div className="vd-lock"><div className="vd-lockin" ref={hero}><Mark play={play}/><h1 className="vd-titles"><span className="vd-t1 vd-rise" style={{animationDelay:'.95s'}}>ועידת</span><span className="vd-t2 vd-rise" style={{animationDelay:'1.1s'}}>נתיבים</span></h1></div></div>
     <p className="vd-tag vd-rise" style={{animationDelay:'1.3s'}}>ידידים<i>.</i> שותפים<i>.</i> מובילים<i>.</i></p>
-    {iso&&<div className="vd-band vd-rise" style={{animationDelay:'1.45s'}}><span>יום {weekday(iso)}</span><span>{hebrewDate(iso)}</span><span>{shortDate(iso)}</span>{ev.time&&<span className="vd-donly">{ev.time}</span>}</div>}
-    <p className="vd-when">{ev.time&&<b>{ev.time}</b>}{ev.time&&<span>·</span>}<span>{venue}</span></p>
+    {iso&&<div className="vd-band vd-rise" style={{animationDelay:'1.45s'}}><span>יום {weekday(iso)}</span><span>{hebrewDate(iso)}</span><span>{shortDate(iso)}</span>{ev.time&&<span className="vd-donly">כניסה {ev.time}</span>}</div>}
+    {(ev.time||venue)&&<p className="vd-when">{ev.time&&<><span>כניסה</span><b>{ev.time}</b></>}{ev.time&&venue&&<span>·</span>}{venue&&<span>{venue}</span>}</p>}
     <p className="vd-about">ערב של מפגש עם השותפים של נתיבים – רבנים, יועצים חינוכיים, מנהיגי קהילות ואנשי עסקים שמלווים איתנו לאורך השנה צעירים בדרך אל המסגרת הנכונה להם. נתחיל במתחם התחנות, ונמשיך יחד באולם.</p>
    </section>}
    <section className="vd-formcol" aria-labelledby="vd-title">
     {!done?<>
      <div className="vd-rule"/>
      <h2 className="vd-h" id="vd-title">אישור השתתפות</h2>
-     <p className="vd-sub">{venue}</p>
+     {(venue||ev.time)&&<p className="vd-sub">{venue||`כניסה ${ev.time}`}</p>}
      {!record.form.enabled?<p className="vd-closed" role="status">ההרשמה סגורה כרגע. לפרטים אפשר לפנות לרכז שהזמין אתכם.</p>:
      <form id="vd-form" ref={formRef} onSubmit={submit} noValidate>
       <fieldset disabled={busy}>
@@ -139,8 +140,8 @@ export default function VeidaRegistration({slug,record}:{slug:string;record:Rec}
      <p className="vd-lead">{done.already?'כבר היית רשום/ה – הפרטים עודכנו. נשמח לראותך.':done.waitlisted?'הבקשה התקבלה ברשימת ההמתנה. נעדכן אותך אם יתפנה מקום.':`ההשתתפות שלך ב${ev.name} נרשמה. נשמח לראותך.`}</p>
      <dl className="vd-tbl">
       {iso&&<div><dt>מתי</dt><dd>יום {weekday(iso)}, {hebrewDate(iso).split(' ').slice(0,2).join(' ')} · {shortDate(iso).split('.').slice(0,2).join('.')}</dd></div>}
-      {ev.time&&<div><dt>שעה</dt><dd>{ev.time}</dd></div>}
-      <div><dt>איפה</dt><dd>{ev.location||'יפורסם בקרוב'}</dd></div>
+      {ev.time&&<div><dt>כניסה</dt><dd>{ev.time}</dd></div>}
+      {ev.location&&<div><dt>איפה</dt><dd>{ev.location}</dd></div>}
       {withGuest&&<div><dt>מלווה</dt><dd>{g.name} · ממתין לאישור</dd></div>}
       {done.no&&<div><dt>מס׳ הרשמה</dt><dd>{done.no}</dd></div>}
      </dl>
