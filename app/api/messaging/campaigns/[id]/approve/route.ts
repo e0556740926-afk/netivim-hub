@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db, guard, activity, bad } from "@/lib/messaging/server"
-import { channelStatus, computeEligibility, contentProblems, runWorker, snapshotCampaign, syncNewsletter } from "@/lib/messaging/core"
+import { channelStatus, computeEligibility, contentProblems, onlyEventAudiences, runWorker, snapshotCampaign, syncEventAudiences, syncNewsletter } from "@/lib/messaging/core"
 
 /**
  * Final approval by an authorised user: freezes the content revision and
@@ -26,7 +26,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     when = new Date(d.scheduled_at)
     if (isNaN(+when) || +when < Date.now() + 60_000) return bad("יש לבחור מועד עתידי לתזמון")
   }
+  if (c.channel === "whatsapp" && !(await onlyEventAudiences(db, c.audience_ids || []))) return bad("קמפיין WhatsApp נשלח ממספר הבוט, ולכן רק לקהלים שיובאו מאירוע (\"ייבוא קהל מאירוע\").", 409)
   await syncNewsletter(db).catch(() => {})
+  await syncEventAudiences(db).catch(e => console.error("[messaging] event audiences", e))
   const elig = await computeEligibility(db, c.channel, c.audience_ids, c.exclude_audience_ids || [])
   if (!elig.eligible) return bad("אין בקהל שנבחר נמענים כשירים לערוץ הזה", 409, { eligibility: elig })
   const [ok] = await db`UPDATE msg_campaigns SET status = ${when ? "scheduled" : "queued"}, approved_revision = revision, approved_content = content,

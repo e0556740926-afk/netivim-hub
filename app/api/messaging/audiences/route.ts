@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db, guard, activity, bad } from "@/lib/messaging/server"
-import { syncNewsletter } from "@/lib/messaging/core"
+import { syncEventAudiences, syncNewsletter } from "@/lib/messaging/core"
 
 /** Audiences with unique people and per-channel eligibility (channels overlap, never summed). */
 export async function GET(req: NextRequest) {
   const u = await guard(req, "view"); if (u instanceof NextResponse) return u
   await syncNewsletter(db).catch(e => console.error("[messaging] newsletter sync", e))
+  await syncEventAudiences(db).catch(e => console.error("[messaging] event audiences", e))
   const rows = await db`
     WITH latest AS (
       SELECT DISTINCT ON (recipient_id, channel) recipient_id, channel, status FROM msg_consents WHERE topic = 'marketing'
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
                 AND EXISTS (SELECT 1 FROM latest l WHERE l.recipient_id = m.recipient_id AND l.channel = 'whatsapp' AND l.status = 'granted')) AS wa_ok
       FROM msg_audience_members m
     )
-    SELECT a.id, a.name, a.description, a.owner, a.source, a.system_key, a.created_at, a.created_by,
+    SELECT a.id, a.name, a.description, a.owner, a.source, a.system_key, a.created_at, a.created_by, a.source_event_id,
       count(p.recipient_id)::int AS people,
       count(*) FILTER (WHERE p.email_ok)::int AS email_ok,
       count(*) FILTER (WHERE p.sms_ok)::int AS sms_ok,

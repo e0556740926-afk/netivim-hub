@@ -982,3 +982,15 @@ ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status = ANY (ARRAY['
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_state text;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_error text;
 ALTER TABLE leads ADD COLUMN IF NOT EXISTS sf_sync_at timestamptz;
+
+-- ── ועידת נתיבים: עיצוב דף לפי אירוע, מלווים, הזמנות אישיות, קהלי אירוע (22.11.2026) ──
+ALTER TABLE events ADD COLUMN IF NOT EXISTS page_design text NOT NULL DEFAULT 'default';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS invite_template text NOT NULL DEFAULT '';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS bot_info jsonb;
+ALTER TABLE event_attendees ADD COLUMN IF NOT EXISTS companion_of bigint;
+ALTER TABLE event_attendees ADD COLUMN IF NOT EXISTS inviter_id bigint; -- users.id of the coordinator who invited
+ALTER TABLE event_attendees ADD COLUMN IF NOT EXISTS invite_id bigint;
+ALTER TABLE event_attendees ADD COLUMN IF NOT EXISTS declined_at timestamptz;
+CREATE TABLE IF NOT EXISTS event_invites (id bigserial PRIMARY KEY, event_id bigint NOT NULL REFERENCES events(id) ON DELETE CASCADE, contact_id bigint NOT NULL, inviter_id bigint, token text NOT NULL UNIQUE, sent_at timestamptz, reminded_at timestamptz, opened_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(event_id, contact_id));
+ALTER TABLE msg_audiences ADD COLUMN IF NOT EXISTS source_event_id bigint;
+ALTER TABLE msg_audiences ADD COLUMN IF NOT EXISTS source_filter text;

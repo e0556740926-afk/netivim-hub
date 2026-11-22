@@ -20,6 +20,9 @@ export default function MessagingCenter() {
   const [conn, setConn] = useState<any>(null)
   const [err, setErr] = useState<any>(null)
   const [newAud, setNewAud] = useState(false)
+  const [fromEvent, setFromEvent] = useState(false)
+  const [evList, setEvList] = useState<any>(null)
+  const [evPick, setEvPick] = useState({ event_id: "", filter: "approved" })
   const [audForm, setAudForm] = useState({ name: "", description: "", source: "" })
   const [busy, setBusy] = useState(false)
   const [chFilter, setChFilter] = useUrlState("ch")
@@ -36,6 +39,20 @@ export default function MessagingCenter() {
   }, [tab, chFilter])
   useEffect(() => { load() }, [load])
   const can = data?.can || { edit: true, send: false }
+
+  async function openFromEvent() {
+    setFromEvent(true)
+    if (!evList) try { setEvList(await api("/api/messaging/audiences/from-event")) } catch (e: any) { toastError(e.message) }
+  }
+  async function importFromEvent() {
+    if (!evPick.event_id) { toastError("יש לבחור אירוע"); return }
+    setBusy(true)
+    try {
+      const d = await api("/api/messaging/audiences/from-event", "POST", { event_id: Number(evPick.event_id), filter: evPick.filter })
+      success(`הקהל מוכן · ${d.people} נמענים`); setFromEvent(false)
+      router.push(`/admin/messaging/audiences/${d.audience.id}`)
+    } catch (e: any) { toastError(e.message) } finally { setBusy(false) }
+  }
 
   async function createAudience() {
     if (!audForm.name.trim()) { toastError("יש להזין שם לקהל"); return }
@@ -58,6 +75,7 @@ export default function MessagingCenter() {
           <Link className="lw-btn" href="/admin/messaging/leads">לידים מקמפיינים</Link>
           <Link className="lw-btn" href="/admin/newsletter">הניוזלטר הקיים</Link>
           <Link className="lw-btn" href="/admin/messaging/import">ייבוא נמענים</Link>
+          <button type="button" className="lw-btn" onClick={openFromEvent}>ייבוא קהל מאירוע</button>
           <button type="button" className="lw-btn" onClick={() => setNewAud(true)}>קהל חדש</button>
           <Link className="lw-btn lw-btn-primary" href="/admin/messaging/campaigns/new">+ קמפיין חדש</Link>
         </div>
@@ -104,7 +122,7 @@ export default function MessagingCenter() {
             <thead><tr><th>קהל</th><th>מקור</th><th className="num">אנשים</th><th>כשירים לפי ערוץ</th><th>אחראי</th></tr></thead>
             <tbody>
               {aud.map(a => <tr key={a.id}>
-                <td><Link className="mc-link" href={`/admin/messaging/audiences/${a.id}`}>{a.name}</Link>{a.system_key && <span className="mc-pill blue" style={{ marginInlineStart: 6 }}>מסונכרן</span>}<span className="mc-sub">{a.description}</span></td>
+                <td><Link className="mc-link" href={`/admin/messaging/audiences/${a.id}`}>{a.name}</Link>{a.system_key && <span className="mc-pill blue" style={{ marginInlineStart: 6 }}>מסונכרן</span>}{a.source_event_id && <span className="mc-pill blue" style={{ marginInlineStart: 6 }}>מקושר לאירוע</span>}<span className="mc-sub">{a.description}</span></td>
                 <td>{a.source || "—"}</td>
                 <td className="num">{n(a.people)}</td>
                 <td><div className="mc-chan"><span>מייל <b>{n(a.email_ok)}</b></span><span>· SMS <b>{n(a.sms_ok)}</b></span><span>· WhatsApp <b>{n(a.wa_ok)}</b></span></div></td>
@@ -166,6 +184,19 @@ export default function MessagingCenter() {
           <label className="mc-field full">שם הקהל *<input value={audForm.name} onChange={e => setAudForm(f => ({ ...f, name: e.target.value }))} placeholder="למשל: שותפים בירושלים" /></label>
           <label className="mc-field full">תיאור<textarea value={audForm.description} onChange={e => setAudForm(f => ({ ...f, description: e.target.value }))} rows={2} /></label>
           <label className="mc-field full">מקור<input value={audForm.source} onChange={e => setAudForm(f => ({ ...f, source: e.target.value }))} placeholder="למשל: נרשמי מפגש אוקטובר" /></label>
+        </div>
+      </Sheet>
+      <Sheet open={fromEvent} onClose={() => setFromEvent(false)} title="ייבוא קהל מאירוע" subtitle="הקהל נשאר מחובר לאירוע: מי שנרשם אחר כך נכנס אליו לפני כל שליחה, ומי שביטל יוצא."
+        footer={<><button type="button" className="lw-btn lw-btn-primary" disabled={busy || !evPick.event_id} onClick={importFromEvent}>{busy ? "מייבא…" : "יצירת הקהל"}</button><button type="button" className="lw-btn" onClick={() => setFromEvent(false)}>ביטול</button></>}>
+        <div className="mc-form">
+          <label className="mc-field full">אירוע *<select value={evPick.event_id} onChange={e => setEvPick(p => ({ ...p, event_id: e.target.value }))}>
+            <option value="">בחירת אירוע…</option>
+            {(evList?.events || []).map((e: any) => <option key={e.id} value={e.id}>{e.name}{e.date ? ` · ${String(e.date).slice(0, 10).split("-").reverse().join(".")}` : ""} · {e.registered} נרשמו</option>)}
+          </select></label>
+          <label className="mc-field full">מי נכנס לקהל<select value={evPick.filter} onChange={e => setEvPick(p => ({ ...p, filter: e.target.value }))}>
+            {Object.entries(evList?.filters || { approved: "נרשמים מאושרים" }).map(([k, l]) => <option key={k} value={k}>{String(l)}</option>)}
+          </select><small>מלווים שעדיין לא אושרו לא נכללים בקהל &quot;נרשמים מאושרים&quot;.</small></label>
+          <p className="mc-sub full">ההרשמה לאירוע היא בסיס ההרשאה לפנות אליהם בנושא האירוע. מי שביקש בעבר הסרה לא יקבל הודעות.</p>
         </div>
       </Sheet>
       {!can.edit && tab !== "connections" && <p className="mc-sub">יש לך הרשאת צפייה בלבד במרכז הדיוורים.</p>}

@@ -22,7 +22,7 @@ export type EmailContent = {
   archive: boolean
 }
 export type SmsContent = { text: string; sender_label: string; optout_text: string; replies?: ReplyOption[] }
-export type WhatsappContent = { template_name: string; language: string; variables: string[]; body_preview: string }
+export type WhatsappContent = { template_name: string; language: string; variables: string[]; body_preview: string; text?: string }
 export type CampaignContent = Partial<EmailContent & SmsContent & WhatsappContent>
 
 export const EMPTY_EMAIL: EmailContent = {
@@ -34,7 +34,7 @@ export const EMPTY_EMAIL: EmailContent = {
 }
 // Replies go to the 019 virtual number, so "השב הסר" is a working opt-out (and far shorter than a link).
 export const EMPTY_SMS: SmsContent = { text: "", sender_label: "", optout_text: "להסרה השב הסר", replies: [] }
-export const EMPTY_WHATSAPP: WhatsappContent = { template_name: "", language: "he", variables: ["{{first_name}}"], body_preview: "" }
+export const EMPTY_WHATSAPP: WhatsappContent = { template_name: "", language: "he", variables: ["{{first_name}}"], body_preview: "", text: "" }
 
 export type Personal = { first_name?: string; full_name?: string; unsubscribe_url?: string; preferences_url?: string; callback_url?: string }
 
@@ -166,7 +166,9 @@ export function contentProblems(channel: string, c: CampaignContent): string[] {
     if (!/\{\{\s*unsubscribe_url\s*\}\}/.test(all) && !SMS_REPLY_OPTOUT.test(all)) out.push("חסרה דרך הסרה שעובדת בפועל (\"להסרה השב הסר\" או קישור הסרה)")
     out.push(...replyProblems(c.replies))
   } else if (channel === "whatsapp") {
-    if (!String(c.template_name || "").trim()) out.push("יש לבחור תבנית WhatsApp מאושרת")
+    // Green API (bot number): free text. An official-template flow would use template_name instead.
+    if (!String(c.text || "").trim() && !String(c.template_name || "").trim()) out.push("חסר טקסט להודעה")
+    if (String(c.text || "").length > 3000) out.push("ההודעה ארוכה מדי (עד 3,000 תווים)")
   }
   return out
 }

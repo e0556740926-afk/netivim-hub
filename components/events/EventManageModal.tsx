@@ -6,6 +6,10 @@ import Modal from "@/components/ui/Modal"
 import { useToast } from "@/components/ui/Toast"
 import { EMPTY_ATTENDEE, EMPTY_VENDOR, VENDOR_CATEGORIES, InputClass } from "./shared"
 import EventRegistrationBuilder from './EventRegistrationBuilder'
+import InvitesPanel from './InvitesPanel'
+import BotInfoEditor from './BotInfoEditor'
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 /**
  * Attendees + vendors management for one event. Owns its own fetching so
@@ -16,10 +20,10 @@ export default function EventManageModal({ event, onClose, onChanged, initialTab
   event: any | null
   onClose: () => void
   onChanged: () => void
-  initialTab?:'attendees'|'registration'
+  initialTab?:'attendees'|'registration'|'invites'|'botinfo'
 }) {
   const { success, error: showError } = useToast()
-  const [tab, setTab] = useState<"attendees"|"vendors"|"registration">(initialTab)
+  const [tab, setTab] = useState<"attendees"|"vendors"|"registration"|"invites"|"botinfo">(initialTab)
   const [attendees, setAttendees] = useState<any[]>([])
   const [vendors, setVendors] = useState<any[]>([])
   const [newAttendee, setNewAttendee] = useState({...EMPTY_ATTENDEE})
@@ -29,6 +33,19 @@ export default function EventManageModal({ event, onClose, onChanged, initialTab
   const [loadError,setLoadError] = useState(false)
   const [confirmDelete,setConfirmDelete] = useState<{kind:"attendee"|"vendor";id:number;name:string}|null>(null)
   const id = event?.id ?? null
+  const router = useRouter()
+  const { user } = useAuth() as any
+  const canMessage = !!user && user.role !== "coordinator"
+  const [msgBusy,setMsgBusy]=useState(false)
+  /** Creates (or refreshes) the event's registrants audience and opens a new campaign on it. */
+  async function messageRegistrants(){
+    if(!id||msgBusy)return
+    setMsgBusy(true)
+    try{const d=await uiMutation(`/api/messaging/audiences/from-event`,"POST",{event_id:id,filter:"approved"});router.push(`/admin/messaging/campaigns/new?audience=${d.audience.id}&name=${encodeURIComponent(`${event?.name||"אירוע"} · הודעה לנרשמים`)}`)}
+    catch(e){showError(e instanceof Error?e.message:"לא ניתן לפתוח קמפיין")}finally{setMsgBusy(false)}
+  }
+  function declineCompanion(a:any){act(async()=>{await uiMutation(`/api/events/${id}/attendees`,"PATCH",{id:a.id,decline:true});await reload();onChanged();success("המלווה סומן כלא מאושר והודעה נשלחה לנרשם")})}
+  const hostName=(cid:number)=>attendees.find((x:any)=>x.id===cid)?.name||"" 
   const loadVersion=useRef(0)
 
   async function reload() {
@@ -65,13 +82,16 @@ export default function EventManageModal({ event, onClose, onChanged, initialTab
     <><Modal open={event!==null} onClose={()=>{if(!busy)onClose()}} title={`ניהול אירוע · ${event?.name||""}`} width={tab==='registration'?'1050px':'700px'}>
       {loadError&&<div className="ui-error" role="alert">לא ניתן לטעון את הרשומות. <button className="underline" onClick={reload}>ניסיון נוסף</button></div>}
       {loading&&<p className="ui-note mb-3" role="status">טוען רשומות…</p>}
+      {canMessage&&<div className="flex items-center justify-between gap-2 mb-3 p-2.5 rounded-[10px] bg-[#f4f6f2]"><span className="text-xs text-[#63756b]">הודעה לכל הנרשמים המאושרים, דרך מרכז הדיוורים</span><button disabled={msgBusy} onClick={messageRegistrants} className="text-xs px-3 py-1.5 rounded-[8px] bg-[#193d33] text-white font-bold disabled:opacity-50 whitespace-nowrap">{msgBusy?"פותח…":"שליחת הודעות על האירוע"}</button></div>}
       <div className="flex gap-2 p-1 bg-[#f4f6f2] rounded-[10px] mb-3">
         <button onClick={()=>setTab("attendees")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==="attendees"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>נרשמים ({attendees.length})</button>
         <button onClick={()=>setTab("vendors")} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==="vendors"?"bg-white text-[#193d33] shadow-sm":"text-[#63756b]"}`}>ספקים ({vendors.length})</button>
         <button onClick={()=>setTab('registration')} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==='registration'?'bg-white text-[#193d33] shadow-sm':'text-[#63756b]'}`}>טופס רישום</button>
+        <button onClick={()=>setTab('invites')} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==='invites'?'bg-white text-[#193d33] shadow-sm':'text-[#63756b]'}`}>הזמנות</button>
+        <button onClick={()=>setTab('botinfo')} className={`flex-1 py-1.5 rounded-[8px] text-xs font-bold transition-colors ${tab==='botinfo'?'bg-white text-[#193d33] shadow-sm':'text-[#63756b]'}`}>מידע לבוט</button>
       </div>
 
-      {tab==='registration'&&event?<EventRegistrationBuilder key={event.id} event={event}/>:tab === "attendees" ? <>
+      {tab==='botinfo'&&event?<BotInfoEditor eventId={event.id}/>:tab==='invites'&&event?<InvitesPanel eventId={event.id}/>:tab==='registration'&&event?<EventRegistrationBuilder key={event.id} event={event}/>:tab === "attendees" ? <>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-3">
           <input value={newAttendee.name} onChange={e=>setNewAttendee(a=>({...a,name:e.target.value}))} placeholder="שם *" className={InputClass}/>
           <input value={newAttendee.phone} onChange={e=>setNewAttendee(a=>({...a,phone:e.target.value}))} placeholder="טלפון" className={InputClass}/>
@@ -84,11 +104,15 @@ export default function EventManageModal({ event, onClose, onChanged, initialTab
                 <input type="checkbox" checked={a.checked_in} disabled={a.waitlisted||busy} aria-label={`סימון הגעה של ${a.name}`} onChange={()=>toggleCheckin(a)} className="accent-[#28634e] w-4 h-4"/>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold">{a.name}</div>
-                  <div className="text-xs text-[#94A3B8]">{a.phone}{a.waitlisted?" · ברשימת המתנה":a.checked_in?" · הגיע/ה ✓":""}</div>
+                  <div className="text-xs text-[#94A3B8]">{a.phone}{a.companion_of?(a.declined_at?" · מלווה לא אושר":a.waitlisted?" · מלווה ממתין לאישור":" · מלווה מאושר"):a.waitlisted?" · ברשימת המתנה":a.checked_in?" · הגיע/ה ✓":""}</div>
+                  {a.companion_of&&<div className="text-xs text-[#7E5F28]">מלווה של {hostName(a.companion_of)||"נרשם"}{a.registration_answers?.role_org?` · ${a.registration_answers.role_org}`:""}</div>}
+                  {a.inviter_name&&!a.companion_of&&<div className="text-xs text-[#63756b]">הוזמן על ידי {a.inviter_name}</div>}
                   {a.source==='registration'&&<div className="text-xs text-[#28634e]">נרשם דרך הטופס · {a.created_at?new Date(a.created_at).toLocaleString('he-IL'):''}</div>}
                   {a.registration_fields?.length>0&&<details className="er-attendee-answers"><summary>פרטי ההרשמה</summary><dl>{a.registration_fields.map((f:any)=><div key={f.id}><dt>{f.label}</dt><dd>{typeof a.registration_answers?.[f.id]==='boolean'?(a.registration_answers[f.id]?'כן':'לא'):String(a.registration_answers?.[f.id]||'—')}</dd></div>)}</dl></details>}
                 </div>
-                {a.waitlisted && <button disabled={busy} onClick={()=>promoteAttendee(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#28634e] text-[#28634e]">קדם</button>}
+                {a.waitlisted && !a.declined_at && <button disabled={busy} onClick={()=>promoteAttendee(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#28634e] text-[#28634e]">{a.companion_of?"אישור":"קדם"}</button>}
+                {a.companion_of && a.waitlisted && !a.declined_at && <button disabled={busy} onClick={()=>declineCompanion(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] text-[#a74450]">דחייה</button>}
+                {a.companion_of && a.declined_at && <button disabled={busy} onClick={()=>promoteAttendee(a)} className="text-xs px-2 py-1 rounded-[6px] border border-[#28634e] text-[#28634e]">אישור בכל זאת</button>}
                 <button disabled={busy} aria-label={`מחיקת המשתתף ${a.name}`} onClick={()=>setConfirmDelete({kind:"attendee",id:a.id,name:a.name})} className="text-xs px-2 py-1 rounded-[6px] border border-[#e1e8df] text-[#94A3B8] hover:text-[#a74450]">✕</button>
               </div>
             ))}

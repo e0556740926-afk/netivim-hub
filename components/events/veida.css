@@ -1,0 +1,147 @@
+/* ועידת נתיבים — public registration design. Everything is scoped under .vd-root. */
+.vd-root{--cream:#F8F4ED;--gold:#C9A25E;--gold-on:#E6D0A0;--deep:#00262B;--danger:#F08A7B;--ease:cubic-bezier(.2,.8,.2,1);
+ --gold-text:linear-gradient(105deg,#A88242 0%,#E9D39C 45%,#C9A25E 70%,#A07B38 100%);
+ position:relative;min-height:100vh;color:var(--cream);font-family:"Assistant",Arial,sans-serif;-webkit-font-smoothing:antialiased;
+ background:radial-gradient(90% 55% at 60% 18%,#0D5560 0%,#063C44 45%,#00262B 100%) fixed,#00262B}
+.vd-root *,.vd-root *::before,.vd-root *::after{box-sizing:border-box}
+.vd-root h1,.vd-root h2,.vd-root p,.vd-root dl,.vd-root dd,.vd-root fieldset{margin:0;padding:0;border:0}
+.vd-frame{position:fixed;inset:12px;border:1px solid rgba(201,162,94,.55);border-radius:16px;pointer-events:none;z-index:30}
+
+/* logo */
+.vd-mark{display:block;overflow:visible}
+.vd-mark .vd-b{transform-box:fill-box}
+.vd-mark .vd-gold{transform-origin:85% 100%;transform:translate(var(--gx,0),var(--gy,0)) rotate(var(--gr,0deg))}
+.vd-mark .vd-white{transform-origin:0% 100%;transform:translate(var(--wx,0),var(--wy,0)) rotate(var(--wr,0deg))}
+.vd-mark .vd-spark,.vd-mark .vd-ring{transform-box:fill-box;transform-origin:50% 50%;opacity:0}
+.vd-mark.vd-play .vd-gold{animation:vdGold 1.15s var(--ease) both}
+.vd-mark.vd-play .vd-white{animation:vdWhite 1.15s var(--ease) .08s both}
+.vd-mark.vd-play .vd-spark{animation:vdSpark .9s ease-out 1.02s both}
+.vd-mark.vd-play .vd-ring{animation:vdRing 1.3s var(--ease) 1.05s both}
+@keyframes vdGold{0%{opacity:0;transform:translate(-38%,-30%) rotate(-24deg)}55%{opacity:1}100%{opacity:1;transform:translate(var(--gx,0),var(--gy,0)) rotate(var(--gr,0deg))}}
+@keyframes vdWhite{0%{opacity:0;transform:translate(42%,-46%) rotate(26deg)}55%{opacity:1}100%{opacity:1;transform:translate(var(--wx,0),var(--wy,0)) rotate(var(--wr,0deg))}}
+@keyframes vdSpark{0%{opacity:0;transform:scale(.2)}25%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(2.6)}}
+@keyframes vdRing{0%{opacity:.9;transform:scale(.3)}100%{opacity:0;transform:scale(5)}}
+@keyframes vdRise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.vd-rise{animation:vdRise .8s var(--ease) both}
+
+/* sticky bar (phone, on scroll) */
+.vd-bar{position:fixed;top:12px;left:12px;right:12px;z-index:25;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;
+ border-radius:16px 16px 0 0;background:rgba(0,38,43,.86);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+ border-bottom:1px solid rgba(201,162,94,.35);transform:translateY(-110%);opacity:0;transition:transform .45s var(--ease),opacity .3s}
+.vd-bar.on{transform:none;opacity:1}
+.vd-who{display:flex;align-items:center;gap:12px;font-weight:800;font-size:18px}
+.vd-who b{background:var(--gold-text);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vd-bar .vd-mark{width:54px}
+.vd-bar a{font-size:14px;font-weight:600;color:var(--gold);text-decoration:none;padding:8px 4px}
+
+/* layout */
+.vd-page{max-width:1440px;margin:0 auto}
+.vd-poster{padding:56px 32px 0;position:relative}
+.vd-eyebrow{font-size:11px;font-weight:600;letter-spacing:.32em;color:var(--gold);text-align:center}
+.vd-lock{display:flex;margin-top:34px;--t:clamp(74px,17vw,128px)}
+.vd-lockin{position:relative;font-size:var(--t);padding-top:.95em}
+.vd-lock .vd-mark{position:absolute;left:-1.38em;top:0;width:2.57em}
+.vd-titles{position:relative;text-align:right;font-size:1em;font-weight:800}
+.vd-t1,.vd-t2{display:block;font-weight:800;font-size:1em;line-height:.89em;letter-spacing:-.01em}
+.vd-t2{background:var(--gold-text);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vd-tag{font-weight:800;font-size:clamp(22px,5vw,32px);margin-top:.7em}
+.vd-tag i{font-style:normal;color:var(--gold)}
+.vd-band{display:flex;justify-content:center;align-items:center;height:46px;margin:28px -32px 0;color:var(--deep);
+ background:linear-gradient(90deg,#A88242 0%,#D9BE82 30%,#E6D0A0 50%,#D9BE82 70%,#A88242 100%)}
+.vd-band span{font-weight:800;font-size:15px;padding:0 12px;white-space:nowrap}
+.vd-band span+span{border-right:1.5px solid rgba(0,38,43,.6)}
+.vd-band .vd-donly{display:none}
+.vd-when{display:flex;justify-content:center;gap:10px;font-size:15px;color:rgba(248,244,237,.86);margin-top:14px}
+.vd-when b{color:var(--gold);font-weight:600}
+.vd-about{font-size:17px;line-height:28px;color:rgba(248,244,237,.84);margin-top:34px}
+
+.vd-formcol{padding:0 32px 64px}
+.vd-rule{height:1px;background:rgba(201,162,94,.5);margin:34px 0 26px}
+.vd-h{font-size:24px;font-weight:800}
+.vd-sub{font-size:16px;color:rgba(248,244,237,.6);margin-top:6px;display:none}
+.vd-closed{margin-top:18px;font-size:17px;line-height:28px;color:rgba(248,244,237,.84)}
+
+.vd-f{display:block;padding:14px 0 10px;border-bottom:1px solid rgba(248,244,237,.32);transition:border-color .2s}
+.vd-f:focus-within{border-color:var(--gold-on)}
+.vd-f label{display:block;font-size:13px;font-weight:600;color:var(--gold);margin-bottom:4px}
+.vd-f input{width:100%;background:transparent;border:0;outline:0;color:var(--cream);font:400 18px/28px "Assistant",Arial,sans-serif;padding:0;border-radius:0;box-shadow:none}
+.vd-f input::placeholder{color:rgba(248,244,237,.38)}
+.vd-f input[type=tel],.vd-f input[type=email]{direction:ltr;text-align:right}
+.vd-err{display:block;font-size:13px;font-weight:600;color:var(--danger);margin-top:4px}
+.vd-f.vd-bad{border-color:var(--danger)}
+.vd-sugg{display:block;margin-top:6px;background:none;border:0;padding:0;font:600 13px "Assistant",Arial,sans-serif;color:var(--gold-on);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.vd-row2{display:grid;grid-template-columns:1fr;gap:0}
+
+.vd-opts{margin-top:20px;display:flex;flex-direction:column}
+.vd-opt{display:flex;align-items:center;gap:12px;font-size:17px;padding:9px 0;cursor:pointer;width:max-content;position:relative}
+.vd-opt input{position:absolute;opacity:0;pointer-events:none}
+.vd-r{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(248,244,237,.6);display:grid;place-items:center;flex:none;transition:border-color .2s}
+.vd-r::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--gold-on);transform:scale(0);transition:transform .25s var(--ease)}
+.vd-opt input:checked + .vd-r{border-color:var(--gold-on)}
+.vd-opt input:checked + .vd-r::after{transform:scale(1)}
+.vd-opt input:focus-visible + .vd-r{outline:2px solid var(--gold);outline-offset:3px}
+.vd-opt small{font-size:14px;color:rgba(248,244,237,.6)}
+
+.vd-guest{display:grid;grid-template-rows:0fr;transition:grid-template-rows .45s var(--ease),opacity .35s,margin .45s var(--ease);opacity:0;margin-top:0}
+.vd-guest.open{grid-template-rows:1fr;opacity:1;margin-top:14px}
+.vd-guest > div{overflow:hidden}
+.vd-inner{border-right:1.5px solid rgba(201,162,94,.8);padding:4px 18px 4px 0}
+.vd-gt{font-size:16px;font-weight:800;margin-bottom:2px}
+.vd-note{font-size:13px;line-height:20px;color:rgba(248,244,237,.6);margin-top:12px}
+.vd-honey{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+.vd-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;margin-top:28px;border:0;border-radius:10px;background:var(--cream);color:var(--deep);
+ font:800 18px "Assistant",Arial,sans-serif;cursor:pointer;transition:transform .2s var(--ease),filter .2s}
+.vd-btn:hover{filter:brightness(.96)}
+.vd-btn:active{transform:scale(.985)}
+.vd-btn:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.vd-btn[disabled]{opacity:.7;cursor:progress}
+.vd-spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(0,38,43,.25);border-top-color:var(--deep);animation:vdSp .7s linear infinite}
+@keyframes vdSp{to{transform:rotate(360deg)}}
+.vd-fine{font-size:13px;color:rgba(248,244,237,.55);text-align:center;margin-top:14px}
+.vd-fine-err{color:var(--danger);font-weight:600}
+
+/* confirmation */
+.vd-done{animation:vdRise .7s var(--ease) both;padding-top:56px;outline:none}
+.vd-mark-done{width:120px;margin:56px 0 0 auto}
+.vd-thanks{font-size:46px;font-weight:800;line-height:47px;margin-top:26px}
+.vd-thanks span{background:var(--gold-text);-webkit-background-clip:text;background-clip:text;color:transparent}
+.vd-lead{font-size:17px;line-height:28px;color:rgba(248,244,237,.84);margin-top:16px}
+.vd-tbl{margin-top:36px;border-top:1px solid rgba(201,162,94,.55);border-bottom:1px solid rgba(201,162,94,.55)}
+.vd-tbl div{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0}
+.vd-tbl div+div{border-top:1px solid rgba(248,244,237,.14)}
+.vd-tbl dt{color:var(--gold);font-size:14px;font-weight:600}
+.vd-tbl dd{font-weight:800;font-size:17px;text-align:left}
+
+@media (min-width:1000px){
+ .vd-page{display:grid;grid-template-columns:1fr 1fr;min-height:100vh}
+ .vd-poster{padding:76px 96px 60px 40px;border-left:1px solid rgba(201,162,94,.45);align-self:start;position:sticky;top:0}
+ .vd-eyebrow{text-align:right;font-size:12px}
+ .vd-lock{margin-top:56px;--t:clamp(110px,9.5vw,140px)}
+ .vd-lockin{padding-top:.8em}
+ .vd-lock .vd-mark{left:-1.15em;width:2.2em}
+ .vd-tag{font-size:34px;margin-top:22px}
+ .vd-band{height:62px;margin:40px -96px 0 -40px;justify-content:flex-start;padding-right:72px}
+ .vd-band span{font-size:20px;padding:0 14px}
+ .vd-band .vd-donly{display:inline}
+ .vd-when{display:none}
+ .vd-about{font-size:18px;line-height:30px;margin-top:30px;padding-left:70px}
+ .vd-formcol{padding:150px 120px 80px 110px;max-width:720px;width:100%}
+ .vd-rule{display:none}
+ .vd-h{font-size:30px}
+ .vd-sub{display:block}
+ .vd-root form{margin-top:16px}
+ .vd-row2{grid-template-columns:1fr 1fr;gap:32px}
+ .vd-opts{flex-direction:row;gap:36px}
+ .vd-btn{width:240px}
+ .vd-fine{text-align:right}
+ .vd-done{padding-top:150px}
+ .vd-mark-done{margin-top:0}
+ .vd-bar{display:none}
+ /* confirmation spans the whole page on desktop too: poster is hidden */
+ .vd-page:not(:has(.vd-poster)){grid-template-columns:1fr;max-width:720px}
+}
+@media (prefers-reduced-motion:reduce){
+ .vd-root *,.vd-root *::before,.vd-root *::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}
+ .vd-mark .vd-spark,.vd-mark .vd-ring{display:none}
+}

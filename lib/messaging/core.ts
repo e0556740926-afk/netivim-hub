@@ -2,7 +2,7 @@
 // background worker. Only relative imports here (the worker is bundled
 // on its own and can't resolve "@/..." aliases). The DB client is passed
 // in, so this file never opens a connection by itself.
-import { normalizeRow, type Channel, type NormalizedRow } from "./normalize"
+import { normalizeRow, normalizePhone, normalizeEmail, type Channel, type NormalizedRow } from "./normalize"
 import { renderEmailHtml, personalizeHtml, personalizeText, plainTextFromEmail, renderSms, type EmailContent, EMPTY_EMAIL, EMPTY_SMS, contentProblems } from "./render"
 import { send019, sms019Missing, toLocalIL, errLabel } from "./sms019"
 
@@ -35,8 +35,22 @@ export function channelStatus(env: Env): Record<Channel, ChannelStatus> {
   return {
     email: { channel: "email", provider: "Resend", connected: emailMissing.length === 0, missing: emailMissing, note: "מתאם קיים בקוד. דורש דומיין מאומת ב-Resend וזהות שולח." },
     sms: { channel: "sms", provider: "019", connected: smsMissing.length === 0, missing: smsMissing, note: "נשלח מהמספר הווירטואלי — הנמען יכול להשיב (תפריט תשובות, \"השב הסר\"). תשובות ודוחות מסירה נכנסים דרך Push API של 019." },
-    whatsapp: { channel: "whatsapp", provider: "טרם נבחר", connected: false, missing: ["חשבון WhatsApp Business Platform רשמי (ישיר או דרך ספק)", "תבניות הודעה מאושרות", "מתאם שליחה וסטטוסים"], note: "Green API הקיים משמש להודעות מערכת בלבד ואינו מחובר לקמפיינים." },
+    whatsapp: waStatus(env),
   }
+}
+
+/**
+ * WhatsApp campaigns go out from the bot number (Green API), and only to
+ * audiences imported from an event — people who registered and gave the
+ * number themselves. Bulk sends to cold lists would risk blocking the
+ * number the staff bot runs on.
+ */
+function waStatus(env: Env): ChannelStatus {
+  const missing: string[] = []
+  if (!env.GREENAPI_ID_INSTANCE || !env.GREENAPI_API_TOKEN) missing.push("חיבור Green API של מספר הבוט (GREENAPI_ID_INSTANCE / GREENAPI_API_TOKEN)")
+  if (env.MESSAGING_WA_ENABLED !== "true") missing.push("הפעלה מפורשת של קמפייני WhatsApp לנרשמי אירועים (MESSAGING_WA_ENABLED=true)")
+  return { channel: "whatsapp", provider: "Green API · מספר הבוט", connected: missing.length === 0, missing,
+    note: "נשלח ממספר הבוט, רק לקהלים שיובאו מאירוע (נרשמים שמסרו את המספר בעצמם), בקצב של הודעה בשנייה." }
 }
 
 // ── newsletter → messaging sync ───────────────────────────────────
@@ -82,6 +96,57 @@ export async function syncNewsletter(db: Db) {
       COALESCE(NULLIF(s.consent_source, ''), 'הרשמה לניוזלטר'), 'newsletter_subscriber:' || s.id, 'ניוזלטר'
     FROM newsletter_subscribers s JOIN msg_recipients r ON r.newsletter_subscriber_id = s.id
     WHERE NOT EXISTS (SELECT 1 FROM msg_consents c WHERE c.recipient_id = r.id AND c.channel = 'email' AND c.topic = 'marketing')`
+}
+
+// ── event registrants → linked audience ──────────────────────────
+export const EVENT_FILTERS: Record<string, string> = { approved: "נרשמים מאושרים (כולל מלווים שאושרו)", all: "כל הנרשמים, כולל ממתינים", arrived: "הגיעו בפועל" }
+
+/**
+ * Keeps an audience that was imported from an event in step with the
+ * event's registrants: new registrants join, cancelled / declined ones
+ * leave. Registration is the consent basis for messages about that event;
+ * an existing explicit consent record (e.g. "הסר") always wins. Runs before
+ * every listing, approval and scheduled release, so a campaign scheduled
+ * days ahead still reaches people who registered after it was approved.
+ */
+export async function syncEventAudiences(db: Db, onlyAudienceId?: number) {
+  const [col] = await db`SELECT 1 AS ok FROM information_schema.columns WHERE table_name='msg_audiences' AND column_name='source_event_id' LIMIT 1`
+  if (!col) return
+  const auds = onlyAudienceId
+    ? await db`SELECT a.id, a.source_event_id, a.source_filter, e.name AS event_name FROM msg_audiences a JOIN events e ON e.id = a.source_event_id WHERE a.id = ${onlyAudienceId} AND NOT a.archived`
+    : await db`SELECT a.id, a.source_event_id, a.source_filter, e.name AS event_name FROM msg_audiences a JOIN events e ON e.id = a.source_event_id WHERE a.source_event_id IS NOT NULL AND NOT a.archived`
+  for (const a of auds) {
+    const f = String(a.source_filter || "approved")
+    const people = await db.query(`SELECT id, name, phone, email FROM event_attendees WHERE event_id = $1
+      AND declined_at IS NULL AND ($2 = 'all' OR ($2 = 'approved' AND NOT COALESCE(waitlisted,false)) OR ($2 = 'arrived' AND checked_in))
+      ORDER BY id`, [a.source_event_id, f])
+    const tag = `אירוע:${a.source_event_id}`, source = `נרשם לאירוע: ${a.event_name}`
+    const keep: number[] = []
+    for (const p of people) {
+      const ph = normalizePhone(p.phone), em = normalizeEmail(p.email)
+      const eps = [ph && { kind: "phone", ...ph, raw: p.phone }, em && { kind: "email", ...em, raw: p.email }].filter(Boolean) as { kind: string; norm: string; valid: boolean; raw: string }[]
+      if (!eps.length) continue
+      let rid: number | null = null
+      for (const e of eps) { const [hit] = await db`SELECT recipient_id FROM msg_endpoints WHERE kind = ${e.kind} AND value_norm = ${e.norm} LIMIT 1`; if (hit) { rid = Number(hit.recipient_id); break } }
+      if (!rid) { const [r] = await db`INSERT INTO msg_recipients (full_name, created_by) VALUES (${String(p.name || "").slice(0, 200)}, ${tag}) RETURNING id`; rid = Number(r.id) }
+      for (const e of eps) await db`INSERT INTO msg_endpoints (recipient_id, kind, value_raw, value_norm, is_valid, source) VALUES (${rid}, ${e.kind}, ${String(e.raw || "")}, ${e.norm}, ${e.valid}, ${source}) ON CONFLICT (kind, value_norm) DO NOTHING`
+      await db`INSERT INTO msg_audience_members (audience_id, recipient_id, added_by) VALUES (${a.id}, ${rid}, ${tag}) ON CONFLICT DO NOTHING`
+      for (const ch of ["email", "sms", "whatsapp"]) {
+        await db`INSERT INTO msg_consents (recipient_id, channel, topic, status, source, evidence, created_by)
+          SELECT ${rid}, ${ch}, 'marketing', 'granted', ${source}, ${"event_attendee:" + p.id}, ${tag}
+          WHERE NOT EXISTS (SELECT 1 FROM msg_consents c WHERE c.recipient_id = ${rid} AND c.channel = ${ch} AND c.topic = 'marketing')`
+      }
+      keep.push(rid)
+    }
+    await db`DELETE FROM msg_audience_members WHERE audience_id = ${a.id} AND added_by = ${tag} AND NOT (recipient_id = ANY(${keep}::int[]))`
+  }
+}
+
+/** True when every audience is linked to an event (registrants gave the number themselves). */
+export async function onlyEventAudiences(db: Db, ids: number[]) {
+  if (!ids.length) return false
+  const rows = await db`SELECT count(*)::int AS n FROM msg_audiences WHERE id = ANY(${ids}::int[]) AND source_event_id IS NOT NULL`
+  return Number(rows[0]?.n || 0) === new Set(ids).size
 }
 
 // ── eligibility ───────────────────────────────────────────────────
@@ -319,8 +384,17 @@ export async function runWorker(db: Db, env: Env, opts: { budgetMs?: number; bat
 
   // A campaign is only picked up once its recipient snapshot exists (written
   // right after approval), so a worker pass can never "finish" it empty.
-  log.released = (await db`UPDATE msg_campaigns SET status = 'queued', updated_at = now()
-    WHERE status = 'scheduled' AND scheduled_at <= now() AND snapshot_at IS NOT NULL RETURNING id`).length
+  const released = await db`UPDATE msg_campaigns SET status = 'queued', updated_at = now()
+    WHERE status = 'scheduled' AND scheduled_at <= now() AND snapshot_at IS NOT NULL RETURNING id, channel, audience_ids, exclude_audience_ids`
+  log.released = released.length
+  // A campaign scheduled days ahead on an event audience also reaches people who registered after approval.
+  for (const c of released) {
+    try {
+      const linked = await db`SELECT id FROM msg_audiences WHERE id = ANY(${c.audience_ids || []}::int[]) AND source_event_id IS NOT NULL`
+      for (const a of linked) await syncEventAudiences(db, Number(a.id))
+      if (linked.length) await snapshotCampaign(db, c as any)
+    } catch (e) { console.error("[messaging] event audience refresh", e) }
+  }
   log.unknown += (await db`UPDATE msg_campaign_recipients SET status = 'unknown', last_error = 'הבקשה לספק לא הסתיימה — לא נשלח שוב אוטומטית', updated_at = now()
     WHERE status = 'sending' AND locked_until < now() RETURNING id`).length
 
@@ -337,11 +411,13 @@ export async function runWorker(db: Db, env: Env, opts: { budgetMs?: number; bat
       await db`UPDATE msg_campaigns SET last_error = ${"הערוץ אינו מחובר — המסירה ממתינה"}, updated_at = now() WHERE id = ${c.id}`
       continue
     }
+    // WhatsApp goes out one message at a time from the bot number, so it claims small batches.
+    const take = ch === "whatsapp" ? Math.min(batch, 8) : batch
     while (Date.now() - started < budget) {
       const claimed = await db`UPDATE msg_campaign_recipients SET status = 'sending', locked_until = now() + interval '5 minutes',
           attempts = attempts + 1, updated_at = now()
         WHERE id IN (SELECT id FROM msg_campaign_recipients WHERE campaign_id = ${c.id} AND status = 'queued' AND next_attempt_at <= now()
-                     ORDER BY id LIMIT ${batch} FOR UPDATE SKIP LOCKED)
+                     ORDER BY id LIMIT ${take} FOR UPDATE SKIP LOCKED)
         RETURNING id, recipient_id, address, attempts`
       if (!claimed.length) break
       log.claimed += claimed.length
@@ -368,11 +444,7 @@ export async function runWorker(db: Db, env: Env, opts: { budgetMs?: number; bat
 
       if (ch === "email") await deliverEmailBatch(db, env, c, toSend, log)
       else if (ch === "sms") await deliverSmsBatch(db, env, c, toSend, log)
-      else {
-        // The WhatsApp adapter is deliberately not implemented until an official account is connected.
-        await db`UPDATE msg_campaign_recipients SET status = 'queued', locked_until = NULL, attempts = attempts - 1 WHERE id = ANY(${toSend.map(r => Number(r.id))}::int[])`
-        break
-      }
+      else await deliverWaBatch(db, env, c, toSend, log, started + budget)
     }
     await finishIfDone(db, c, env)
     log.finished++
@@ -486,6 +558,54 @@ async function deliverSmsBatch(db: Db, env: Env, c: any, rows: any[], log: Recor
   } else {
     await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = ${errLabel(res)}, updated_at = now() WHERE id = ANY(${ids}::int[])`
     log.failed += ids.length
+  }
+}
+
+/**
+ * WhatsApp through Green API (the bot number). Sequential, about one message
+ * a second; whatever doesn't fit in this pass goes back to the queue untouched.
+ */
+async function deliverWaBatch(db: Db, env: Env, c: any, rows: any[], log: Record<string, number>, deadline: number) {
+  const content = { ...(c.approved_content || c.content || {}) }
+  const base = `${(env.GREENAPI_API_URL || "https://api.green-api.com").replace(/\/$/, "")}/waInstance${env.GREENAPI_ID_INSTANCE}`
+  const people = await db`SELECT id, full_name FROM msg_recipients WHERE id = ANY(${rows.map(r => Number(r.recipient_id))}::int[])`
+  const byId = new Map(people.map(p => [Number(p.id), p]))
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    if (Date.now() > deadline - 2500) {
+      const rest = rows.slice(i).map(x => Number(x.id))
+      await db`UPDATE msg_campaign_recipients SET status = 'queued', locked_until = NULL, attempts = GREATEST(attempts - 1, 0), updated_at = now() WHERE id = ANY(${rest}::int[])`
+      return
+    }
+    const digits = String(r.address || "").replace(/\D/g, "")
+    if (digits.length < 11) {
+      await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = 'מספר לא תקין ל-WhatsApp', updated_at = now() WHERE id = ${r.id}`
+      log.failed++; continue
+    }
+    const p = byId.get(Number(r.recipient_id)) || {}
+    const text = personalizeText(String(content.text || ""), { first_name: String(p.full_name || "").trim().split(/\s+/)[0] || "", full_name: p.full_name || "" }).trim()
+    let res: Response | null = null, body: any = null
+    try {
+      const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 10000)
+      res = await fetch(`${base}/sendMessage/${env.GREENAPI_API_TOKEN}`, { method: "POST", signal: ctrl.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: `${digits}@c.us`, message: text }) })
+      clearTimeout(timer)
+      try { body = await res.json() } catch {}
+    } catch (e: any) {
+      await db`UPDATE msg_campaign_recipients SET status = 'unknown', locked_until = NULL, last_error = ${"אין תשובה מ-Green API: " + String(e?.name || e).slice(0, 100)}, updated_at = now() WHERE id = ${r.id}`
+      log.unknown++; continue
+    }
+    if (res.ok && body?.idMessage) {
+      await db`UPDATE msg_campaign_recipients SET status = 'accepted', provider_id = ${String(body.idMessage)}, sent_at = now(), locked_until = NULL, last_error = '', updated_at = now() WHERE id = ${r.id}`
+      log.accepted++
+    } else if (RETRYABLE.has(res.status)) {
+      const [x] = await db`UPDATE msg_campaign_recipients SET status = CASE WHEN attempts >= 3 THEN 'failed' ELSE 'queued' END,
+          next_attempt_at = now() + (interval '2 minutes' * attempts), locked_until = NULL, last_error = ${"Green API החזיר " + res.status}, updated_at = now() WHERE id = ${r.id} RETURNING status`
+      if (x?.status === "queued") log.retried++; else log.failed++
+    } else {
+      await db`UPDATE msg_campaign_recipients SET status = 'failed', locked_until = NULL, last_error = ${"Green API דחה את ההודעה (" + res.status + ")"}, updated_at = now() WHERE id = ${r.id}`
+      log.failed++
+    }
+    if (i < rows.length - 1) await new Promise(ok => setTimeout(ok, 1000))
   }
 }
 

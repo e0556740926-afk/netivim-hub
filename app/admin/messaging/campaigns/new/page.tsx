@@ -17,15 +17,15 @@ function NewCampaign() {
   const { error: toastError } = useToast()
   const [conn, setConn] = useState<any>(null)
   const [err, setErr] = useState<any>(null)
-  const [channel, setChannel] = useState("email")
-  const [name, setName] = useState("")
+  const [channel, setChannel] = useState(params.get("audience") ? "whatsapp" : "email")
+  const [name, setName] = useState(params.get("name") || "")
   const [goal, setGoal] = useState("")
   const [busy, setBusy] = useState(false)
   useEffect(() => { api("/api/messaging/connections").then(d => setConn(d.connections)).catch(setErr) }, [])
   async function create() {
     setBusy(true)
     try {
-      const d = await api("/api/messaging/campaigns", "POST", { channel, name, goal, duplicate_of: params.get("duplicate") ? Number(params.get("duplicate")) : undefined })
+      const d = await api("/api/messaging/campaigns", "POST", { channel, name, goal, duplicate_of: params.get("duplicate") ? Number(params.get("duplicate")) : undefined, audience_ids: params.get("audience") ? [Number(params.get("audience"))] : undefined })
       router.replace(`/admin/messaging/campaigns/${d.id}`)
     } catch (e: any) { toastError(e.message); setBusy(false) }
   }

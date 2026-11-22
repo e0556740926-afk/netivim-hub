@@ -1,20 +1,27 @@
 import {NextRequest,NextResponse} from 'next/server'
 import sql from '@/lib/db'
 import {defaultRegistration,parseRegistrationForm,RegistrationError} from '@/lib/event-registration'
+import {hasColumn} from '@/lib/schema'
+import {pageDesign,VEIDA_FIELDS} from '@/lib/veida'
 import {registrationAccess,registrationBody,registrationFailure,registrationReady} from '@/lib/event-registration-server'
 export async function GET(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{
   const {id}=await ctx.params,event=await registrationAccess(req,Number(id))
   if(!await registrationReady())return NextResponse.json({form:defaultRegistration(event.name),event,available:false},{headers:{'Cache-Control':'no-store'}})
   const [form]=await sql`SELECT title,description,logo,fields,enabled,version FROM event_registration_forms WHERE event_id=${Number(id)}`
-  return NextResponse.json({form:form||defaultRegistration(event.name),event,available:true},{headers:{'Cache-Control':'no-store'}})
+  const designed=await hasColumn('events','page_design')
+  const [ev]=designed?await sql`SELECT page_design FROM events WHERE id=${Number(id)}`:[{}]
+  return NextResponse.json({form:form||defaultRegistration(event.name),event,available:true,design:pageDesign(ev?.page_design),designAvailable:designed},{headers:{'Cache-Control':'no-store'}})
  }catch(e){return registrationFailure(e)}
 }
 export async function PUT(req:NextRequest,ctx:{params:Promise<{id:string}>}){
  try{
   const {id}=await ctx.params,event=await registrationAccess(req,Number(id),true)
   if(!await registrationReady())throw new RegistrationError('יש להחיל את מיגרציית טפסי האירועים לפני שמירה',503)
-  const f=parseRegistrationForm(await registrationBody(req))
+  const body=await registrationBody(req),design=pageDesign(body.design)
+  // The conference design has a fixed form: its fields are set here, not by the editor.
+  if(design==='veida')body.fields=VEIDA_FIELDS.map(f=>({...f}))
+  const f=parseRegistrationForm(body)
   if(f.enabled&&!event.slug)throw new RegistrationError('לאירוע חסר קישור אישי. יש לשמור קישור לאירוע לפני פתיחת הרשמה')
   if(f.enabled&&['done','cancelled'].includes(event.status))throw new RegistrationError('לא ניתן לפתוח הרשמה לאירוע שהסתיים או בוטל')
   const [saved]=await sql`WITH updated AS (
@@ -26,6 +33,7 @@ export async function PUT(req:NextRequest,ctx:{params:Promise<{id:string}>}){
    ON CONFLICT(event_id) DO NOTHING RETURNING title,description,logo,fields,enabled,version
   ) SELECT * FROM updated UNION ALL SELECT * FROM inserted`
   if(!saved)throw new RegistrationError('הטופס עודכן בחלון אחר. רעננו לפני שמירה נוספת.',409)
-  return NextResponse.json({form:saved})
+  if(await hasColumn('events','page_design'))await sql`UPDATE events SET page_design=${design} WHERE id=${Number(id)}`
+  return NextResponse.json({form:saved,design})
  }catch(e){return registrationFailure(e)}
 }

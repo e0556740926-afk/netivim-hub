@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
   if (!["email", "sms", "whatsapp"].includes(channel)) return bad("יש לבחור ערוץ")
   const name = String(d.name || "").trim().slice(0, 160) || (channel === "email" ? "ניוזלטר חדש" : channel === "sms" ? "SMS חדש" : "WhatsApp חדש")
   let content: any = channel === "email" ? { ...EMPTY_EMAIL } : channel === "sms" ? { ...EMPTY_SMS } : { ...EMPTY_WHATSAPP }
-  let audienceIds: number[] = []
+  // Opened from an event ("שליחת הודעות על האירוע"): the event audience comes preselected.
+  let audienceIds: number[] = Array.isArray(d.audience_ids) ? d.audience_ids.map(Number).filter((x: number) => Number.isInteger(x) && x > 0).slice(0, 20) : []
   let goal = String(d.goal || "").slice(0, 300)
   if (d.duplicate_of) {
     const [src] = await db`SELECT * FROM msg_campaigns WHERE id = ${Number(d.duplicate_of)}`

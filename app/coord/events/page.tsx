@@ -13,6 +13,8 @@ import EventResultsModal from "@/components/events/EventResultsModal"
 import EventManageModal from "@/components/events/EventManageModal"
 import EventInsightsModal from "@/components/events/EventInsightsModal"
 import EventCard from "@/components/events/EventCard"
+import InvitesPanel from "@/components/events/InvitesPanel"
+import Modal from "@/components/ui/Modal"
 import { ST, EMPTY_FORM, EMPTY_RESULTS, formFromEvent, duplicateForm, resultsFromEvent, formToBody } from "@/components/events/shared"
 
 /**
@@ -42,6 +44,8 @@ export default function CoordEvents() {
   const [manageId, setManageId] = useState<number|null>(null)
   const [manageTab,setManageTab]=useState<"attendees"|"registration">("attendees")
 
+  const [inviteEvents, setInviteEvents] = useState<any[]>([])
+  const [inviteFor, setInviteFor] = useState<any|null>(null)
   const [showInsights, setShowInsights] = useState(false)
   const [insights, setInsights] = useState<any>(null)
 
@@ -64,6 +68,9 @@ export default function CoordEvents() {
       const { contacts } = await ct.json().catch(()=>({contacts:[]}))
       // Only my own events — the API enforces this on writes; this is the read-side filter.
       setEvents((events||[]).filter((e:any)=>cid && e.coordinator_id===cid))
+      // Org events with the conference design: every coordinator invites their own partners.
+      const today=new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Jerusalem"})
+      setInviteEvents((events||[]).filter((e:any)=>e.page_design==="veida"&&!["done","cancelled"].includes(e.status)&&(!e.date||String(e.date).slice(0,10)>=today)))
       setContacts(contacts||[])
       const m: Record<number,number> = {}
       ;(expenses||[]).forEach((e:any)=>{ if(e.event_id) m[e.event_id]=(m[e.event_id]||0)+(+e.amount||0) })
@@ -154,6 +161,12 @@ export default function CoordEvents() {
     <EventFormModal open={showNew || editId !== null} onClose={()=>{if(!saving){setEditId(null);setShowNew(false)}}}
       editEvent={editEvent} form={form} setForm={setForm} contacts={contacts} saving={saving} onSave={saveEdit} mode="coord"/>
     <EventResultsModal event={resultsEvent} results={results} setResults={setResults} saving={saving} onSave={saveResults} onClose={()=>{if(!saving)setResultsId(null)}}/>
+
+    <Modal open={!!inviteFor} onClose={()=>setInviteFor(null)} title={`ההזמנות שלי · ${inviteFor?.name||""}`} width="640px">{inviteFor&&<InvitesPanel eventId={inviteFor.id}/>}</Modal>
+    {inviteEvents.map(e=><div key={e.id} className="flex items-center justify-between gap-3 mt-3 px-4 py-3 rounded-[12px] bg-[#00262B] text-[#F8F4ED]">
+      <div className="min-w-0"><div className="text-xs text-[#C9A25E] font-semibold">הזמנות אישיות</div><div className="font-bold truncate">{e.name}</div><div className="text-xs opacity-75">שלחו לשותפים שלכם את הקישור האישי בוואטסאפ</div></div>
+      <button className="px-3 py-2 rounded-[9px] bg-[#F8F4ED] text-[#00262B] text-xs font-bold whitespace-nowrap" onClick={()=>setInviteFor(e)}>ההזמנות שלי</button>
+    </div>)}
 
     {/* Filter */}
     <div className="flex gap-2 mt-3 mb-3 overflow-x-auto pb-1">

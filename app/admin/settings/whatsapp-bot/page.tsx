@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import StaffBroadcast from "@/components/admin/StaffBroadcast"
 import WaScheduled from "@/components/admin/WaScheduled"
 import WaGroupExport from "@/components/admin/WaGroupExport"
+import TracksBotKnowledge from "@/components/admin/TracksBotKnowledge"
 
 /** Bot settings screen: connection, toggles, who can use the bot, weekly numbers and the conversation log. */
 
@@ -153,6 +154,8 @@ export default function WhatsAppBotSettings() {
       </div>
 
       <StaffBroadcast staff={staff} onSent={() => load()} />
+
+      <TracksBotKnowledge />
 
       <WaScheduled />
 

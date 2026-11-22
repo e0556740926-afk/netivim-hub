@@ -161,7 +161,7 @@ function Editor({ data, reload }: { data: any; reload: () => Promise<void> }) {
 
       {step === 3 && channel === "email" && <EmailEditor content={content as EmailContent} setC={setC} sample={sample} events={events} />}
       {step === 3 && channel === "sms" && <SmsEditor content={content as SmsContent} setC={setC} sample={sample} />}
-      {step === 3 && channel === "whatsapp" && <WaEditor content={content as WhatsappContent} setC={setC} sample={sample} />}
+      {step === 3 && channel === "whatsapp" && <WaEditor content={content as WhatsappContent} setC={setC} sample={sample} provider={conn?.provider} />}
       {step === 3 && <div className="mc-stepfoot"><button type="button" className="lw-btn" onClick={() => go(2)}>חזרה</button><button type="button" className="lw-btn lw-btn-primary" onClick={() => go(4)}>לבדיקה</button></div>}
 
       {step === 4 && <div className="mc-split">
@@ -344,7 +344,8 @@ function SmsEditor({ content: c, setC, sample }: { content: SmsContent; setC: (p
   </div>
 }
 
-function WaEditor({ content: c, setC, sample }: { content: WhatsappContent; setC: (p: any) => void; sample: any }) {
+function WaEditor({ content: c, setC, sample, provider }: { content: WhatsappContent; setC: (p: any) => void; sample: any; provider?: string }) {
+  if (/green/i.test(provider || "")) return <WaTextEditor content={c} setC={setC} sample={sample} />
   const vars = c.variables || []
   const body = String(c.body_preview || "").replace(/\{\{(\d+)\}\}/g, (_, i) => personalizeText(vars[Number(i) - 1] ?? `{{${i}}}`, sample) || "—")
   return <div className="mc-split">
@@ -360,6 +361,21 @@ function WaEditor({ content: c, setC, sample }: { content: WhatsappContent; setC
       <div className="mc-preview-bar"><span>תצוגה לנמען</span><span>{c.template_name ? <span className="mc-ltr">{c.template_name}</span> : "לא נבחרה תבנית"}</span></div>
       <div className="mc-phone"><div className="mc-bubble wa">{body || "…"}</div></div>
       <p className="mc-sub">״נקרא״ יוצג רק אם הספק ידווח עליו.</p>
+    </div>
+  </div>
+}
+
+/** Free-text WhatsApp from the bot number — only for audiences imported from an event. */
+function WaTextEditor({ content: c, setC, sample }: { content: WhatsappContent; setC: (p: any) => void; sample: any }) {
+  const text = String(c.text || "")
+  return <div className="mc-split">
+    <div className="mc-card"><div className="mc-form">
+      <div className="full mc-note" style={{ margin: 0 }}>נשלח ממספר הבוט, רק לנרשמים לאירוע. הנמען יכול להשיב לבוט ולשאול שאלות, ותשובה &quot;הסר&quot; מסירה אותו מהודעות.</div>
+      <label className="mc-field full">טקסט ההודעה *<textarea value={text} onChange={e => setC({ text: e.target.value })} rows={9} placeholder={"שלום {{first_name}},\nמחר בשעה 19:00 נפגשים בוועידת נתיבים…"} /><small>משתנים: <span className="mc-ltr">{"{{first_name}}"}</span> (שם פרטי), <span className="mc-ltr">{"{{full_name}}"}</span>. {text.length}/3000 תווים.</small></label>
+    </div></div>
+    <div className="mc-preview">
+      <div className="mc-preview-bar"><span>תצוגה לנמען</span><span>WhatsApp · מספר הבוט</span></div>
+      <div className="mc-phone"><div className="mc-bubble wa" style={{ whiteSpace: "pre-wrap" }}>{personalizeText(text, sample) || "…"}</div></div>
     </div>
   </div>
 }

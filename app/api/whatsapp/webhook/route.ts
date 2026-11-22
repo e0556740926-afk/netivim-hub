@@ -9,6 +9,7 @@ import { sendBotReply } from "@/lib/whatsapp-bot/send";
 import { getBotSettings, supportPhone } from "@/lib/whatsapp-bot/settings";
 import { renderAsText } from "@/lib/whatsapp-bot/render";
 import { extractInput } from "@/lib/whatsapp-bot/extract";
+import { EVENT_BOT_SENDER, findEventGuest, handleEventMessage } from "@/lib/whatsapp-bot/event-bot";
 
 /**
  * Green API calls this URL (set in the instance settings, outside this
@@ -130,6 +131,27 @@ export async function POST(req: NextRequest) {
         }
       }
       return ok();
+    }
+
+    // Not staff: someone registered / personally invited to an upcoming event
+    // gets the event bot (event details, their registration, tracks questions).
+    if (input?.text && process.env.WHATSAPP_BOT_ENABLED === "true") {
+      const guest = await findEventGuest(phoneKey);
+      if (guest) {
+        await logMessage(phoneKey, "in", input.text, waMessageId || null, guest.name || body?.senderData?.senderName || "משתתף", "bot", "text", { eventId: guest.eventId });
+        const settings = await getBotSettings();
+        if (!settings.enabled) return ok();
+        const [rate] = await sql`SELECT count(*)::int AS n FROM whatsapp_messages WHERE phone = ${phoneKey} AND direction = 'in' AND created_at > now() - interval '1 minute'`;
+        if (Number(rate?.n) > 10) return ok();
+        let replies;
+        try { replies = await handleEventMessage(guest, phoneKey, input.text, () => supportPhone(settings)); }
+        catch (e) { console.error("[wa-bot] event handler failed", e); replies = [{ text: "משהו השתבש אצלי 😕 נסו שוב בעוד רגע." }]; }
+        for (const r of replies) {
+          const sent = await sendWhatsApp(phoneKey, renderAsText(r));
+          await logMessage(phoneKey, "out", r.text, (sent as any).id || null, EVENT_BOT_SENDER, sent.ok ? "sent" : "failed", (r as any).ai ? "ai" : "text");
+        }
+        return ok();
+      }
     }
 
     // Not staff: keep the existing behaviour for leads only.
