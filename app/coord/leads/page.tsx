@@ -8,6 +8,7 @@ import { useQuickAction } from "@/lib/quick-action"
 import Sheet from "@/components/shell/Sheet"
 import { Icon } from "@/components/shell/icons"
 import "@/components/shell/screens.css"
+import "@/components/leads/leads.css"
 import { SkeletonCard } from "@/components/ui/Skeleton"
 import SfStatusBadge from "@/components/ui/SfStatusBadge"
 
@@ -44,6 +45,7 @@ export default function CoordLeads() {
   const [dupWarning, setDupWarning] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [openId, setOpenId] = useState<number|null>(null)
   const [q, setQ] = useUrlState("q")
   const [view, setView] = useUrlState("view", "month")
   const m = new Date().getMonth()+1
@@ -138,6 +140,8 @@ export default function CoordLeads() {
   ]
   const viewFn = (VIEWS.find(v=>v[0]===view)||VIEWS[0])[2]
   const shown = leads.filter(l=>viewFn(l) && (!needle || [l.name,l.phone,l.city,l.id_number].join(" ").toLowerCase().includes(needle)))
+  const openLead = openId!=null ? leads.find(l=>l.id===openId) : null
+  const none = <span className="lw-none">—</span>
   const field = (label:string, node:React.ReactNode, hint?:string) => <label className="ws-field">{label}{node}{hint&&<small>{hint}</small>}</label>
 
   if (error) return <div className="ws"><ErrorState retry={load}/></div>
@@ -184,7 +188,9 @@ export default function CoordLeads() {
             return (
               <div key={l.id} className="ws-item" style={{alignItems:"flex-start"}}>
                 <span className="ws-avatar">{(l.name||"").split(" ").map((w:string)=>w[0]).join("").slice(0,2)}</span>
-                <div className="ws-main">
+                <div className="ws-main" role="button" tabIndex={0} style={{cursor:"pointer"}} aria-label={`פרטי הליד ${l.name}`}
+                  onClick={e=>{ if((e.target as HTMLElement).closest("a")) return; setOpenId(l.id) }}
+                  onKeyDown={e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setOpenId(l.id) } }}>
                   <strong>{l.name}</strong>
                   <small>
                     {l.phone && <a href={`tel:${l.phone}`} style={{color:"inherit"}}>{l.phone}</a>}
@@ -213,6 +219,41 @@ export default function CoordLeads() {
           )}
         </div>
       </>}
+
+      {/* Lead details — read-only, incl. the Salesforce process status */}
+      <Sheet open={!!openLead} onClose={()=>setOpenId(null)} title={openLead?.name || "פרטי ליד"} labelledBy="coord-lead-detail"
+        subtitle={openLead?.created_at ? `נוצר ${new Date(openLead.created_at).toLocaleDateString("he-IL")}` : undefined}
+        footer={openLead ? <>
+          {openLead.phone && <a className="ws-btn" href={`tel:${openLead.phone}`}>חיוג</a>}
+          {openLead.phone && <a className="ws-btn" href={`https://wa.me/972${String(openLead.phone).replace(/^0/,"").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer">וואטסאפ</a>}
+          <button type="button" className="ws-btn" onClick={()=>setOpenId(null)}>סגירה</button>
+        </> : undefined}>
+        {openLead && <>
+          <section className="ld-sec" aria-label="סטטוס">
+            <h3>סטטוס</h3>
+            <div className="ld-row"><span>אצלי</span><b>{STATUS_LABEL[openLead.status]||openLead.status}</b></div>
+            <div className="ld-row"><span>סילפרוס</span><b>{openLead.sf_status || openLead.sf_sync_state ? <SfStatusBadge lead={openLead} detailed/> : <span className="lw-none">עדיין לא התקבל</span>}</b></div>
+          </section>
+          <section className="ld-sec" aria-label="פרטי קשר">
+            <h3>פרטי קשר</h3>
+            <div className="ld-row"><span>טלפון</span><b className="lw-ltr">{openLead.phone ? <a href={`tel:${openLead.phone}`} style={{color:"inherit"}}>{openLead.phone}</a> : none}</b></div>
+            <div className="ld-row"><span>דוא״ל</span><b className="lw-ltr">{openLead.email || none}</b></div>
+            <div className="ld-row"><span>עיר</span><b>{openLead.city || none}</b></div>
+            <div className="ld-row"><span>גיל</span><b>{openLead.age || none}</b></div>
+            <div className="ld-row"><span>ת״ז</span><b className="lw-ltr">{openLead.id_number || none}</b></div>
+          </section>
+          <section className="ld-sec" aria-label="מקור">
+            <h3>מקור</h3>
+            <div className="ld-row"><span>מקור פנייה</span><b>{openLead.lead_source_label || none}</b></div>
+            <div className="ld-row"><span>ערוץ הגעה</span><b>{openLead.arrival_channel_label || none}</b></div>
+            <div className="ld-row"><span>אירוע</span><b>{openLead.event_name || none}</b></div>
+          </section>
+          <section className="ld-sec" aria-label="הערות">
+            <h3>הערות</h3>
+            {openLead.notes ? <p className="ld-notes">{openLead.notes}</p> : <p className="ld-notes lw-none">אין הערות</p>}
+          </section>
+        </>}
+      </Sheet>
 
       {/* Lead form — same fields, validation and duplicate check as before; input is kept on error */}
       <Sheet open={showForm} onClose={()=>{setShowForm(false);setErr("");setDupWarning(null)}} title="ליד חדש" subtitle="הליד ישויך אליך ויישלח לסנכרון כרגיל" labelledBy="lead-form-title"
