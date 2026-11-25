@@ -30,13 +30,9 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const d = await req.json();
-  // A coordinator can only create events under their own name — the
-  // client-supplied coordinator_id is ignored for them, not trusted.
+  // A coordinator who doesn't pick a coordinator gets the event under their own name.
   const scope = await eventScope(req);
-  if (scope.isCoordinator) {
-    if (!scope.ownCoordId) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-    d.coordinator_id = scope.ownCoordId;
-  }
+  if (scope.isCoordinator && !d.coordinator_id) d.coordinator_id = scope.ownCoordId;
   const rows = await sql`
     INSERT INTO events (name, date, time, location, status, budget_planned, target_attendees, capacity, partner_contact_id, approved, coordinator_id)
     VALUES (${d.name}, ${d.date||null}, ${d.time||''}, ${d.location||''}, 'pending_approval', ${d.budget_planned||0}, ${d.target_attendees||0}, ${d.capacity||null}, ${d.partner_contact_id||null}, false, ${d.coordinator_id||null})

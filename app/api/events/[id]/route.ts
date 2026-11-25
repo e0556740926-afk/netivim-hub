@@ -44,19 +44,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const d = await req.json();
   const eid = parseInt(id);
   const me = await currentUser(req);
-  const { ok, scope } = await canTouchEvent(req, eid);
+  // Coordinators have the manager's full event permissions, approval included.
+  const { ok } = await canTouchEvent(req, eid);
   if (!ok) return NextResponse.json({ error: "אין הרשאה" }, { status: 403 });
-  if (scope.isCoordinator) {
-    // Approval is a manager decision: a coordinator may edit their own
-    // event freely but can neither approve it nor flip the approved flag,
-    // and can't move it into an approved-only status themselves.
-    if (d.approve) return NextResponse.json({ error: "אישור אירוע שמור למנהל" }, { status: 403 });
-    if (!d.results) {
-      const [cur] = await sql`SELECT approved, status FROM events WHERE id=${eid} LIMIT 1`;
-      d.approved = !!cur?.approved;
-      if (!cur?.approved && (d.status === "approved" || d.status === "marketing")) d.status = "pending_approval";
-    }
-  }
 
   if (d.approve) {
     await sql`UPDATE events SET approved=true, status='marketing' WHERE id=${eid}`;

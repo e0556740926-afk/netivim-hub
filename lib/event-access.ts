@@ -4,10 +4,10 @@ import { currentUser } from "@/lib/auth-server";
 import type { SessionUser } from "@/lib/session";
 
 /**
- * Row-level scoping for events, mirroring the leads pattern: a
- * coordinator may only touch events whose coordinator_id is their own
- * coordinators row. Everyone else (admin and the other staff roles,
- * which middleware already gates at module level) passes through.
+ * Event access. Since Nov 2026 coordinators have the same event
+ * permissions as managers (see, edit, approve, registration form,
+ * attendees, delete) on every event — not only their own. Module-level
+ * gating (read-only roles can't write) stays in middleware.
  *
  * Returns the caller plus their own coordinator id (null for non-
  * coordinators) so routes can also force coordinator_id on inserts.
@@ -19,11 +19,8 @@ export async function eventScope(req: NextRequest): Promise<{ me: SessionUser | 
   return { me, ownCoordId: own?.id ?? null, isCoordinator: true };
 }
 
-/** True when the caller may act on this event (admin, or the owning coordinator). */
-export async function canTouchEvent(req: NextRequest, eventId: number): Promise<{ ok: boolean; scope: Awaited<ReturnType<typeof eventScope>> }> {
+/** True when the caller may act on this event — managers and coordinators alike, on any event. */
+export async function canTouchEvent(req: NextRequest, _eventId: number): Promise<{ ok: boolean; scope: Awaited<ReturnType<typeof eventScope>> }> {
   const scope = await eventScope(req);
-  if (!scope.isCoordinator) return { ok: true, scope };
-  if (!scope.ownCoordId) return { ok: false, scope };
-  const [ev] = await sql`SELECT coordinator_id FROM events WHERE id=${eventId} LIMIT 1`;
-  return { ok: !!ev && ev.coordinator_id === scope.ownCoordId, scope };
+  return { ok: true, scope };
 }

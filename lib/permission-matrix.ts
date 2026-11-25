@@ -28,7 +28,7 @@ export interface UserCtx { id: number; role: string; team?: string | null }
 const MATRIX: Record<ModuleName, Partial<Record<Role, "M" | "E" | "R" | "O" | "T" | "A" | "NONE">>> = {
   leads: { admin: "M", ceo: "R", recruitment_manager: "M", advisor: "O", field_manager: "R", coordinator: "O", secretary: "E", viewer: "R" },
   contacts: { admin: "M", ceo: "R", rav: "R", recruitment_manager: "M", advisor: "E", field_manager: "M", coordinator: "E", secretary: "E", viewer: "R" },
-  events: { admin: "M", ceo: "R", recruitment_manager: "R", field_manager: "M", coordinator: "E", secretary: "R", viewer: "R" },
+  events: { admin: "M", ceo: "R", recruitment_manager: "R", field_manager: "M", coordinator: "M", secretary: "R", viewer: "R" },
   tasks: { admin: "M", ceo: "R", rav: "O", recruitment_manager: "T", advisor: "O", field_manager: "T", coordinator: "O", secretary: "O", viewer: "R" },
   newsletters: { admin: "M", ceo: "M", recruitment_manager: "E", field_manager: "M", coordinator: "R", secretary: "E" },
   budget_main: { admin: "M", ceo: "M", recruitment_manager: "R", field_manager: "E", secretary: "E", viewer: "A" },
